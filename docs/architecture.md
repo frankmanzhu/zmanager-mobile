@@ -12,6 +12,8 @@ Shared:  Rust + UniFFI bridge over zmanager-core
 
 The mobile apps should share archive behavior, not UI code.
 
+The companion product design and market strategy lives in [mobile-product-design.md](mobile-product-design.md). Implementation-facing launch requirements live in [mobile-launch-spec.md](mobile-launch-spec.md).
+
 ## Boundaries
 
 ### Native Shells Own
@@ -41,6 +43,7 @@ The bridge should stay small and DTO-oriented:
 
 ```text
 healthcheck
+detect_archive
 list_archive
 test_archive
 plan_extract
@@ -49,6 +52,7 @@ plan_create
 start_create
 poll_job_events
 cancel_job
+clear_sensitive_state
 ```
 
 Do not pass passwords through logs, persistent storage, command-line arguments, analytics, or crash diagnostics.
@@ -86,4 +90,3 @@ rust/
     src/
     uniffi/
 ```
-

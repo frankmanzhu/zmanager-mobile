@@ -23,16 +23,21 @@ Android Compose / iOS SwiftUI
   -> zmanager-core
 ```
 
+See [docs/mobile-product-design.md](docs/mobile-product-design.md) for the expanded product design, market context, mobile workflows, and roadmap. See [docs/mobile-launch-spec.md](docs/mobile-launch-spec.md) for implementation-facing launch requirements.
+
 ## Initial Targets
 
 - Android: min SDK 26
 - iOS: deployment target 15.0
 
-## First Milestone
+## Launch Direction
 
-Wire `zmanager-mobile-core` to `zmanager-core` and expose:
+ZManager Mobile targets a polished v2-level archive workbench from the first serious release, aligned with the `zm` CLI polish goal: public claims, docs, GUI states, bridge behavior, and platform file handling should agree before a feature is advertised.
+
+The first engineering slice is to wire `zmanager-mobile-core` to `zmanager-core` and expose:
 
 - `healthcheck`
+- `detect_archive`
 - `list_archive`
 - `test_archive`
 - `plan_extract`
@@ -41,4 +46,4 @@ Wire `zmanager-mobile-core` to `zmanager-core` and expose:
 - `start_create`
 - `poll_job_events`
 - `cancel_job`
-
+- `clear_sensitive_state`
