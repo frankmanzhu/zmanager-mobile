@@ -1,0 +1,12 @@
+.DS_Store
+.gradle/
+.idea/
+.swiftpm/
+DerivedData/
+build/
+target/
+local.properties
+*.iml
+*.xcuserstate
+xcuserdata/
+

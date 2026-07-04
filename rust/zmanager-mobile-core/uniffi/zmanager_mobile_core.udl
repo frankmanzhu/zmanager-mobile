@@ -1,0 +1,46 @@
+namespace zmanager {
+    HealthcheckResult healthcheck();
+    ListArchiveResult listArchive(ListArchiveRequest request);
+};
+
+enum BridgeSeverity {
+    "Info",
+    "Warning",
+    "Error"
+};
+
+dictionary BridgeError {
+    string code;
+    string message;
+    string? recovery_hint;
+    BridgeSeverity severity;
+    boolean retryable;
+};
+
+dictionary HealthcheckResult {
+    string status;
+    string engine;
+};
+
+dictionary ArchiveEntry {
+    string path;
+    boolean is_dir;
+    u64? size;
+    string? modified_at;
+};
+
+dictionary ListArchiveRequest {
+    string archive_path;
+    string? password;
+};
+
+dictionary ListArchiveResult {
+    sequence<ArchiveEntry> entries;
+};
+
+[Error]
+enum ZmanagerMobileError {
+    "InvalidRequest",
+    "EngineUnavailable",
+    "ArchiveError"
+};

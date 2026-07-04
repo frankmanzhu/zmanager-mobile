@@ -1,0 +1,349 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000101 /* ZManagerMobileApp.swift */; };
+		01A000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000102 /* ContentView.swift */; };
+		01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000103 /* ZManagerMobileTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		01A000000000000000000201 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 01A000000000000000000301 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 01A000000000000000000401;
+			remoteInfo = ZManagerMobile;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		01A000000000000000000101 /* ZManagerMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileApp.swift; sourceTree = "<group>"; };
+		01A000000000000000000102 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		01A000000000000000000103 /* ZManagerMobileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileTests.swift; sourceTree = "<group>"; };
+		01A000000000000000000104 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01A000000000000000000105 /* ZManagerMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZManagerMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		01A000000000000000000106 /* ZManagerMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		01A000000000000000000501 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01A000000000000000000502 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		01A000000000000000000601 = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000602 /* ZManagerMobile */,
+				01A000000000000000000603 /* ZManagerMobileTests */,
+				01A000000000000000000604 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		01A000000000000000000602 /* ZManagerMobile */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000101 /* ZManagerMobileApp.swift */,
+				01A000000000000000000102 /* ContentView.swift */,
+				01A000000000000000000104 /* Info.plist */,
+			);
+			path = ZManagerMobile;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000603 /* ZManagerMobileTests */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000103 /* ZManagerMobileTests.swift */,
+			);
+			path = ZManagerMobileTests;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000604 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000105 /* ZManagerMobile.app */,
+				01A000000000000000000106 /* ZManagerMobileTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		01A000000000000000000401 /* ZManagerMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01A000000000000000000701 /* Build configuration list for PBXNativeTarget "ZManagerMobile" */;
+			buildPhases = (
+				01A000000000000000000801 /* Sources */,
+				01A000000000000000000501 /* Frameworks */,
+				01A000000000000000000901 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ZManagerMobile;
+			productName = ZManagerMobile;
+			productReference = 01A000000000000000000105 /* ZManagerMobile.app */;
+			productType = "com.apple.product-type.application";
+		};
+		01A000000000000000000402 /* ZManagerMobileTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01A000000000000000000702 /* Build configuration list for PBXNativeTarget "ZManagerMobileTests" */;
+			buildPhases = (
+				01A000000000000000000802 /* Sources */,
+				01A000000000000000000502 /* Frameworks */,
+				01A000000000000000000902 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				01A000000000000000000202 /* PBXTargetDependency */,
+			);
+			name = ZManagerMobileTests;
+			productName = ZManagerMobileTests;
+			productReference = 01A000000000000000000106 /* ZManagerMobileTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		01A000000000000000000301 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					01A000000000000000000401 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					01A000000000000000000402 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 01A000000000000000000401;
+					};
+				};
+			};
+			buildConfigurationList = 01A000000000000000000700 /* Build configuration list for PBXProject "ZManagerMobile" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 01A000000000000000000601;
+			productRefGroup = 01A000000000000000000604 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				01A000000000000000000401 /* ZManagerMobile */,
+				01A000000000000000000402 /* ZManagerMobileTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		01A000000000000000000901 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01A000000000000000000902 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		01A000000000000000000801 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */,
+				01A000000000000000000002 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		01A000000000000000000802 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		01A000000000000000000202 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 01A000000000000000000401 /* ZManagerMobile */;
+			targetProxy = 01A000000000000000000201 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01A000000000000000000A01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		01A000000000000000000A02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		01A000000000000000000A03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ZManagerMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		01A000000000000000000A04 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ZManagerMobile/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		01A000000000000000000A05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
+			};
+			name = Debug;
+		};
+		01A000000000000000000A06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		01A000000000000000000700 /* Build configuration list for PBXProject "ZManagerMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01A000000000000000000A01 /* Debug */,
+				01A000000000000000000A02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		01A000000000000000000701 /* Build configuration list for PBXNativeTarget "ZManagerMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01A000000000000000000A03 /* Debug */,
+				01A000000000000000000A04 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		01A000000000000000000702 /* Build configuration list for PBXNativeTarget "ZManagerMobileTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01A000000000000000000A05 /* Debug */,
+				01A000000000000000000A06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 01A000000000000000000301 /* Project object */;
+}
+

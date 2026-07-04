@@ -1,0 +1,23 @@
+[package]
+name = "zmanager-mobile-core"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+name = "zmanager_mobile_core"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uniffi = { version = "0.29", features = ["cli"] }
+
+# TODO: Replace with the canonical path or Git dependency once mobile wiring starts.
+# zmanager-core = { git = "https://github.com/tzap-org/zmanager", branch = "main", package = "zmanager-core" }
+
+[build-dependencies]
+uniffi = { version = "0.29", features = ["build"] }
+
