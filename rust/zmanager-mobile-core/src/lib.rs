@@ -9,6 +9,10 @@ use zmanager_core::archive_browser::{
 };
 use zmanager_core::libarchive_backend::{self, LibarchiveError, LibarchiveTestReport};
 use zmanager_core::raw_stream_backend::{self, RawStreamError};
+use zmanager_core::safety::{
+    ExtractionDecision, ExtractionEntry, ExtractionEntryKind, ExtractionPolicy,
+    ExtractionSafetyError, ExtractionSafetyPlanner, OverwritePolicy,
+};
 use zmanager_core::sevenz_backend::SevenZError;
 use zmanager_core::tar_zst_backend::TarZstdError;
 use zmanager_core::tzap_backend::{self, TzapError, TzapTestReport};
@@ -188,6 +192,60 @@ pub struct MaterializePreviewResult {
     pub cleanup_root: String,
     pub preview_path: String,
     pub written_bytes: u64,
+    pub warnings: Vec<BridgeError>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ExtractionCollisionPolicy {
+    Refuse,
+    Replace,
+    Rename,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ExtractionPlanEntryStatus {
+    Write,
+    Skip,
+    Block,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanExtractRequest {
+    pub archive_path: String,
+    pub destination_root: String,
+    pub password: Option<String>,
+    pub selected_paths: Vec<String>,
+    pub strip_components: u64,
+    pub collision_policy: ExtractionCollisionPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractionPlanEntry {
+    pub archive_path: String,
+    pub normalized_path: Option<String>,
+    pub destination_path: Option<String>,
+    pub kind: ArchiveEntryKind,
+    pub status: ExtractionPlanEntryStatus,
+    pub reason: Option<String>,
+    pub size: Option<u64>,
+    pub compressed_size: Option<u64>,
+    pub replace_existing: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanExtractResult {
+    pub plan_id: String,
+    pub archive_path: String,
+    pub destination_root: String,
+    pub format: ArchiveFormat,
+    pub format_label: String,
+    pub entries: Vec<ExtractionPlanEntry>,
+    pub total_entries: u64,
+    pub writable_entries: u64,
+    pub skipped_entries: u64,
+    pub blocked_entries: u64,
+    pub estimated_bytes: Option<u64>,
+    pub can_start: bool,
     pub warnings: Vec<BridgeError>,
 }
 
@@ -387,6 +445,100 @@ pub fn materializePreview(
     materialize_preview(request)
 }
 
+pub fn plan_extract(request: PlanExtractRequest) -> Result<PlanExtractResult, ZmanagerMobileError> {
+    let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
+    let destination_root = ensure_destination_root_path(request.destination_root)?;
+    let strip_components = usize_from_u64(request.strip_components, "stripComponents")?;
+    let password = request
+        .password
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let selected_paths = sanitize_selected_paths(request.selected_paths);
+    let path = Path::new(&archive_path);
+    let (format, _warnings) = classify_archive_path(path);
+    let listing = archive_browser::list_entries_with_options(path, BrowserListOptions { password })
+        .map_err(map_archive_browser_error)?;
+
+    let policy = ExtractionPolicy {
+        overwrite: map_collision_policy(request.collision_policy),
+        strip_components,
+        ..ExtractionPolicy::default()
+    };
+    let mut planner = ExtractionSafetyPlanner::new(PathBuf::from(&destination_root), policy);
+    let mut entries = Vec::new();
+    let mut estimated_bytes = 0u64;
+    let mut has_estimated_bytes = false;
+    let mut warnings = Vec::new();
+
+    for entry in listing.entries {
+        if !selected_path_matches(&selected_paths, &entry.path) {
+            continue;
+        }
+
+        match plan_browser_entry(&mut planner, entry) {
+            PlanEntryOutcome::Entry(plan_entry) => {
+                if matches!(plan_entry.status, ExtractionPlanEntryStatus::Write)
+                    && matches!(plan_entry.kind, ArchiveEntryKind::File)
+                    && let Some(size) = plan_entry.size
+                {
+                    estimated_bytes = estimated_bytes.saturating_add(size);
+                    has_estimated_bytes = true;
+                }
+                entries.push(plan_entry);
+            }
+            PlanEntryOutcome::EntryWithWarning {
+                plan_entry,
+                warning,
+            } => {
+                warnings.push(warning);
+                entries.push(plan_entry);
+            }
+        }
+    }
+
+    let total_entries = usize_to_u64(entries.len());
+    let writable_entries = usize_to_u64(
+        entries
+            .iter()
+            .filter(|entry| matches!(entry.status, ExtractionPlanEntryStatus::Write))
+            .count(),
+    );
+    let skipped_entries = usize_to_u64(
+        entries
+            .iter()
+            .filter(|entry| matches!(entry.status, ExtractionPlanEntryStatus::Skip))
+            .count(),
+    );
+    let blocked_entries = usize_to_u64(
+        entries
+            .iter()
+            .filter(|entry| matches!(entry.status, ExtractionPlanEntryStatus::Block))
+            .count(),
+    );
+
+    Ok(PlanExtractResult {
+        plan_id: new_plan_id("extract"),
+        archive_path,
+        destination_root,
+        format,
+        format_label: format_label(format).to_string(),
+        entries,
+        total_entries,
+        writable_entries,
+        skipped_entries,
+        blocked_entries,
+        estimated_bytes: has_estimated_bytes.then_some(estimated_bytes),
+        can_start: writable_entries > 0,
+        warnings,
+    })
+}
+
+#[allow(non_snake_case)]
+pub fn planExtract(request: PlanExtractRequest) -> Result<PlanExtractResult, ZmanagerMobileError> {
+    plan_extract(request)
+}
+
 struct TestArchiveReport {
     tested_entries: u64,
     skipped_entries: u64,
@@ -437,6 +589,163 @@ impl TestArchiveReport {
 
     fn total_entries(&self) -> u64 {
         self.tested_entries.saturating_add(self.skipped_entries)
+    }
+}
+
+enum PlanEntryOutcome {
+    Entry(ExtractionPlanEntry),
+    EntryWithWarning {
+        plan_entry: ExtractionPlanEntry,
+        warning: BridgeError,
+    },
+}
+
+fn plan_browser_entry(
+    planner: &mut ExtractionSafetyPlanner<'_>,
+    entry: zmanager_core::archive_browser::BrowserEntry,
+) -> PlanEntryOutcome {
+    let kind = map_browser_entry_kind(entry.kind);
+
+    let extraction_kind = match entry.kind {
+        BrowserEntryKind::File => ExtractionEntryKind::File,
+        BrowserEntryKind::Directory => ExtractionEntryKind::Directory,
+        BrowserEntryKind::Symlink | BrowserEntryKind::Hardlink => {
+            let reason =
+                "Link target metadata is required before mobile can safely plan this entry.";
+            let archive_path = entry.path.clone();
+            return PlanEntryOutcome::EntryWithWarning {
+                plan_entry: blocked_plan_entry(entry, kind, reason),
+                warning: bridge_warning(format!(
+                    "Blocked {} until zmanager-core exposes link target metadata for mobile planning.",
+                    archive_path
+                )),
+            };
+        }
+        BrowserEntryKind::Special => {
+            return PlanEntryOutcome::Entry(blocked_plan_entry(
+                entry,
+                kind,
+                "Special files are blocked by the mobile extraction policy.",
+            ));
+        }
+    };
+
+    let safety_entry = ExtractionEntry {
+        archive_path: entry.path.clone(),
+        kind: extraction_kind,
+        uncompressed_size: entry.size,
+        compressed_size: entry.compressed_size,
+    };
+
+    match planner.validate_entry(&safety_entry) {
+        Ok(ExtractionDecision::Write {
+            normalized_archive_path,
+            destination_path,
+            replace_existing,
+            ..
+        }) => PlanEntryOutcome::Entry(ExtractionPlanEntry {
+            archive_path: entry.path,
+            normalized_path: Some(normalized_archive_path),
+            destination_path: Some(destination_path.to_string_lossy().to_string()),
+            kind,
+            status: ExtractionPlanEntryStatus::Write,
+            reason: None,
+            size: entry.size,
+            compressed_size: entry.compressed_size,
+            replace_existing,
+        }),
+        Ok(ExtractionDecision::Skip {
+            normalized_archive_path,
+            reason,
+        }) => PlanEntryOutcome::Entry(ExtractionPlanEntry {
+            archive_path: entry.path,
+            normalized_path: Some(normalized_archive_path),
+            destination_path: None,
+            kind,
+            status: ExtractionPlanEntryStatus::Skip,
+            reason: Some(reason),
+            size: entry.size,
+            compressed_size: entry.compressed_size,
+            replace_existing: false,
+        }),
+        Err(error) => {
+            PlanEntryOutcome::Entry(blocked_plan_entry_from_safety_error(entry, kind, error))
+        }
+    }
+}
+
+fn blocked_plan_entry(
+    entry: zmanager_core::archive_browser::BrowserEntry,
+    kind: ArchiveEntryKind,
+    reason: impl Into<String>,
+) -> ExtractionPlanEntry {
+    ExtractionPlanEntry {
+        archive_path: entry.path,
+        normalized_path: None,
+        destination_path: None,
+        kind,
+        status: ExtractionPlanEntryStatus::Block,
+        reason: Some(reason.into()),
+        size: entry.size,
+        compressed_size: entry.compressed_size,
+        replace_existing: false,
+    }
+}
+
+fn blocked_plan_entry_from_safety_error(
+    entry: zmanager_core::archive_browser::BrowserEntry,
+    kind: ArchiveEntryKind,
+    error: ExtractionSafetyError,
+) -> ExtractionPlanEntry {
+    let destination_path = safety_error_destination_path(&error);
+    ExtractionPlanEntry {
+        archive_path: entry.path,
+        normalized_path: None,
+        destination_path: destination_path.map(|path| path.to_string_lossy().to_string()),
+        kind,
+        status: ExtractionPlanEntryStatus::Block,
+        reason: Some(error.to_string()),
+        size: entry.size,
+        compressed_size: entry.compressed_size,
+        replace_existing: false,
+    }
+}
+
+fn safety_error_destination_path(error: &ExtractionSafetyError) -> Option<PathBuf> {
+    match error {
+        ExtractionSafetyError::DestinationEscape {
+            destination_path, ..
+        }
+        | ExtractionSafetyError::DestinationExists {
+            destination_path, ..
+        }
+        | ExtractionSafetyError::OverwritePromptUnavailable {
+            destination_path, ..
+        }
+        | ExtractionSafetyError::OverwriteAborted {
+            destination_path, ..
+        }
+        | ExtractionSafetyError::DestinationProbe {
+            destination_path, ..
+        } => Some(destination_path.clone()),
+        ExtractionSafetyError::EmptyPath
+        | ExtractionSafetyError::NulByte { .. }
+        | ExtractionSafetyError::AbsolutePath { .. }
+        | ExtractionSafetyError::WindowsPrefix { .. }
+        | ExtractionSafetyError::ParentTraversal { .. }
+        | ExtractionSafetyError::NameCollision { .. }
+        | ExtractionSafetyError::UnsafeFileType { .. }
+        | ExtractionSafetyError::LinkTargetEscapes { .. }
+        | ExtractionSafetyError::ExpandedSizeLimitExceeded { .. }
+        | ExtractionSafetyError::ExpansionRatioLimitExceeded { .. } => None,
+    }
+}
+
+fn map_collision_policy(policy: ExtractionCollisionPolicy) -> OverwritePolicy {
+    match policy {
+        ExtractionCollisionPolicy::Refuse => OverwritePolicy::Refuse,
+        ExtractionCollisionPolicy::Replace => OverwritePolicy::Replace,
+        ExtractionCollisionPolicy::Rename => OverwritePolicy::Rename,
     }
 }
 
@@ -492,6 +801,45 @@ fn ensure_non_empty_entry_path(value: String) -> Result<String, ZmanagerMobileEr
     }
 
     Ok(value)
+}
+
+fn ensure_destination_root_path(value: String) -> Result<String, ZmanagerMobileError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationRoot cannot be empty",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    if value.contains("://") {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationRoot must be an app-controlled filesystem path",
+            hint(
+                "Resolve provider destinations to app-controlled staging before calling the Rust bridge.",
+            ),
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let path = Path::new(&value);
+    match fs::metadata(path) {
+        Ok(metadata) if !metadata.is_dir() => Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationRoot must point to a directory when it already exists",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        )),
+        Ok(_) => Ok(value),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(value),
+        Err(source) => Err(map_io_error(path.to_path_buf(), source)),
+    }
 }
 
 fn usize_from_u64(value: u64, field: &str) -> Result<usize, ZmanagerMobileError> {
@@ -997,6 +1345,14 @@ fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
+fn new_plan_id(prefix: &str) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{prefix}-{}-{now}", std::process::id())
+}
+
 fn is_retryable_io_error(kind: io::ErrorKind) -> bool {
     matches!(
         kind,
@@ -1214,6 +1570,74 @@ mod tests {
         assert_bridge_error_code(error, ERROR_INVALID_REQUEST);
     }
 
+    #[test]
+    fn plan_extract_returns_write_plan_without_creating_destination() {
+        let fixture = create_test_zip("plan-extract-real-zip");
+        let destination = fixture.temp.path("out");
+
+        let result = plan_extract(PlanExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: Vec::new(),
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("planning should succeed without extracting");
+
+        assert!(!destination.exists());
+        assert!(result.can_start);
+        assert!(result.writable_entries >= 1);
+        assert_eq!(result.blocked_entries, 0);
+        assert!(result.estimated_bytes.is_some());
+        assert!(result.entries.iter().any(|entry| {
+            matches!(entry.status, ExtractionPlanEntryStatus::Write)
+                && entry
+                    .destination_path
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).starts_with(&destination))
+        }));
+    }
+
+    #[test]
+    fn plan_extract_surfaces_destination_collision_as_blocked_entry() {
+        let fixture = create_test_zip("plan-extract-collision");
+        let entry_path = readme_entry_path(&fixture.archive);
+        let destination = fixture.temp.path("out");
+        let colliding_path = destination.join(&entry_path);
+        fs::create_dir_all(
+            colliding_path
+                .parent()
+                .expect("colliding path should have a parent"),
+        )
+        .expect("collision parent should be created");
+        fs::write(&colliding_path, b"existing").expect("collision file should be written");
+
+        let result = plan_extract(PlanExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: vec![entry_path.clone()],
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("planning should return a blocked collision row");
+
+        assert_eq!(result.total_entries, 1);
+        assert_eq!(result.writable_entries, 0);
+        assert_eq!(result.blocked_entries, 1);
+        assert!(!result.can_start);
+        let blocked = result.entries.first().expect("blocked entry should exist");
+        assert_eq!(blocked.archive_path, entry_path);
+        assert!(matches!(blocked.status, ExtractionPlanEntryStatus::Block));
+        assert!(
+            blocked
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("would overwrite"))
+        );
+    }
+
     fn assert_bridge_error_code(error: ZmanagerMobileError, expected: &str) {
         match error {
             ZmanagerMobileError::Bridge { code, .. } => assert_eq!(code, expected),
@@ -1240,14 +1664,11 @@ mod tests {
         let archive = temp.path("archive.zip");
         create_zip_from_path(temp.path("project"), &archive, &ZipCreateOptions::default())
             .expect("fixture zip should be created through zmanager-core");
-        TestArchiveFixture {
-            _temp: temp,
-            archive,
-        }
+        TestArchiveFixture { temp, archive }
     }
 
     struct TestArchiveFixture {
-        _temp: TestDir,
+        temp: TestDir,
         archive: PathBuf,
     }
 

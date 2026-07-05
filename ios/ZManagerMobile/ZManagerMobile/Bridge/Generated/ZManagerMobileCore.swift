@@ -863,6 +863,132 @@ public func FfiConverterTypeDetectArchiveResult_lower(_ value: DetectArchiveResu
 }
 
 
+public struct ExtractionPlanEntry {
+    public var archivePath: String
+    public var normalizedPath: String?
+    public var destinationPath: String?
+    public var kind: ArchiveEntryKind
+    public var status: ExtractionPlanEntryStatus
+    public var reason: String?
+    public var size: UInt64?
+    public var compressedSize: UInt64?
+    public var replaceExisting: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, normalizedPath: String?, destinationPath: String?, kind: ArchiveEntryKind, status: ExtractionPlanEntryStatus, reason: String?, size: UInt64?, compressedSize: UInt64?, replaceExisting: Bool) {
+        self.archivePath = archivePath
+        self.normalizedPath = normalizedPath
+        self.destinationPath = destinationPath
+        self.kind = kind
+        self.status = status
+        self.reason = reason
+        self.size = size
+        self.compressedSize = compressedSize
+        self.replaceExisting = replaceExisting
+    }
+}
+
+#if compiler(>=6)
+extension ExtractionPlanEntry: Sendable {}
+#endif
+
+
+extension ExtractionPlanEntry: Equatable, Hashable {
+    public static func ==(lhs: ExtractionPlanEntry, rhs: ExtractionPlanEntry) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.normalizedPath != rhs.normalizedPath {
+            return false
+        }
+        if lhs.destinationPath != rhs.destinationPath {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        if lhs.reason != rhs.reason {
+            return false
+        }
+        if lhs.size != rhs.size {
+            return false
+        }
+        if lhs.compressedSize != rhs.compressedSize {
+            return false
+        }
+        if lhs.replaceExisting != rhs.replaceExisting {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(normalizedPath)
+        hasher.combine(destinationPath)
+        hasher.combine(kind)
+        hasher.combine(status)
+        hasher.combine(reason)
+        hasher.combine(size)
+        hasher.combine(compressedSize)
+        hasher.combine(replaceExisting)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExtractionPlanEntry: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionPlanEntry {
+        return
+            try ExtractionPlanEntry(
+                archivePath: FfiConverterString.read(from: &buf),
+                normalizedPath: FfiConverterOptionString.read(from: &buf),
+                destinationPath: FfiConverterOptionString.read(from: &buf),
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
+                status: FfiConverterTypeExtractionPlanEntryStatus.read(from: &buf),
+                reason: FfiConverterOptionString.read(from: &buf),
+                size: FfiConverterOptionUInt64.read(from: &buf),
+                compressedSize: FfiConverterOptionUInt64.read(from: &buf),
+                replaceExisting: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ExtractionPlanEntry, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterOptionString.write(value.normalizedPath, into: &buf)
+        FfiConverterOptionString.write(value.destinationPath, into: &buf)
+        FfiConverterTypeArchiveEntryKind.write(value.kind, into: &buf)
+        FfiConverterTypeExtractionPlanEntryStatus.write(value.status, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+        FfiConverterOptionUInt64.write(value.size, into: &buf)
+        FfiConverterOptionUInt64.write(value.compressedSize, into: &buf)
+        FfiConverterBool.write(value.replaceExisting, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionPlanEntry_lift(_ buf: RustBuffer) throws -> ExtractionPlanEntry {
+    return try FfiConverterTypeExtractionPlanEntry.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionPlanEntry_lower(_ value: ExtractionPlanEntry) -> RustBuffer {
+    return FfiConverterTypeExtractionPlanEntry.lower(value)
+}
+
+
 public struct HealthcheckResult {
     public var status: String
     public var engine: String
@@ -1322,6 +1448,266 @@ public func FfiConverterTypeMaterializePreviewResult_lift(_ buf: RustBuffer) thr
 #endif
 public func FfiConverterTypeMaterializePreviewResult_lower(_ value: MaterializePreviewResult) -> RustBuffer {
     return FfiConverterTypeMaterializePreviewResult.lower(value)
+}
+
+
+public struct PlanExtractRequest {
+    public var archivePath: String
+    public var destinationRoot: String
+    public var password: String?
+    public var selectedPaths: [String]
+    public var stripComponents: UInt64
+    public var collisionPolicy: ExtractionCollisionPolicy
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, destinationRoot: String, password: String?, selectedPaths: [String], stripComponents: UInt64, collisionPolicy: ExtractionCollisionPolicy) {
+        self.archivePath = archivePath
+        self.destinationRoot = destinationRoot
+        self.password = password
+        self.selectedPaths = selectedPaths
+        self.stripComponents = stripComponents
+        self.collisionPolicy = collisionPolicy
+    }
+}
+
+#if compiler(>=6)
+extension PlanExtractRequest: Sendable {}
+#endif
+
+
+extension PlanExtractRequest: Equatable, Hashable {
+    public static func ==(lhs: PlanExtractRequest, rhs: PlanExtractRequest) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.destinationRoot != rhs.destinationRoot {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.selectedPaths != rhs.selectedPaths {
+            return false
+        }
+        if lhs.stripComponents != rhs.stripComponents {
+            return false
+        }
+        if lhs.collisionPolicy != rhs.collisionPolicy {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(destinationRoot)
+        hasher.combine(password)
+        hasher.combine(selectedPaths)
+        hasher.combine(stripComponents)
+        hasher.combine(collisionPolicy)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePlanExtractRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanExtractRequest {
+        return
+            try PlanExtractRequest(
+                archivePath: FfiConverterString.read(from: &buf),
+                destinationRoot: FfiConverterString.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                selectedPaths: FfiConverterSequenceString.read(from: &buf),
+                stripComponents: FfiConverterUInt64.read(from: &buf),
+                collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PlanExtractRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.destinationRoot, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterSequenceString.write(value.selectedPaths, into: &buf)
+        FfiConverterUInt64.write(value.stripComponents, into: &buf)
+        FfiConverterTypeExtractionCollisionPolicy.write(value.collisionPolicy, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanExtractRequest_lift(_ buf: RustBuffer) throws -> PlanExtractRequest {
+    return try FfiConverterTypePlanExtractRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanExtractRequest_lower(_ value: PlanExtractRequest) -> RustBuffer {
+    return FfiConverterTypePlanExtractRequest.lower(value)
+}
+
+
+public struct PlanExtractResult {
+    public var planId: String
+    public var archivePath: String
+    public var destinationRoot: String
+    public var format: ArchiveFormat
+    public var formatLabel: String
+    public var entries: [ExtractionPlanEntry]
+    public var totalEntries: UInt64
+    public var writableEntries: UInt64
+    public var skippedEntries: UInt64
+    public var blockedEntries: UInt64
+    public var estimatedBytes: UInt64?
+    public var canStart: Bool
+    public var warnings: [BridgeError]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(planId: String, archivePath: String, destinationRoot: String, format: ArchiveFormat, formatLabel: String, entries: [ExtractionPlanEntry], totalEntries: UInt64, writableEntries: UInt64, skippedEntries: UInt64, blockedEntries: UInt64, estimatedBytes: UInt64?, canStart: Bool, warnings: [BridgeError]) {
+        self.planId = planId
+        self.archivePath = archivePath
+        self.destinationRoot = destinationRoot
+        self.format = format
+        self.formatLabel = formatLabel
+        self.entries = entries
+        self.totalEntries = totalEntries
+        self.writableEntries = writableEntries
+        self.skippedEntries = skippedEntries
+        self.blockedEntries = blockedEntries
+        self.estimatedBytes = estimatedBytes
+        self.canStart = canStart
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension PlanExtractResult: Sendable {}
+#endif
+
+
+extension PlanExtractResult: Equatable, Hashable {
+    public static func ==(lhs: PlanExtractResult, rhs: PlanExtractResult) -> Bool {
+        if lhs.planId != rhs.planId {
+            return false
+        }
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.destinationRoot != rhs.destinationRoot {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.formatLabel != rhs.formatLabel {
+            return false
+        }
+        if lhs.entries != rhs.entries {
+            return false
+        }
+        if lhs.totalEntries != rhs.totalEntries {
+            return false
+        }
+        if lhs.writableEntries != rhs.writableEntries {
+            return false
+        }
+        if lhs.skippedEntries != rhs.skippedEntries {
+            return false
+        }
+        if lhs.blockedEntries != rhs.blockedEntries {
+            return false
+        }
+        if lhs.estimatedBytes != rhs.estimatedBytes {
+            return false
+        }
+        if lhs.canStart != rhs.canStart {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(planId)
+        hasher.combine(archivePath)
+        hasher.combine(destinationRoot)
+        hasher.combine(format)
+        hasher.combine(formatLabel)
+        hasher.combine(entries)
+        hasher.combine(totalEntries)
+        hasher.combine(writableEntries)
+        hasher.combine(skippedEntries)
+        hasher.combine(blockedEntries)
+        hasher.combine(estimatedBytes)
+        hasher.combine(canStart)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePlanExtractResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanExtractResult {
+        return
+            try PlanExtractResult(
+                planId: FfiConverterString.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf),
+                destinationRoot: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeArchiveFormat.read(from: &buf),
+                formatLabel: FfiConverterString.read(from: &buf),
+                entries: FfiConverterSequenceTypeExtractionPlanEntry.read(from: &buf),
+                totalEntries: FfiConverterUInt64.read(from: &buf),
+                writableEntries: FfiConverterUInt64.read(from: &buf),
+                skippedEntries: FfiConverterUInt64.read(from: &buf),
+                blockedEntries: FfiConverterUInt64.read(from: &buf),
+                estimatedBytes: FfiConverterOptionUInt64.read(from: &buf),
+                canStart: FfiConverterBool.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PlanExtractResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.planId, into: &buf)
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.destinationRoot, into: &buf)
+        FfiConverterTypeArchiveFormat.write(value.format, into: &buf)
+        FfiConverterString.write(value.formatLabel, into: &buf)
+        FfiConverterSequenceTypeExtractionPlanEntry.write(value.entries, into: &buf)
+        FfiConverterUInt64.write(value.totalEntries, into: &buf)
+        FfiConverterUInt64.write(value.writableEntries, into: &buf)
+        FfiConverterUInt64.write(value.skippedEntries, into: &buf)
+        FfiConverterUInt64.write(value.blockedEntries, into: &buf)
+        FfiConverterOptionUInt64.write(value.estimatedBytes, into: &buf)
+        FfiConverterBool.write(value.canStart, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanExtractResult_lift(_ buf: RustBuffer) throws -> PlanExtractResult {
+    return try FfiConverterTypePlanExtractResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanExtractResult_lower(_ value: PlanExtractResult) -> RustBuffer {
+    return FfiConverterTypePlanExtractResult.lower(value)
 }
 
 
@@ -1885,6 +2271,160 @@ extension BridgeSeverity: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum ExtractionCollisionPolicy {
+
+    case refuse
+    case replace
+    case rename
+}
+
+
+#if compiler(>=6)
+extension ExtractionCollisionPolicy: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExtractionCollisionPolicy: FfiConverterRustBuffer {
+    typealias SwiftType = ExtractionCollisionPolicy
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionCollisionPolicy {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .refuse
+
+        case 2: return .replace
+
+        case 3: return .rename
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExtractionCollisionPolicy, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .refuse:
+            writeInt(&buf, Int32(1))
+
+
+        case .replace:
+            writeInt(&buf, Int32(2))
+
+
+        case .rename:
+            writeInt(&buf, Int32(3))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionCollisionPolicy_lift(_ buf: RustBuffer) throws -> ExtractionCollisionPolicy {
+    return try FfiConverterTypeExtractionCollisionPolicy.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionCollisionPolicy_lower(_ value: ExtractionCollisionPolicy) -> RustBuffer {
+    return FfiConverterTypeExtractionCollisionPolicy.lower(value)
+}
+
+
+extension ExtractionCollisionPolicy: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum ExtractionPlanEntryStatus {
+
+    case write
+    case skip
+    case block
+}
+
+
+#if compiler(>=6)
+extension ExtractionPlanEntryStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExtractionPlanEntryStatus: FfiConverterRustBuffer {
+    typealias SwiftType = ExtractionPlanEntryStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionPlanEntryStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .write
+
+        case 2: return .skip
+
+        case 3: return .block
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExtractionPlanEntryStatus, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .write:
+            writeInt(&buf, Int32(1))
+
+
+        case .skip:
+            writeInt(&buf, Int32(2))
+
+
+        case .block:
+            writeInt(&buf, Int32(3))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionPlanEntryStatus_lift(_ buf: RustBuffer) throws -> ExtractionPlanEntryStatus {
+    return try FfiConverterTypeExtractionPlanEntryStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtractionPlanEntryStatus_lower(_ value: ExtractionPlanEntryStatus) -> RustBuffer {
+    return FfiConverterTypeExtractionPlanEntryStatus.lower(value)
+}
+
+
+extension ExtractionPlanEntryStatus: Equatable, Hashable {}
+
+
+
+
+
+
 
 public enum ZmanagerMobileError: Swift.Error {
 
@@ -2091,6 +2631,31 @@ fileprivate struct FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer {
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffer {
+    typealias SwiftType = [ExtractionPlanEntry]
+
+    public static func write(_ value: [ExtractionPlanEntry], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeExtractionPlanEntry.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ExtractionPlanEntry] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ExtractionPlanEntry]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeExtractionPlanEntry.read(from: &buf))
+        }
+        return seq
+    }
+}
 public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchiveResult  {
     return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_detectarchive(
@@ -2115,6 +2680,13 @@ public func materializePreview(request: MaterializePreviewRequest)throws  -> Mat
     return try  FfiConverterTypeMaterializePreviewResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_materializepreview(
         FfiConverterTypeMaterializePreviewRequest_lower(request),$0
+    )
+})
+}
+public func planExtract(request: PlanExtractRequest)throws  -> PlanExtractResult  {
+    return try  FfiConverterTypePlanExtractResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_planextract(
+        FfiConverterTypePlanExtractRequest_lower(request),$0
     )
 })
 }
@@ -2151,6 +2723,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995) {

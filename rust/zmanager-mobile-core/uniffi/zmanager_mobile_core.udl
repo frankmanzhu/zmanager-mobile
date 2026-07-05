@@ -8,6 +8,8 @@ namespace zmanager {
     TestArchiveResult testArchive(TestArchiveRequest request);
     [Throws=ZmanagerMobileError]
     MaterializePreviewResult materializePreview(MaterializePreviewRequest request);
+    [Throws=ZmanagerMobileError]
+    PlanExtractResult planExtract(PlanExtractRequest request);
 };
 
 enum BridgeSeverity {
@@ -133,6 +135,55 @@ dictionary MaterializePreviewResult {
     string cleanup_root;
     string preview_path;
     u64 written_bytes;
+    sequence<BridgeError> warnings;
+};
+
+enum ExtractionCollisionPolicy {
+    "Refuse",
+    "Replace",
+    "Rename"
+};
+
+enum ExtractionPlanEntryStatus {
+    "Write",
+    "Skip",
+    "Block"
+};
+
+dictionary PlanExtractRequest {
+    string archive_path;
+    string destination_root;
+    string? password;
+    sequence<string> selected_paths;
+    u64 strip_components;
+    ExtractionCollisionPolicy collision_policy;
+};
+
+dictionary ExtractionPlanEntry {
+    string archive_path;
+    string? normalized_path;
+    string? destination_path;
+    ArchiveEntryKind kind;
+    ExtractionPlanEntryStatus status;
+    string? reason;
+    u64? size;
+    u64? compressed_size;
+    boolean replace_existing;
+};
+
+dictionary PlanExtractResult {
+    string plan_id;
+    string archive_path;
+    string destination_root;
+    ArchiveFormat format;
+    string format_label;
+    sequence<ExtractionPlanEntry> entries;
+    u64 total_entries;
+    u64 writable_entries;
+    u64 skipped_entries;
+    u64 blocked_entries;
+    u64? estimated_bytes;
+    boolean can_start;
     sequence<BridgeError> warnings;
 };
 

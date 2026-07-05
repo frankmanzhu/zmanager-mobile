@@ -721,6 +721,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -743,6 +745,8 @@ fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
 fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_materializepreview(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_planextract(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_testarchive(
 ): Short
@@ -798,6 +802,8 @@ fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCa
 fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_planextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -937,6 +943,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995.toShort()) {
@@ -1306,6 +1315,66 @@ public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<Detect
 
 
 
+data class ExtractionPlanEntry (
+    var `archivePath`: kotlin.String,
+    var `normalizedPath`: kotlin.String?,
+    var `destinationPath`: kotlin.String?,
+    var `kind`: ArchiveEntryKind,
+    var `status`: ExtractionPlanEntryStatus,
+    var `reason`: kotlin.String?,
+    var `size`: kotlin.ULong?,
+    var `compressedSize`: kotlin.ULong?,
+    var `replaceExisting`: kotlin.Boolean
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExtractionPlanEntry: FfiConverterRustBuffer<ExtractionPlanEntry> {
+    override fun read(buf: ByteBuffer): ExtractionPlanEntry {
+        return ExtractionPlanEntry(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeArchiveEntryKind.read(buf),
+            FfiConverterTypeExtractionPlanEntryStatus.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ExtractionPlanEntry) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterOptionalString.allocationSize(value.`normalizedPath`) +
+            FfiConverterOptionalString.allocationSize(value.`destinationPath`) +
+            FfiConverterTypeArchiveEntryKind.allocationSize(value.`kind`) +
+            FfiConverterTypeExtractionPlanEntryStatus.allocationSize(value.`status`) +
+            FfiConverterOptionalString.allocationSize(value.`reason`) +
+            FfiConverterOptionalULong.allocationSize(value.`size`) +
+            FfiConverterOptionalULong.allocationSize(value.`compressedSize`) +
+            FfiConverterBoolean.allocationSize(value.`replaceExisting`)
+    )
+
+    override fun write(value: ExtractionPlanEntry, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterOptionalString.write(value.`normalizedPath`, buf)
+            FfiConverterOptionalString.write(value.`destinationPath`, buf)
+            FfiConverterTypeArchiveEntryKind.write(value.`kind`, buf)
+            FfiConverterTypeExtractionPlanEntryStatus.write(value.`status`, buf)
+            FfiConverterOptionalString.write(value.`reason`, buf)
+            FfiConverterOptionalULong.write(value.`size`, buf)
+            FfiConverterOptionalULong.write(value.`compressedSize`, buf)
+            FfiConverterBoolean.write(value.`replaceExisting`, buf)
+    }
+}
+
+
+
 data class HealthcheckResult (
     var `status`: kotlin.String,
     var `engine`: kotlin.String,
@@ -1522,6 +1591,130 @@ public object FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer<M
 
 
 
+data class PlanExtractRequest (
+    var `archivePath`: kotlin.String,
+    var `destinationRoot`: kotlin.String,
+    var `password`: kotlin.String?,
+    var `selectedPaths`: List<kotlin.String>,
+    var `stripComponents`: kotlin.ULong,
+    var `collisionPolicy`: ExtractionCollisionPolicy
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlanExtractRequest: FfiConverterRustBuffer<PlanExtractRequest> {
+    override fun read(buf: ByteBuffer): PlanExtractRequest {
+        return PlanExtractRequest(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterTypeExtractionCollisionPolicy.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PlanExtractRequest) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`destinationRoot`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterSequenceString.allocationSize(value.`selectedPaths`) +
+            FfiConverterULong.allocationSize(value.`stripComponents`) +
+            FfiConverterTypeExtractionCollisionPolicy.allocationSize(value.`collisionPolicy`)
+    )
+
+    override fun write(value: PlanExtractRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`destinationRoot`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterSequenceString.write(value.`selectedPaths`, buf)
+            FfiConverterULong.write(value.`stripComponents`, buf)
+            FfiConverterTypeExtractionCollisionPolicy.write(value.`collisionPolicy`, buf)
+    }
+}
+
+
+
+data class PlanExtractResult (
+    var `planId`: kotlin.String,
+    var `archivePath`: kotlin.String,
+    var `destinationRoot`: kotlin.String,
+    var `format`: ArchiveFormat,
+    var `formatLabel`: kotlin.String,
+    var `entries`: List<ExtractionPlanEntry>,
+    var `totalEntries`: kotlin.ULong,
+    var `writableEntries`: kotlin.ULong,
+    var `skippedEntries`: kotlin.ULong,
+    var `blockedEntries`: kotlin.ULong,
+    var `estimatedBytes`: kotlin.ULong?,
+    var `canStart`: kotlin.Boolean,
+    var `warnings`: List<BridgeError>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtractResult> {
+    override fun read(buf: ByteBuffer): PlanExtractResult {
+        return PlanExtractResult(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeArchiveFormat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeExtractionPlanEntry.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PlanExtractResult) = (
+            FfiConverterString.allocationSize(value.`planId`) +
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`destinationRoot`) +
+            FfiConverterTypeArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`formatLabel`) +
+            FfiConverterSequenceTypeExtractionPlanEntry.allocationSize(value.`entries`) +
+            FfiConverterULong.allocationSize(value.`totalEntries`) +
+            FfiConverterULong.allocationSize(value.`writableEntries`) +
+            FfiConverterULong.allocationSize(value.`skippedEntries`) +
+            FfiConverterULong.allocationSize(value.`blockedEntries`) +
+            FfiConverterOptionalULong.allocationSize(value.`estimatedBytes`) +
+            FfiConverterBoolean.allocationSize(value.`canStart`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: PlanExtractResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`planId`, buf)
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`destinationRoot`, buf)
+            FfiConverterTypeArchiveFormat.write(value.`format`, buf)
+            FfiConverterString.write(value.`formatLabel`, buf)
+            FfiConverterSequenceTypeExtractionPlanEntry.write(value.`entries`, buf)
+            FfiConverterULong.write(value.`totalEntries`, buf)
+            FfiConverterULong.write(value.`writableEntries`, buf)
+            FfiConverterULong.write(value.`skippedEntries`, buf)
+            FfiConverterULong.write(value.`blockedEntries`, buf)
+            FfiConverterOptionalULong.write(value.`estimatedBytes`, buf)
+            FfiConverterBoolean.write(value.`canStart`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
 data class TestArchiveRequest (
     var `archivePath`: kotlin.String,
     var `password`: kotlin.String?,
@@ -1721,6 +1914,68 @@ public object FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer<BridgeSever
     override fun allocationSize(value: BridgeSeverity) = 4UL
 
     override fun write(value: BridgeSeverity, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class ExtractionCollisionPolicy {
+
+    REFUSE,
+    REPLACE,
+    RENAME;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExtractionCollisionPolicy: FfiConverterRustBuffer<ExtractionCollisionPolicy> {
+    override fun read(buf: ByteBuffer) = try {
+        ExtractionCollisionPolicy.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ExtractionCollisionPolicy) = 4UL
+
+    override fun write(value: ExtractionCollisionPolicy, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class ExtractionPlanEntryStatus {
+
+    WRITE,
+    SKIP,
+    BLOCK;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeExtractionPlanEntryStatus: FfiConverterRustBuffer<ExtractionPlanEntryStatus> {
+    override fun read(buf: ByteBuffer) = try {
+        ExtractionPlanEntryStatus.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ExtractionPlanEntryStatus) = 4UL
+
+    override fun write(value: ExtractionPlanEntryStatus, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -1953,6 +2208,34 @@ public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<B
         }
     }
 }
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffer<List<ExtractionPlanEntry>> {
+    override fun read(buf: ByteBuffer): List<ExtractionPlanEntry> {
+        val len = buf.getInt()
+        return List<ExtractionPlanEntry>(len) {
+            FfiConverterTypeExtractionPlanEntry.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ExtractionPlanEntry>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeExtractionPlanEntry.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ExtractionPlanEntry>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeExtractionPlanEntry.write(it, buf)
+        }
+    }
+}
     @Throws(ZmanagerMobileException::class) fun `detectArchive`(`request`: DetectArchiveRequest): DetectArchiveResult {
             return FfiConverterTypeDetectArchiveResult.lift(
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
@@ -1987,6 +2270,16 @@ public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<B
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_materializepreview(
         FfiConverterTypeMaterializePreviewRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `planExtract`(`request`: PlanExtractRequest): PlanExtractResult {
+            return FfiConverterTypePlanExtractResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_planextract(
+        FfiConverterTypePlanExtractRequest.lower(`request`),_status)
 }
     )
     }
