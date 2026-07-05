@@ -6,9 +6,13 @@ import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
+import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewRequest
+import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerMobileException
 import org.tzap.zmanager.mobile.bridge.generated.detectArchive as bridgeDetectArchive
 import org.tzap.zmanager.mobile.bridge.generated.listArchive as bridgeListArchive
+import org.tzap.zmanager.mobile.bridge.generated.materializePreview as bridgeMaterializePreview
+import java.util.Locale
 
 private const val ERROR_PASSWORD_REQUIRED = "password_required"
 private const val ERROR_INVALID_PASSWORD = "invalid_password"
@@ -33,10 +37,16 @@ data class ArchiveListingSummary(
 )
 
 data class ArchiveEntrySummary(
+    val id: String,
     val path: String,
+    val displayName: String,
+    val parentPath: String,
     val kind: ArchiveEntryKind,
     val size: ULong?
-)
+) {
+    val isPreviewable: Boolean
+        get() = kind == ArchiveEntryKind.FILE
+}
 
 data class ArchiveListingError(
     val code: String,
@@ -45,9 +55,54 @@ data class ArchiveListingError(
     val retryable: Boolean
 )
 
+enum class ArchiveEntrySort {
+    PATH_ASCENDING,
+    SIZE_DESCENDING,
+    KIND_ASCENDING
+}
+
+enum class ArchiveEntryViewMode {
+    LIST,
+    FOLDERS
+}
+
+data class ArchiveEntryGroup(
+    val id: String,
+    val label: String,
+    val entries: List<ArchiveEntrySummary>
+)
+
+sealed interface ArchivePreviewState {
+    data object Idle : ArchivePreviewState
+    data class Loading(val entry: ArchiveEntrySummary) : ArchivePreviewState
+    data class Ready(val summary: ArchivePreviewSummary) : ArchivePreviewState
+    data class PasswordRequired(
+        val entry: ArchiveEntrySummary,
+        val error: ArchiveListingError
+    ) : ArchivePreviewState
+
+    data class Failed(
+        val entry: ArchiveEntrySummary?,
+        val error: ArchiveListingError
+    ) : ArchivePreviewState
+}
+
+data class ArchivePreviewSummary(
+    val entry: ArchiveEntrySummary,
+    val cleanupRoot: String,
+    val previewPath: String,
+    val writtenBytes: ULong,
+    val warnings: List<String>
+)
+
 interface ArchiveBridgeGateway {
     fun detectArchive(path: String): DetectArchiveResult
     fun listArchive(path: String, password: String?): ListArchiveResult
+    fun materializePreview(
+        archivePath: String,
+        entryPath: String,
+        password: String?
+    ): MaterializePreviewResult
 }
 
 class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
@@ -57,6 +112,21 @@ class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
 
     override fun listArchive(path: String, password: String?): ListArchiveResult {
         return bridgeListArchive(ListArchiveRequest(archivePath = path, password = password))
+    }
+
+    override fun materializePreview(
+        archivePath: String,
+        entryPath: String,
+        password: String?
+    ): MaterializePreviewResult {
+        return bridgeMaterializePreview(
+            MaterializePreviewRequest(
+                archivePath = archivePath,
+                entryPath = entryPath,
+                password = password,
+                stripComponents = 0UL
+            )
+        )
     }
 }
 
@@ -102,36 +172,157 @@ class ArchiveListingRepository(
         }
     }
 
+    fun materializePreview(
+        archive: ImportedArchive,
+        entry: ArchiveEntrySummary,
+        password: String?
+    ): ArchivePreviewState {
+        return try {
+            val preview = bridge.materializePreview(archive.localPath, entry.path, password)
+            ArchivePreviewState.Ready(preview.toSummary(entry))
+        } catch (error: ZmanagerMobileException.Bridge) {
+            val listingError = error.toListingError()
+            if (listingError.code == ERROR_PASSWORD_REQUIRED || listingError.code == ERROR_INVALID_PASSWORD) {
+                ArchivePreviewState.PasswordRequired(entry, listingError)
+            } else {
+                ArchivePreviewState.Failed(entry, listingError)
+            }
+        } catch (error: LinkageError) {
+            ArchivePreviewState.Failed(
+                entry,
+                ArchiveListingError(
+                    code = ERROR_BRIDGE_UNAVAILABLE,
+                    message = "The archive engine is not available in this build.",
+                    recoveryHint = "Install a build with the mobile core native library.",
+                    retryable = false
+                )
+            )
+        } catch (error: RuntimeException) {
+            ArchivePreviewState.Failed(
+                entry,
+                ArchiveListingError(
+                    code = ERROR_UNKNOWN,
+                    message = "Unable to preview that archive entry.",
+                    recoveryHint = null,
+                    retryable = false
+                )
+            )
+        }
+    }
+
     private fun ListArchiveResult.toSummary(): ArchiveListingSummary {
         return ArchiveListingSummary(
             formatLabel = formatLabel,
             entryCount = entryCount,
             totalSize = totalSize,
-            entries = entries.take(50).map { it.toSummary() },
+            entries = entries.take(50).mapIndexed { index, entry -> entry.toSummary(index) },
             warnings = warnings.map { it.message }
         )
     }
 
-    private fun ArchiveEntry.toSummary(): ArchiveEntrySummary {
+    private fun ArchiveEntry.toSummary(index: Int): ArchiveEntrySummary {
+        val normalizedSeparators = path.replace('\\', '/')
+        val displayName = normalizedSeparators.substringAfterLast('/').ifBlank { path }
+        val parentPath = normalizedSeparators.substringBeforeLast('/', missingDelimiterValue = "")
         return ArchiveEntrySummary(
+            id = "$index:$path",
             path = path,
+            displayName = displayName,
+            parentPath = parentPath,
             kind = kind,
             size = size
         )
     }
 
-    private fun ZmanagerMobileException.Bridge.toListingState(): ArchiveListingState {
-        val error = ArchiveListingError(
-            code = code,
-            message = userMessage,
-            recoveryHint = recoveryHint,
-            retryable = retryable
+    private fun MaterializePreviewResult.toSummary(entry: ArchiveEntrySummary): ArchivePreviewSummary {
+        return ArchivePreviewSummary(
+            entry = entry,
+            cleanupRoot = cleanupRoot,
+            previewPath = previewPath,
+            writtenBytes = writtenBytes,
+            warnings = warnings.map { it.message }
         )
+    }
+
+    private fun ZmanagerMobileException.Bridge.toListingState(): ArchiveListingState {
+        val error = toListingError()
 
         return if (code == ERROR_PASSWORD_REQUIRED || code == ERROR_INVALID_PASSWORD) {
             ArchiveListingState.PasswordRequired(error)
         } else {
             ArchiveListingState.Failed(error)
         }
+    }
+
+    private fun ZmanagerMobileException.Bridge.toListingError(): ArchiveListingError {
+        return ArchiveListingError(
+            code = code,
+            message = userMessage,
+            recoveryHint = recoveryHint,
+            retryable = retryable
+        )
+    }
+}
+
+fun ArchiveListingSummary.visibleGroups(
+    searchQuery: String,
+    sort: ArchiveEntrySort,
+    viewMode: ArchiveEntryViewMode
+): List<ArchiveEntryGroup> {
+    val filtered = entries
+        .filter { entry -> entry.matchesSearch(searchQuery) }
+        .sortedWith(sort.comparator())
+
+    return when (viewMode) {
+        ArchiveEntryViewMode.LIST -> {
+            if (filtered.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(ArchiveEntryGroup(id = "all", label = "All entries", entries = filtered))
+            }
+        }
+        ArchiveEntryViewMode.FOLDERS -> filtered
+            .groupBy { entry -> entry.parentPath.ifBlank { "/" } }
+            .toSortedMap(compareBy<String> { it != "/" }.thenBy { it.lowercase(Locale.ROOT) })
+            .map { (parentPath, groupedEntries) ->
+                ArchiveEntryGroup(
+                    id = parentPath,
+                    label = parentPath,
+                    entries = groupedEntries
+                )
+            }
+    }
+}
+
+fun ArchiveListingSummary.selectedEntries(selectedIds: Set<String>): List<ArchiveEntrySummary> {
+    return entries.filter { selectedIds.contains(it.id) }
+}
+
+fun ArchiveListingSummary.previewableSelectedEntry(
+    selectedIds: Set<String>
+): ArchiveEntrySummary? {
+    val selected = selectedEntries(selectedIds)
+    return selected.singleOrNull()?.takeIf { it.isPreviewable }
+}
+
+private fun ArchiveEntrySummary.matchesSearch(searchQuery: String): Boolean {
+    val normalizedQuery = searchQuery.trim()
+    if (normalizedQuery.isEmpty()) {
+        return true
+    }
+
+    return path.contains(normalizedQuery, ignoreCase = true) ||
+        displayName.contains(normalizedQuery, ignoreCase = true) ||
+        parentPath.contains(normalizedQuery, ignoreCase = true)
+}
+
+private fun ArchiveEntrySort.comparator(): Comparator<ArchiveEntrySummary> {
+    val pathComparator = compareBy<ArchiveEntrySummary> { it.path.lowercase(Locale.ROOT) }
+    return when (this) {
+        ArchiveEntrySort.PATH_ASCENDING -> pathComparator
+        ArchiveEntrySort.SIZE_DESCENDING -> compareByDescending<ArchiveEntrySummary> { it.size ?: 0UL }
+            .then(pathComparator)
+        ArchiveEntrySort.KIND_ASCENDING -> compareBy<ArchiveEntrySummary> { it.kind.name }
+            .then(pathComparator)
     }
 }
