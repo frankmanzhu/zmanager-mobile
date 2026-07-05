@@ -9,6 +9,13 @@ ANDROID_JAVA_ROOT="$ROOT_DIR/android/app/src/main/java"
 ANDROID_GENERATED_DIR="$ANDROID_JAVA_ROOT/org/tzap/zmanager/mobile/bridge/generated"
 IOS_GENERATED_DIR="$ROOT_DIR/ios/ZManagerMobile/ZManagerMobile/Bridge/Generated"
 
+strip_trailing_whitespace() {
+  local dir="$1"
+  while IFS= read -r -d '' file; do
+    perl -pi -e 's/[ \t]+$//' "$file"
+  done < <(find "$dir" -type f \( -name '*.kt' -o -name '*.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0)
+}
+
 rm -rf "$ANDROID_GENERATED_DIR" "$IOS_GENERATED_DIR"
 mkdir -p "$ANDROID_GENERATED_DIR" "$IOS_GENERATED_DIR"
 
@@ -31,3 +38,6 @@ mkdir -p "$ANDROID_GENERATED_DIR" "$IOS_GENERATED_DIR"
     --no-format \
     "$UDL_FILE"
 )
+
+strip_trailing_whitespace "$ANDROID_GENERATED_DIR"
+strip_trailing_whitespace "$IOS_GENERATED_DIR"

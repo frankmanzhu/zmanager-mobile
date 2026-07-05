@@ -251,10 +251,15 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
+RustBuffer uniffi_zmanager_mobile_core_fn_func_detectarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_HEALTHCHECK
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_HEALTHCHECK
 RustBuffer uniffi_zmanager_mobile_core_fn_func_healthcheck(RustCallStatus *_Nonnull out_status
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_LISTARCHIVE
@@ -542,22 +547,28 @@ void ffi_zmanager_mobile_core_rust_future_free_void(uint64_t handle
 void ffi_zmanager_mobile_core_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_DETECTARCHIVE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_DETECTARCHIVE
+uint16_t uniffi_zmanager_mobile_core_checksum_func_detectarchive(void
+
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_HEALTHCHECK
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_HEALTHCHECK
 uint16_t uniffi_zmanager_mobile_core_checksum_func_healthcheck(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_LISTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_LISTARCHIVE
 uint16_t uniffi_zmanager_mobile_core_checksum_func_listarchive(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_ZMANAGER_MOBILE_CORE_UNIFFI_CONTRACT_VERSION
 #define UNIFFI_FFIDEF_FFI_ZMANAGER_MOBILE_CORE_UNIFFI_CONTRACT_VERSION
 uint32_t ffi_zmanager_mobile_core_uniffi_contract_version(void
-    
+
 );
 #endif
 

@@ -481,16 +481,20 @@ fileprivate struct FfiConverterString: FfiConverter {
 
 public struct ArchiveEntry {
     public var path: String
+    public var kind: ArchiveEntryKind
     public var isDir: Bool
     public var size: UInt64?
+    public var compressedSize: UInt64?
     public var modifiedAt: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(path: String, isDir: Bool, size: UInt64?, modifiedAt: String?) {
+    public init(path: String, kind: ArchiveEntryKind, isDir: Bool, size: UInt64?, compressedSize: UInt64?, modifiedAt: String?) {
         self.path = path
+        self.kind = kind
         self.isDir = isDir
         self.size = size
+        self.compressedSize = compressedSize
         self.modifiedAt = modifiedAt
     }
 }
@@ -505,10 +509,16 @@ extension ArchiveEntry: Equatable, Hashable {
         if lhs.path != rhs.path {
             return false
         }
+        if lhs.kind != rhs.kind {
+            return false
+        }
         if lhs.isDir != rhs.isDir {
             return false
         }
         if lhs.size != rhs.size {
+            return false
+        }
+        if lhs.compressedSize != rhs.compressedSize {
             return false
         }
         if lhs.modifiedAt != rhs.modifiedAt {
@@ -519,8 +529,10 @@ extension ArchiveEntry: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(path)
+        hasher.combine(kind)
         hasher.combine(isDir)
         hasher.combine(size)
+        hasher.combine(compressedSize)
         hasher.combine(modifiedAt)
     }
 }
@@ -534,17 +546,21 @@ public struct FfiConverterTypeArchiveEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveEntry {
         return
             try ArchiveEntry(
-                path: FfiConverterString.read(from: &buf), 
-                isDir: FfiConverterBool.read(from: &buf), 
-                size: FfiConverterOptionUInt64.read(from: &buf), 
+                path: FfiConverterString.read(from: &buf),
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
+                isDir: FfiConverterBool.read(from: &buf),
+                size: FfiConverterOptionUInt64.read(from: &buf),
+                compressedSize: FfiConverterOptionUInt64.read(from: &buf),
                 modifiedAt: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: ArchiveEntry, into buf: inout [UInt8]) {
         FfiConverterString.write(value.path, into: &buf)
+        FfiConverterTypeArchiveEntryKind.write(value.kind, into: &buf)
         FfiConverterBool.write(value.isDir, into: &buf)
         FfiConverterOptionUInt64.write(value.size, into: &buf)
+        FfiConverterOptionUInt64.write(value.compressedSize, into: &buf)
         FfiConverterOptionString.write(value.modifiedAt, into: &buf)
     }
 }
@@ -626,10 +642,10 @@ public struct FfiConverterTypeBridgeError: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BridgeError {
         return
             try BridgeError(
-                code: FfiConverterString.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
-                recoveryHint: FfiConverterOptionString.read(from: &buf), 
-                severity: FfiConverterTypeBridgeSeverity.read(from: &buf), 
+                code: FfiConverterString.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
+                recoveryHint: FfiConverterOptionString.read(from: &buf),
+                severity: FfiConverterTypeBridgeSeverity.read(from: &buf),
                 retryable: FfiConverterBool.read(from: &buf)
         )
     }
@@ -659,15 +675,209 @@ public func FfiConverterTypeBridgeError_lower(_ value: BridgeError) -> RustBuffe
 }
 
 
-public struct HealthcheckResult {
-    public var status: String
-    public var engine: String
+public struct DetectArchiveRequest {
+    public var archivePath: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: String, engine: String) {
+    public init(archivePath: String) {
+        self.archivePath = archivePath
+    }
+}
+
+#if compiler(>=6)
+extension DetectArchiveRequest: Sendable {}
+#endif
+
+
+extension DetectArchiveRequest: Equatable, Hashable {
+    public static func ==(lhs: DetectArchiveRequest, rhs: DetectArchiveRequest) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDetectArchiveRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetectArchiveRequest {
+        return
+            try DetectArchiveRequest(
+                archivePath: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DetectArchiveRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectArchiveRequest_lift(_ buf: RustBuffer) throws -> DetectArchiveRequest {
+    return try FfiConverterTypeDetectArchiveRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectArchiveRequest_lower(_ value: DetectArchiveRequest) -> RustBuffer {
+    return FfiConverterTypeDetectArchiveRequest.lower(value)
+}
+
+
+public struct DetectArchiveResult {
+    public var archivePath: String
+    public var format: ArchiveFormat
+    public var formatLabel: String
+    public var exists: Bool
+    public var isFile: Bool
+    public var canList: Bool
+    public var canExtract: Bool
+    public var canCreate: Bool
+    public var warnings: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, format: ArchiveFormat, formatLabel: String, exists: Bool, isFile: Bool, canList: Bool, canExtract: Bool, canCreate: Bool, warnings: [String]) {
+        self.archivePath = archivePath
+        self.format = format
+        self.formatLabel = formatLabel
+        self.exists = exists
+        self.isFile = isFile
+        self.canList = canList
+        self.canExtract = canExtract
+        self.canCreate = canCreate
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension DetectArchiveResult: Sendable {}
+#endif
+
+
+extension DetectArchiveResult: Equatable, Hashable {
+    public static func ==(lhs: DetectArchiveResult, rhs: DetectArchiveResult) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.formatLabel != rhs.formatLabel {
+            return false
+        }
+        if lhs.exists != rhs.exists {
+            return false
+        }
+        if lhs.isFile != rhs.isFile {
+            return false
+        }
+        if lhs.canList != rhs.canList {
+            return false
+        }
+        if lhs.canExtract != rhs.canExtract {
+            return false
+        }
+        if lhs.canCreate != rhs.canCreate {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(format)
+        hasher.combine(formatLabel)
+        hasher.combine(exists)
+        hasher.combine(isFile)
+        hasher.combine(canList)
+        hasher.combine(canExtract)
+        hasher.combine(canCreate)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetectArchiveResult {
+        return
+            try DetectArchiveResult(
+                archivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeArchiveFormat.read(from: &buf),
+                formatLabel: FfiConverterString.read(from: &buf),
+                exists: FfiConverterBool.read(from: &buf),
+                isFile: FfiConverterBool.read(from: &buf),
+                canList: FfiConverterBool.read(from: &buf),
+                canExtract: FfiConverterBool.read(from: &buf),
+                canCreate: FfiConverterBool.read(from: &buf),
+                warnings: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DetectArchiveResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterTypeArchiveFormat.write(value.format, into: &buf)
+        FfiConverterString.write(value.formatLabel, into: &buf)
+        FfiConverterBool.write(value.exists, into: &buf)
+        FfiConverterBool.write(value.isFile, into: &buf)
+        FfiConverterBool.write(value.canList, into: &buf)
+        FfiConverterBool.write(value.canExtract, into: &buf)
+        FfiConverterBool.write(value.canCreate, into: &buf)
+        FfiConverterSequenceString.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectArchiveResult_lift(_ buf: RustBuffer) throws -> DetectArchiveResult {
+    return try FfiConverterTypeDetectArchiveResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectArchiveResult_lower(_ value: DetectArchiveResult) -> RustBuffer {
+    return FfiConverterTypeDetectArchiveResult.lower(value)
+}
+
+
+public struct HealthcheckResult {
+    public var status: String
+    public var engine: String
+    public var version: String
+    public var ready: Bool
+    public var summary: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(status: String, engine: String, version: String, ready: Bool, summary: String) {
         self.status = status
         self.engine = engine
+        self.version = version
+        self.ready = ready
+        self.summary = summary
     }
 }
 
@@ -684,12 +894,24 @@ extension HealthcheckResult: Equatable, Hashable {
         if lhs.engine != rhs.engine {
             return false
         }
+        if lhs.version != rhs.version {
+            return false
+        }
+        if lhs.ready != rhs.ready {
+            return false
+        }
+        if lhs.summary != rhs.summary {
+            return false
+        }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(status)
         hasher.combine(engine)
+        hasher.combine(version)
+        hasher.combine(ready)
+        hasher.combine(summary)
     }
 }
 
@@ -702,14 +924,20 @@ public struct FfiConverterTypeHealthcheckResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HealthcheckResult {
         return
             try HealthcheckResult(
-                status: FfiConverterString.read(from: &buf), 
-                engine: FfiConverterString.read(from: &buf)
+                status: FfiConverterString.read(from: &buf),
+                engine: FfiConverterString.read(from: &buf),
+                version: FfiConverterString.read(from: &buf),
+                ready: FfiConverterBool.read(from: &buf),
+                summary: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: HealthcheckResult, into buf: inout [UInt8]) {
         FfiConverterString.write(value.status, into: &buf)
         FfiConverterString.write(value.engine, into: &buf)
+        FfiConverterString.write(value.version, into: &buf)
+        FfiConverterBool.write(value.ready, into: &buf)
+        FfiConverterString.write(value.summary, into: &buf)
     }
 }
 
@@ -772,7 +1000,7 @@ public struct FfiConverterTypeListArchiveRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListArchiveRequest {
         return
             try ListArchiveRequest(
-                archivePath: FfiConverterString.read(from: &buf), 
+                archivePath: FfiConverterString.read(from: &buf),
                 password: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -800,12 +1028,24 @@ public func FfiConverterTypeListArchiveRequest_lower(_ value: ListArchiveRequest
 
 
 public struct ListArchiveResult {
+    public var archivePath: String
+    public var format: ArchiveFormat
+    public var formatLabel: String
     public var entries: [ArchiveEntry]
+    public var entryCount: UInt64
+    public var totalSize: UInt64?
+    public var warnings: [BridgeError]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(entries: [ArchiveEntry]) {
+    public init(archivePath: String, format: ArchiveFormat, formatLabel: String, entries: [ArchiveEntry], entryCount: UInt64, totalSize: UInt64?, warnings: [BridgeError]) {
+        self.archivePath = archivePath
+        self.format = format
+        self.formatLabel = formatLabel
         self.entries = entries
+        self.entryCount = entryCount
+        self.totalSize = totalSize
+        self.warnings = warnings
     }
 }
 
@@ -816,14 +1056,38 @@ extension ListArchiveResult: Sendable {}
 
 extension ListArchiveResult: Equatable, Hashable {
     public static func ==(lhs: ListArchiveResult, rhs: ListArchiveResult) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.formatLabel != rhs.formatLabel {
+            return false
+        }
         if lhs.entries != rhs.entries {
+            return false
+        }
+        if lhs.entryCount != rhs.entryCount {
+            return false
+        }
+        if lhs.totalSize != rhs.totalSize {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
             return false
         }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(format)
+        hasher.combine(formatLabel)
         hasher.combine(entries)
+        hasher.combine(entryCount)
+        hasher.combine(totalSize)
+        hasher.combine(warnings)
     }
 }
 
@@ -836,12 +1100,24 @@ public struct FfiConverterTypeListArchiveResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListArchiveResult {
         return
             try ListArchiveResult(
-                entries: FfiConverterSequenceTypeArchiveEntry.read(from: &buf)
+                archivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeArchiveFormat.read(from: &buf),
+                formatLabel: FfiConverterString.read(from: &buf),
+                entries: FfiConverterSequenceTypeArchiveEntry.read(from: &buf),
+                entryCount: FfiConverterUInt64.read(from: &buf),
+                totalSize: FfiConverterOptionUInt64.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
 
     public static func write(_ value: ListArchiveResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterTypeArchiveFormat.write(value.format, into: &buf)
+        FfiConverterString.write(value.formatLabel, into: &buf)
         FfiConverterSequenceTypeArchiveEntry.write(value.entries, into: &buf)
+        FfiConverterUInt64.write(value.entryCount, into: &buf)
+        FfiConverterOptionUInt64.write(value.totalSize, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
     }
 }
 
@@ -863,8 +1139,288 @@ public func FfiConverterTypeListArchiveResult_lower(_ value: ListArchiveResult) 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum ArchiveEntryKind {
+
+    case file
+    case directory
+    case symlink
+    case hardlink
+    case special
+}
+
+
+#if compiler(>=6)
+extension ArchiveEntryKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeArchiveEntryKind: FfiConverterRustBuffer {
+    typealias SwiftType = ArchiveEntryKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveEntryKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .file
+
+        case 2: return .directory
+
+        case 3: return .symlink
+
+        case 4: return .hardlink
+
+        case 5: return .special
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ArchiveEntryKind, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .file:
+            writeInt(&buf, Int32(1))
+
+
+        case .directory:
+            writeInt(&buf, Int32(2))
+
+
+        case .symlink:
+            writeInt(&buf, Int32(3))
+
+
+        case .hardlink:
+            writeInt(&buf, Int32(4))
+
+
+        case .special:
+            writeInt(&buf, Int32(5))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeArchiveEntryKind_lift(_ buf: RustBuffer) throws -> ArchiveEntryKind {
+    return try FfiConverterTypeArchiveEntryKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeArchiveEntryKind_lower(_ value: ArchiveEntryKind) -> RustBuffer {
+    return FfiConverterTypeArchiveEntryKind.lower(value)
+}
+
+
+extension ArchiveEntryKind: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum ArchiveFormat {
+
+    case zip
+    case splitZip
+    case rar
+    case multipartRar
+    case sevenZ
+    case tar
+    case tarGz
+    case tarBz2
+    case tarXz
+    case tarZst
+    case gzip
+    case bzip2
+    case xz
+    case zstd
+    case tzap
+    case appleArchive
+    case xip
+    case rawStream
+    case other
+}
+
+
+#if compiler(>=6)
+extension ArchiveFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeArchiveFormat: FfiConverterRustBuffer {
+    typealias SwiftType = ArchiveFormat
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveFormat {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .zip
+
+        case 2: return .splitZip
+
+        case 3: return .rar
+
+        case 4: return .multipartRar
+
+        case 5: return .sevenZ
+
+        case 6: return .tar
+
+        case 7: return .tarGz
+
+        case 8: return .tarBz2
+
+        case 9: return .tarXz
+
+        case 10: return .tarZst
+
+        case 11: return .gzip
+
+        case 12: return .bzip2
+
+        case 13: return .xz
+
+        case 14: return .zstd
+
+        case 15: return .tzap
+
+        case 16: return .appleArchive
+
+        case 17: return .xip
+
+        case 18: return .rawStream
+
+        case 19: return .other
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ArchiveFormat, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .zip:
+            writeInt(&buf, Int32(1))
+
+
+        case .splitZip:
+            writeInt(&buf, Int32(2))
+
+
+        case .rar:
+            writeInt(&buf, Int32(3))
+
+
+        case .multipartRar:
+            writeInt(&buf, Int32(4))
+
+
+        case .sevenZ:
+            writeInt(&buf, Int32(5))
+
+
+        case .tar:
+            writeInt(&buf, Int32(6))
+
+
+        case .tarGz:
+            writeInt(&buf, Int32(7))
+
+
+        case .tarBz2:
+            writeInt(&buf, Int32(8))
+
+
+        case .tarXz:
+            writeInt(&buf, Int32(9))
+
+
+        case .tarZst:
+            writeInt(&buf, Int32(10))
+
+
+        case .gzip:
+            writeInt(&buf, Int32(11))
+
+
+        case .bzip2:
+            writeInt(&buf, Int32(12))
+
+
+        case .xz:
+            writeInt(&buf, Int32(13))
+
+
+        case .zstd:
+            writeInt(&buf, Int32(14))
+
+
+        case .tzap:
+            writeInt(&buf, Int32(15))
+
+
+        case .appleArchive:
+            writeInt(&buf, Int32(16))
+
+
+        case .xip:
+            writeInt(&buf, Int32(17))
+
+
+        case .rawStream:
+            writeInt(&buf, Int32(18))
+
+
+        case .other:
+            writeInt(&buf, Int32(19))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeArchiveFormat_lift(_ buf: RustBuffer) throws -> ArchiveFormat {
+    return try FfiConverterTypeArchiveFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeArchiveFormat_lower(_ value: ArchiveFormat) -> RustBuffer {
+    return FfiConverterTypeArchiveFormat.lower(value)
+}
+
+
+extension ArchiveFormat: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum BridgeSeverity {
-    
+
     case info
     case warning
     case error
@@ -884,32 +1440,32 @@ public struct FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BridgeSeverity {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .info
-        
+
         case 2: return .warning
-        
+
         case 3: return .error
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: BridgeSeverity, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .info:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .warning:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .error:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -940,14 +1496,10 @@ extension BridgeSeverity: Equatable, Hashable {}
 
 public enum ZmanagerMobileError: Swift.Error {
 
-    
-    
-    case InvalidRequest(message: String)
-    
-    case EngineUnavailable(message: String)
-    
-    case ArchiveError(message: String)
-    
+
+
+    case Bridge(code: String, userMessage: String, recoveryHint: String?, severity: BridgeSeverity, retryable: Bool
+    )
 }
 
 
@@ -961,40 +1513,36 @@ public struct FfiConverterTypeZmanagerMobileError: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
 
-        
 
-        
-        case 1: return .InvalidRequest(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 2: return .EngineUnavailable(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 3: return .ArchiveError(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
 
-        default: throw UniffiInternalError.unexpectedEnumCase
+
+        case 1: return .Bridge(
+            code: try FfiConverterString.read(from: &buf),
+            userMessage: try FfiConverterString.read(from: &buf),
+            recoveryHint: try FfiConverterOptionString.read(from: &buf),
+            severity: try FfiConverterTypeBridgeSeverity.read(from: &buf),
+            retryable: try FfiConverterBool.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ZmanagerMobileError, into buf: inout [UInt8]) {
         switch value {
 
-        
 
-        
-        case .InvalidRequest(_ /* message is ignored*/):
+
+
+
+        case let .Bridge(code,userMessage,recoveryHint,severity,retryable):
             writeInt(&buf, Int32(1))
-        case .EngineUnavailable(_ /* message is ignored*/):
-            writeInt(&buf, Int32(2))
-        case .ArchiveError(_ /* message is ignored*/):
-            writeInt(&buf, Int32(3))
+            FfiConverterString.write(code, into: &buf)
+            FfiConverterString.write(userMessage, into: &buf)
+            FfiConverterOptionString.write(recoveryHint, into: &buf)
+            FfiConverterTypeBridgeSeverity.write(severity, into: &buf)
+            FfiConverterBool.write(retryable, into: &buf)
 
-        
         }
     }
 }
@@ -1080,6 +1628,31 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
+    typealias SwiftType = [String]
+
+    public static func write(_ value: [String], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterString.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [String]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer {
     typealias SwiftType = [ArchiveEntry]
 
@@ -1101,14 +1674,46 @@ fileprivate struct FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer 
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer {
+    typealias SwiftType = [BridgeError]
+
+    public static func write(_ value: [BridgeError], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeBridgeError.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [BridgeError] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [BridgeError]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeBridgeError.read(from: &buf))
+        }
+        return seq
+    }
+}
+public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchiveResult  {
+    return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_detectarchive(
+        FfiConverterTypeDetectArchiveRequest_lower(request),$0
+    )
+})
+}
 public func healthcheck() -> HealthcheckResult  {
     return try!  FfiConverterTypeHealthcheckResult_lift(try! rustCall() {
     uniffi_zmanager_mobile_core_fn_func_healthcheck($0
     )
 })
 }
-public func listArchive(request: ListArchiveRequest) -> ListArchiveResult  {
-    return try!  FfiConverterTypeListArchiveResult_lift(try! rustCall() {
+public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult  {
+    return try  FfiConverterTypeListArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest_lower(request),$0
     )
@@ -1130,10 +1735,13 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_zmanager_mobile_core_checksum_func_healthcheck() != 32996) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_listarchive() != 35126) {
+    if (uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364) {
         return InitializationResult.apiChecksumMismatch
     }
 

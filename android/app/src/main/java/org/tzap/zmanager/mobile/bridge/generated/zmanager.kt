@@ -715,22 +715,26 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
-// N.B. the name of the extension is very misleading, since it is 
-// rather `InterfaceTooLargeException`, caused by too many methods 
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
 // in the interface for large crates.
 //
 // By splitting the otherwise huge interface into two parts
-// * UniffiLib 
+// * UniffiLib
 // * IntegrityCheckingUniffiLib (this)
 // we allow for ~2x as many methods in the UniffiLib interface.
-// 
-// The `ffi_uniffi_contract_version` method and all checksum methods are put 
+//
+// The `ffi_uniffi_contract_version` method and all checksum methods are put
 // into `IntegrityCheckingUniffiLib` and these methods are called only once,
 // when the library is loaded.
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
-    fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
+    fun uniffi_zmanager_mobile_core_checksum_func_detectarchive(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
 ): Short
@@ -746,8 +750,8 @@ internal interface UniffiLib : Library {
         internal val INSTANCE: UniffiLib by lazy {
             val componentName = "zmanager"
             // For large crates we prevent `MethodTooLargeException` (see #2340)
-            // N.B. the name of the extension is very misleading, since it is 
-            // rather `InterfaceTooLargeException`, caused by too many methods 
+            // N.B. the name of the extension is very misleading, since it is
+            // rather `InterfaceTooLargeException`, caused by too many methods
             // in the interface for large crates.
             //
             // By splitting the otherwise huge interface into two parts
@@ -755,7 +759,7 @@ internal interface UniffiLib : Library {
             // * IntegrityCheckingUniffiLib
             // And all checksum methods are put into `IntegrityCheckingUniffiLib`
             // we allow for ~2x as many methods in the UniffiLib interface.
-            // 
+            //
             // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
             // so that we can (optionally!) call `uniffiCheckApiChecksums`...
             loadIndirect<IntegrityCheckingUniffiLib>(componentName)
@@ -770,26 +774,28 @@ internal interface UniffiLib : Library {
             // to trigger this issue, the performance impact is negligible, running on
             // a macOS M1 machine the `loadIndirect` call takes ~50ms.
             val lib = loadIndirect<UniffiLib>(componentName)
-            // No need to check the contract version and checksums, since 
+            // No need to check the contract version and checksums, since
             // we already did that with `IntegrityCheckingUniffiLib` above.
             // Loading of library with integrity check done.
             lib
         }
-        
+
     }
 
     // FFI functions
-    fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_zmanager_mobile_core_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun ffi_zmanager_mobile_core_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-fun ffi_zmanager_mobile_core_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun ffi_zmanager_mobile_core_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -797,7 +803,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_u8(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_u8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
 fun ffi_zmanager_mobile_core_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -805,7 +811,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_i8(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_i8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
 fun ffi_zmanager_mobile_core_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -813,7 +819,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_u16(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_u16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Short
 fun ffi_zmanager_mobile_core_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -821,7 +827,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_i16(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_i16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Short
 fun ffi_zmanager_mobile_core_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -829,7 +835,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_u32(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_u32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Int
 fun ffi_zmanager_mobile_core_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -837,7 +843,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_i32(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_i32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Int
 fun ffi_zmanager_mobile_core_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -845,7 +851,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_u64(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_u64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Long
 fun ffi_zmanager_mobile_core_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -853,7 +859,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_i64(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_i64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Long
 fun ffi_zmanager_mobile_core_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -861,7 +867,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_f32(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_f32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Float
 fun ffi_zmanager_mobile_core_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -869,7 +875,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_f64(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_f64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Double
 fun ffi_zmanager_mobile_core_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -877,7 +883,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_pointer(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_pointer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Pointer
 fun ffi_zmanager_mobile_core_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -885,7 +891,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_rust_buffer(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun ffi_zmanager_mobile_core_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
@@ -893,7 +899,7 @@ fun ffi_zmanager_mobile_core_rust_future_cancel_void(`handle`: Long,
 ): Unit
 fun ffi_zmanager_mobile_core_rust_future_free_void(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+fun ffi_zmanager_mobile_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
 
 }
@@ -909,10 +915,13 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_healthcheck() != 32996.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_listarchive() != 35126.toShort()) {
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -987,7 +996,7 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
         }
     }
 
-/** 
+/**
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
@@ -1100,12 +1109,14 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 
 data class ArchiveEntry (
-    var `path`: kotlin.String, 
-    var `isDir`: kotlin.Boolean, 
-    var `size`: kotlin.ULong?, 
+    var `path`: kotlin.String,
+    var `kind`: ArchiveEntryKind,
+    var `isDir`: kotlin.Boolean,
+    var `size`: kotlin.ULong?,
+    var `compressedSize`: kotlin.ULong?,
     var `modifiedAt`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -1116,7 +1127,9 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
     override fun read(buf: ByteBuffer): ArchiveEntry {
         return ArchiveEntry(
             FfiConverterString.read(buf),
+            FfiConverterTypeArchiveEntryKind.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalString.read(buf),
         )
@@ -1124,15 +1137,19 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
 
     override fun allocationSize(value: ArchiveEntry) = (
             FfiConverterString.allocationSize(value.`path`) +
+            FfiConverterTypeArchiveEntryKind.allocationSize(value.`kind`) +
             FfiConverterBoolean.allocationSize(value.`isDir`) +
             FfiConverterOptionalULong.allocationSize(value.`size`) +
+            FfiConverterOptionalULong.allocationSize(value.`compressedSize`) +
             FfiConverterOptionalString.allocationSize(value.`modifiedAt`)
     )
 
     override fun write(value: ArchiveEntry, buf: ByteBuffer) {
             FfiConverterString.write(value.`path`, buf)
+            FfiConverterTypeArchiveEntryKind.write(value.`kind`, buf)
             FfiConverterBoolean.write(value.`isDir`, buf)
             FfiConverterOptionalULong.write(value.`size`, buf)
+            FfiConverterOptionalULong.write(value.`compressedSize`, buf)
             FfiConverterOptionalString.write(value.`modifiedAt`, buf)
     }
 }
@@ -1140,13 +1157,13 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
 
 
 data class BridgeError (
-    var `code`: kotlin.String, 
-    var `message`: kotlin.String, 
-    var `recoveryHint`: kotlin.String?, 
-    var `severity`: BridgeSeverity, 
+    var `code`: kotlin.String,
+    var `message`: kotlin.String,
+    var `recoveryHint`: kotlin.String?,
+    var `severity`: BridgeSeverity,
     var `retryable`: kotlin.Boolean
 ) {
-    
+
     companion object
 }
 
@@ -1183,11 +1200,102 @@ public object FfiConverterTypeBridgeError: FfiConverterRustBuffer<BridgeError> {
 
 
 
-data class HealthcheckResult (
-    var `status`: kotlin.String, 
-    var `engine`: kotlin.String
+data class DetectArchiveRequest (
+    var `archivePath`: kotlin.String
 ) {
-    
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDetectArchiveRequest: FfiConverterRustBuffer<DetectArchiveRequest> {
+    override fun read(buf: ByteBuffer): DetectArchiveRequest {
+        return DetectArchiveRequest(
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DetectArchiveRequest) = (
+            FfiConverterString.allocationSize(value.`archivePath`)
+    )
+
+    override fun write(value: DetectArchiveRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+    }
+}
+
+
+
+data class DetectArchiveResult (
+    var `archivePath`: kotlin.String,
+    var `format`: ArchiveFormat,
+    var `formatLabel`: kotlin.String,
+    var `exists`: kotlin.Boolean,
+    var `isFile`: kotlin.Boolean,
+    var `canList`: kotlin.Boolean,
+    var `canExtract`: kotlin.Boolean,
+    var `canCreate`: kotlin.Boolean,
+    var `warnings`: List<kotlin.String>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<DetectArchiveResult> {
+    override fun read(buf: ByteBuffer): DetectArchiveResult {
+        return DetectArchiveResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeArchiveFormat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DetectArchiveResult) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterTypeArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`formatLabel`) +
+            FfiConverterBoolean.allocationSize(value.`exists`) +
+            FfiConverterBoolean.allocationSize(value.`isFile`) +
+            FfiConverterBoolean.allocationSize(value.`canList`) +
+            FfiConverterBoolean.allocationSize(value.`canExtract`) +
+            FfiConverterBoolean.allocationSize(value.`canCreate`) +
+            FfiConverterSequenceString.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: DetectArchiveResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterTypeArchiveFormat.write(value.`format`, buf)
+            FfiConverterString.write(value.`formatLabel`, buf)
+            FfiConverterBoolean.write(value.`exists`, buf)
+            FfiConverterBoolean.write(value.`isFile`, buf)
+            FfiConverterBoolean.write(value.`canList`, buf)
+            FfiConverterBoolean.write(value.`canExtract`, buf)
+            FfiConverterBoolean.write(value.`canCreate`, buf)
+            FfiConverterSequenceString.write(value.`warnings`, buf)
+    }
+}
+
+
+
+data class HealthcheckResult (
+    var `status`: kotlin.String,
+    var `engine`: kotlin.String,
+    var `version`: kotlin.String,
+    var `ready`: kotlin.Boolean,
+    var `summary`: kotlin.String
+) {
+
     companion object
 }
 
@@ -1199,27 +1307,36 @@ public object FfiConverterTypeHealthcheckResult: FfiConverterRustBuffer<Healthch
         return HealthcheckResult(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
     override fun allocationSize(value: HealthcheckResult) = (
             FfiConverterString.allocationSize(value.`status`) +
-            FfiConverterString.allocationSize(value.`engine`)
+            FfiConverterString.allocationSize(value.`engine`) +
+            FfiConverterString.allocationSize(value.`version`) +
+            FfiConverterBoolean.allocationSize(value.`ready`) +
+            FfiConverterString.allocationSize(value.`summary`)
     )
 
     override fun write(value: HealthcheckResult, buf: ByteBuffer) {
             FfiConverterString.write(value.`status`, buf)
             FfiConverterString.write(value.`engine`, buf)
+            FfiConverterString.write(value.`version`, buf)
+            FfiConverterBoolean.write(value.`ready`, buf)
+            FfiConverterString.write(value.`summary`, buf)
     }
 }
 
 
 
 data class ListArchiveRequest (
-    var `archivePath`: kotlin.String, 
+    var `archivePath`: kotlin.String,
     var `password`: kotlin.String?
 ) {
-    
+
     companion object
 }
 
@@ -1248,9 +1365,15 @@ public object FfiConverterTypeListArchiveRequest: FfiConverterRustBuffer<ListArc
 
 
 data class ListArchiveResult (
-    var `entries`: List<ArchiveEntry>
+    var `archivePath`: kotlin.String,
+    var `format`: ArchiveFormat,
+    var `formatLabel`: kotlin.String,
+    var `entries`: List<ArchiveEntry>,
+    var `entryCount`: kotlin.ULong,
+    var `totalSize`: kotlin.ULong?,
+    var `warnings`: List<BridgeError>
 ) {
-    
+
     companion object
 }
 
@@ -1260,24 +1383,122 @@ data class ListArchiveResult (
 public object FfiConverterTypeListArchiveResult: FfiConverterRustBuffer<ListArchiveResult> {
     override fun read(buf: ByteBuffer): ListArchiveResult {
         return ListArchiveResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeArchiveFormat.read(buf),
+            FfiConverterString.read(buf),
             FfiConverterSequenceTypeArchiveEntry.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
         )
     }
 
     override fun allocationSize(value: ListArchiveResult) = (
-            FfiConverterSequenceTypeArchiveEntry.allocationSize(value.`entries`)
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterTypeArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`formatLabel`) +
+            FfiConverterSequenceTypeArchiveEntry.allocationSize(value.`entries`) +
+            FfiConverterULong.allocationSize(value.`entryCount`) +
+            FfiConverterOptionalULong.allocationSize(value.`totalSize`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
     )
 
     override fun write(value: ListArchiveResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterTypeArchiveFormat.write(value.`format`, buf)
+            FfiConverterString.write(value.`formatLabel`, buf)
             FfiConverterSequenceTypeArchiveEntry.write(value.`entries`, buf)
+            FfiConverterULong.write(value.`entryCount`, buf)
+            FfiConverterOptionalULong.write(value.`totalSize`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
     }
 }
 
 
 
 
+enum class ArchiveEntryKind {
+
+    FILE,
+    DIRECTORY,
+    SYMLINK,
+    HARDLINK,
+    SPECIAL;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeArchiveEntryKind: FfiConverterRustBuffer<ArchiveEntryKind> {
+    override fun read(buf: ByteBuffer) = try {
+        ArchiveEntryKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ArchiveEntryKind) = 4UL
+
+    override fun write(value: ArchiveEntryKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class ArchiveFormat {
+
+    ZIP,
+    SPLIT_ZIP,
+    RAR,
+    MULTIPART_RAR,
+    SEVEN_Z,
+    TAR,
+    TAR_GZ,
+    TAR_BZ2,
+    TAR_XZ,
+    TAR_ZST,
+    GZIP,
+    BZIP2,
+    XZ,
+    ZSTD,
+    TZAP,
+    APPLE_ARCHIVE,
+    XIP,
+    RAW_STREAM,
+    OTHER;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeArchiveFormat: FfiConverterRustBuffer<ArchiveFormat> {
+    override fun read(buf: ByteBuffer) = try {
+        ArchiveFormat.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ArchiveFormat) = 4UL
+
+    override fun write(value: ArchiveFormat, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 enum class BridgeSeverity {
-    
+
     INFO,
     WARNING,
     ERROR;
@@ -1308,18 +1529,30 @@ public object FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer<BridgeSever
 
 
 
-sealed class ZmanagerMobileException(message: String): kotlin.Exception(message) {
-        
-        class InvalidRequest(message: String) : ZmanagerMobileException(message)
-        
-        class EngineUnavailable(message: String) : ZmanagerMobileException(message)
-        
-        class ArchiveException(message: String) : ZmanagerMobileException(message)
-        
+sealed class ZmanagerMobileException: kotlin.Exception() {
+
+    class Bridge(
+
+        val `code`: kotlin.String,
+
+        val `userMessage`: kotlin.String,
+
+        val `recoveryHint`: kotlin.String?,
+
+        val `severity`: BridgeSeverity,
+
+        val `retryable`: kotlin.Boolean
+        ) : ZmanagerMobileException() {
+        override val message
+            get() = "code=${ `code` }, userMessage=${ `userMessage` }, recoveryHint=${ `recoveryHint` }, severity=${ `severity` }, retryable=${ `retryable` }"
+    }
+
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ZmanagerMobileException> {
         override fun lift(error_buf: RustBuffer.ByValue): ZmanagerMobileException = FfiConverterTypeZmanagerMobileError.lift(error_buf)
     }
+
+
 }
 
 /**
@@ -1327,32 +1560,43 @@ sealed class ZmanagerMobileException(message: String): kotlin.Exception(message)
  */
 public object FfiConverterTypeZmanagerMobileError : FfiConverterRustBuffer<ZmanagerMobileException> {
     override fun read(buf: ByteBuffer): ZmanagerMobileException {
-        
-            return when(buf.getInt()) {
-            1 -> ZmanagerMobileException.InvalidRequest(FfiConverterString.read(buf))
-            2 -> ZmanagerMobileException.EngineUnavailable(FfiConverterString.read(buf))
-            3 -> ZmanagerMobileException.ArchiveException(FfiConverterString.read(buf))
+
+
+        return when(buf.getInt()) {
+            1 -> ZmanagerMobileException.Bridge(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterOptionalString.read(buf),
+                FfiConverterTypeBridgeSeverity.read(buf),
+                FfiConverterBoolean.read(buf),
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
-        
     }
 
     override fun allocationSize(value: ZmanagerMobileException): ULong {
-        return 4UL
+        return when(value) {
+            is ZmanagerMobileException.Bridge -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`code`)
+                + FfiConverterString.allocationSize(value.`userMessage`)
+                + FfiConverterOptionalString.allocationSize(value.`recoveryHint`)
+                + FfiConverterTypeBridgeSeverity.allocationSize(value.`severity`)
+                + FfiConverterBoolean.allocationSize(value.`retryable`)
+            )
+        }
     }
 
     override fun write(value: ZmanagerMobileException, buf: ByteBuffer) {
         when(value) {
-            is ZmanagerMobileException.InvalidRequest -> {
+            is ZmanagerMobileException.Bridge -> {
                 buf.putInt(1)
-                Unit
-            }
-            is ZmanagerMobileException.EngineUnavailable -> {
-                buf.putInt(2)
-                Unit
-            }
-            is ZmanagerMobileException.ArchiveException -> {
-                buf.putInt(3)
+                FfiConverterString.write(value.`code`, buf)
+                FfiConverterString.write(value.`userMessage`, buf)
+                FfiConverterOptionalString.write(value.`recoveryHint`, buf)
+                FfiConverterTypeBridgeSeverity.write(value.`severity`, buf)
+                FfiConverterBoolean.write(value.`retryable`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -1430,6 +1674,34 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): List<kotlin.String> {
+        val len = buf.getInt()
+        return List<kotlin.String>(len) {
+            FfiConverterString.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.String>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer<List<ArchiveEntry>> {
     override fun read(buf: ByteBuffer): List<ArchiveEntry> {
         val len = buf.getInt()
@@ -1450,7 +1722,45 @@ public object FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer<List<
             FfiConverterTypeArchiveEntry.write(it, buf)
         }
     }
-} fun `healthcheck`(): HealthcheckResult {
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<BridgeError>> {
+    override fun read(buf: ByteBuffer): List<BridgeError> {
+        val len = buf.getInt()
+        return List<BridgeError>(len) {
+            FfiConverterTypeBridgeError.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<BridgeError>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeBridgeError.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<BridgeError>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeBridgeError.write(it, buf)
+        }
+    }
+}
+    @Throws(ZmanagerMobileException::class) fun `detectArchive`(`request`: DetectArchiveRequest): DetectArchiveResult {
+            return FfiConverterTypeDetectArchiveResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_detectarchive(
+        FfiConverterTypeDetectArchiveRequest.lower(`request`),_status)
+}
+    )
+    }
+
+ fun `healthcheck`(): HealthcheckResult {
             return FfiConverterTypeHealthcheckResult.lift(
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_healthcheck(
@@ -1458,15 +1768,16 @@ public object FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer<List<
 }
     )
     }
-    
- fun `listArchive`(`request`: ListArchiveRequest): ListArchiveResult {
+
+
+    @Throws(ZmanagerMobileException::class) fun `listArchive`(`request`: ListArchiveRequest): ListArchiveResult {
             return FfiConverterTypeListArchiveResult.lift(
-    uniffiRustCall() { _status ->
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest.lower(`request`),_status)
 }
     )
     }
-    
+
 
 

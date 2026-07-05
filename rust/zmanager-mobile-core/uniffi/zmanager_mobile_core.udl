@@ -1,5 +1,8 @@
 namespace zmanager {
     HealthcheckResult healthcheck();
+    [Throws=ZmanagerMobileError]
+    DetectArchiveResult detectArchive(DetectArchiveRequest request);
+    [Throws=ZmanagerMobileError]
     ListArchiveResult listArchive(ListArchiveRequest request);
 };
 
@@ -20,12 +23,63 @@ dictionary BridgeError {
 dictionary HealthcheckResult {
     string status;
     string engine;
+    string version;
+    boolean ready;
+    string summary;
+};
+
+enum ArchiveFormat {
+    "Zip",
+    "SplitZip",
+    "Rar",
+    "MultipartRar",
+    "SevenZ",
+    "Tar",
+    "TarGz",
+    "TarBz2",
+    "TarXz",
+    "TarZst",
+    "Gzip",
+    "Bzip2",
+    "Xz",
+    "Zstd",
+    "Tzap",
+    "AppleArchive",
+    "Xip",
+    "RawStream",
+    "Other"
+};
+
+dictionary DetectArchiveRequest {
+    string archive_path;
+};
+
+dictionary DetectArchiveResult {
+    string archive_path;
+    ArchiveFormat format;
+    string format_label;
+    boolean exists;
+    boolean is_file;
+    boolean can_list;
+    boolean can_extract;
+    boolean can_create;
+    sequence<string> warnings;
+};
+
+enum ArchiveEntryKind {
+    "File",
+    "Directory",
+    "Symlink",
+    "Hardlink",
+    "Special"
 };
 
 dictionary ArchiveEntry {
     string path;
+    ArchiveEntryKind kind;
     boolean is_dir;
     u64? size;
+    u64? compressed_size;
     string? modified_at;
 };
 
@@ -35,12 +89,16 @@ dictionary ListArchiveRequest {
 };
 
 dictionary ListArchiveResult {
+    string archive_path;
+    ArchiveFormat format;
+    string format_label;
     sequence<ArchiveEntry> entries;
+    u64 entry_count;
+    u64? total_size;
+    sequence<BridgeError> warnings;
 };
 
 [Error]
-enum ZmanagerMobileError {
-    "InvalidRequest",
-    "EngineUnavailable",
-    "ArchiveError"
+interface ZmanagerMobileError {
+    Bridge(string code, string user_message, string? recovery_hint, BridgeSeverity severity, boolean retryable);
 };
