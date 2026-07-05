@@ -7,6 +7,7 @@ use std::thread;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use zmanager_core::apple_archive_backend::{self, AppleArchiveError};
 use zmanager_core::archive_browser::{
     self, ArchiveBrowserError, BrowserEntryKind, BrowserExtractOptions, BrowserListOptions,
 };
@@ -355,6 +356,8 @@ pub enum MobileJobKind {
     TarZstdExtract,
     TzapCreate,
     TzapExtract,
+    AppleArchiveCreate,
+    AppleArchiveExtract,
     ArchiveExtract,
     RawStreamExtract,
     TestArchive,
@@ -477,7 +480,7 @@ pub fn detect_archive(
     let (format, mut warnings) = classify_archive_path(path);
     let (can_list, can_extract, can_create) = format_capabilities(format);
 
-    if matches!(format, ArchiveFormat::AppleArchive | ArchiveFormat::Xip) {
+    if matches!(format, ArchiveFormat::Xip) {
         warnings.push(bridge_warning_with_code(
             WARNING_LAUNCH_GATED_FORMAT,
             "This launch-scope format must be handled by zmanager-core before mobile exposes it."
@@ -575,6 +578,14 @@ pub fn test_archive(request: TestArchiveRequest) -> Result<TestArchiveResult, Zm
                 None,
             )
             .map_err(map_tzap_error)?,
+        )
+    } else if matches!(format, ArchiveFormat::AppleArchive) {
+        let selected_paths = selected_paths.as_slice();
+        TestArchiveReport::from_apple_archive(
+            apple_archive_backend::test_apple_archive_filter(path, |entry_path| {
+                selected_path_matches(selected_paths, entry_path)
+            })
+            .map_err(map_apple_archive_error)?,
         )
     } else if let Some(raw_format) = raw_stream_backend::detect_raw_stream_format(path) {
         test_raw_stream(path, raw_format, &selected_paths)?
@@ -1455,6 +1466,17 @@ fn run_full_extract_job(
         .map(ArchiveJobReport::from)
         .map_err(map_tzap_error)
         .map(JobTerminalSummary::from)
+    } else if matches!(input.format, ArchiveFormat::AppleArchive) {
+        jobs::run_apple_archive_extract_job_with_policy(
+            archive_path,
+            destination_root,
+            policy,
+            token,
+            sink,
+        )
+        .map(ArchiveJobReport::from)
+        .map_err(map_apple_archive_error)
+        .map(JobTerminalSummary::from)
     } else if let Some(raw_format) = raw_stream_backend::detect_raw_stream_format(archive_path) {
         jobs::run_raw_stream_extract_job_with_policy(
             archive_path,
@@ -1671,6 +1693,21 @@ impl From<tzap_backend::TzapExtractReport> for ArchiveJobReport {
     }
 }
 
+impl From<apple_archive_backend::AppleArchiveExtractReport> for ArchiveJobReport {
+    fn from(report: apple_archive_backend::AppleArchiveExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
+            warnings: report.warnings,
+        }
+    }
+}
+
 impl From<raw_stream_backend::RawStreamExtractReport> for ArchiveJobReport {
     fn from(report: raw_stream_backend::RawStreamExtractReport) -> Self {
         Self {
@@ -1824,6 +1861,15 @@ impl TestArchiveReport {
             skipped_entries: usize_to_u64(report.skipped_entries),
             tested_bytes: report.tested_bytes,
             warnings,
+        }
+    }
+
+    fn from_apple_archive(report: apple_archive_backend::AppleArchiveTestReport) -> Self {
+        Self {
+            tested_entries: usize_to_u64(report.tested_entries),
+            skipped_entries: usize_to_u64(report.skipped_entries),
+            tested_bytes: report.tested_bytes,
+            warnings: Vec::new(),
         }
     }
 
@@ -2086,6 +2132,8 @@ fn mobile_extract_job_kind(path: &Path, format: ArchiveFormat) -> MobileJobKind 
         CoreJobKind::TarZstdExtract => MobileJobKind::TarZstdExtract,
         CoreJobKind::TzapCreate => MobileJobKind::TzapCreate,
         CoreJobKind::TzapExtract => MobileJobKind::TzapExtract,
+        CoreJobKind::AppleArchiveCreate => MobileJobKind::AppleArchiveCreate,
+        CoreJobKind::AppleArchiveExtract => MobileJobKind::AppleArchiveExtract,
         CoreJobKind::ArchiveExtract => MobileJobKind::ArchiveExtract,
         CoreJobKind::RawStreamExtract => MobileJobKind::RawStreamExtract,
     }
@@ -2102,6 +2150,8 @@ fn core_extract_job_kind(path: &Path, format: ArchiveFormat) -> CoreJobKind {
         CoreJobKind::TarZstdExtract
     } else if matches!(format, ArchiveFormat::Tzap) {
         CoreJobKind::TzapExtract
+    } else if matches!(format, ArchiveFormat::AppleArchive) {
+        CoreJobKind::AppleArchiveExtract
     } else if raw_stream_backend::detect_raw_stream_format(path).is_some() {
         CoreJobKind::RawStreamExtract
     } else {
@@ -2120,6 +2170,8 @@ fn mobile_job_kind_from_core(kind: CoreJobKind) -> MobileJobKind {
         CoreJobKind::TarZstdExtract => MobileJobKind::TarZstdExtract,
         CoreJobKind::TzapCreate => MobileJobKind::TzapCreate,
         CoreJobKind::TzapExtract => MobileJobKind::TzapExtract,
+        CoreJobKind::AppleArchiveCreate => MobileJobKind::AppleArchiveCreate,
+        CoreJobKind::AppleArchiveExtract => MobileJobKind::AppleArchiveExtract,
         CoreJobKind::ArchiveExtract => MobileJobKind::ArchiveExtract,
         CoreJobKind::RawStreamExtract => MobileJobKind::RawStreamExtract,
     }
@@ -2650,7 +2702,8 @@ fn classify_archive_path(path: &Path) -> (ArchiveFormat, Vec<BridgeError>) {
 
 fn format_capabilities(format: ArchiveFormat) -> (bool, bool, bool) {
     match format {
-        ArchiveFormat::AppleArchive | ArchiveFormat::Xip => (false, false, false),
+        ArchiveFormat::Xip => (false, false, false),
+        ArchiveFormat::AppleArchive => (true, true, false),
         ArchiveFormat::Rar | ArchiveFormat::MultipartRar | ArchiveFormat::SplitZip => {
             (true, true, false)
         }
@@ -2725,6 +2778,7 @@ fn map_archive_browser_error(error: ArchiveBrowserError) -> ZmanagerMobileError 
         ArchiveBrowserError::TarZst(source) => map_tar_zst_error(source),
         ArchiveBrowserError::SevenZ(source) => map_7z_error(source),
         ArchiveBrowserError::Tzap(source) => map_tzap_error(source),
+        ArchiveBrowserError::AppleArchive(source) => map_apple_archive_error(source),
         ArchiveBrowserError::Libarchive(source) => map_libarchive_error(source),
         ArchiveBrowserError::RawStream(source) => map_raw_stream_error(source),
         ArchiveBrowserError::Io { path, source } => map_io_error(path, source),
@@ -2905,6 +2959,50 @@ fn map_tzap_error(error: TzapError) -> ZmanagerMobileError {
             true,
         ),
         source => operation_failed(format!("TZAP operation failed: {source}")),
+    }
+}
+
+fn map_apple_archive_error(error: AppleArchiveError) -> ZmanagerMobileError {
+    match error {
+        AppleArchiveError::Plan(source) => map_plan_error(source),
+        AppleArchiveError::Native(source) => {
+            operation_failed(format!("AppleArchive operation failed: {source}"))
+        }
+        AppleArchiveError::Io { path, source } => map_io_error(path, source),
+        AppleArchiveError::Safety(source) => bridge_error(
+            ERROR_UNSAFE_ARCHIVE,
+            format!("Entry blocked by safety policy: {source}"),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ),
+        AppleArchiveError::MissingLinkTarget { path } => damaged_archive(format!(
+            "AppleArchive symlink entry has no target: {path}"
+        )),
+        AppleArchiveError::MissingFileData { path } => damaged_archive(format!(
+            "AppleArchive file entry has no data blob: {path}"
+        )),
+        AppleArchiveError::EntryNotFound { path } => bridge_error(
+            ERROR_NOT_FOUND,
+            format!("Archive entry not found: {path}"),
+            hint("Open a different archive or choose a different entry."),
+            BridgeSeverity::Warning,
+            false,
+        ),
+        AppleArchiveError::StdoutSelectionNotSingleFile { selected_files } => bridge_error(
+            ERROR_INVALID_REQUEST,
+            format!("AppleArchive stdout extraction needs exactly one file, found {selected_files}."),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ),
+        AppleArchiveError::Cancelled => bridge_error(
+            ERROR_CANCELLED,
+            "AppleArchive job was cancelled.",
+            None,
+            BridgeSeverity::Info,
+            true,
+        ),
     }
 }
 

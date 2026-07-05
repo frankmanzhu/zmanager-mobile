@@ -4047,6 +4047,8 @@ public enum MobileJobKind {
     case tarZstdExtract
     case tzapCreate
     case tzapExtract
+    case appleArchiveCreate
+    case appleArchiveExtract
     case archiveExtract
     case rawStreamExtract
     case testArchive
@@ -4085,11 +4087,15 @@ public struct FfiConverterTypeMobileJobKind: FfiConverterRustBuffer {
 
         case 9: return .tzapExtract
 
-        case 10: return .archiveExtract
+        case 10: return .appleArchiveCreate
 
-        case 11: return .rawStreamExtract
+        case 11: return .appleArchiveExtract
 
-        case 12: return .testArchive
+        case 12: return .archiveExtract
+
+        case 13: return .rawStreamExtract
+
+        case 14: return .testArchive
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -4135,16 +4141,24 @@ public struct FfiConverterTypeMobileJobKind: FfiConverterRustBuffer {
             writeInt(&buf, Int32(9))
 
 
-        case .archiveExtract:
+        case .appleArchiveCreate:
             writeInt(&buf, Int32(10))
 
 
-        case .rawStreamExtract:
+        case .appleArchiveExtract:
             writeInt(&buf, Int32(11))
 
 
-        case .testArchive:
+        case .archiveExtract:
             writeInt(&buf, Int32(12))
+
+
+        case .rawStreamExtract:
+            writeInt(&buf, Int32(13))
+
+
+        case .testArchive:
+            writeInt(&buf, Int32(14))
 
         }
     }

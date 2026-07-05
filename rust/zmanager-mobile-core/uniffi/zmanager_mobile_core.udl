@@ -275,6 +275,8 @@ enum MobileJobKind {
     "TarZstdExtract",
     "TzapCreate",
     "TzapExtract",
+    "AppleArchiveCreate",
+    "AppleArchiveExtract",
     "ArchiveExtract",
     "RawStreamExtract",
     "TestArchive"
