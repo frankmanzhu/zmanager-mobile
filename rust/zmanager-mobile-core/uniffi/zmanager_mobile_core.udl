@@ -4,6 +4,8 @@ namespace zmanager {
     DetectArchiveResult detectArchive(DetectArchiveRequest request);
     [Throws=ZmanagerMobileError]
     ListArchiveResult listArchive(ListArchiveRequest request);
+    [Throws=ZmanagerMobileError]
+    TestArchiveResult testArchive(TestArchiveRequest request);
 };
 
 enum BridgeSeverity {
@@ -95,6 +97,24 @@ dictionary ListArchiveResult {
     sequence<ArchiveEntry> entries;
     u64 entry_count;
     u64? total_size;
+    sequence<BridgeError> warnings;
+};
+
+dictionary TestArchiveRequest {
+    string archive_path;
+    string? password;
+    sequence<string> selected_paths;
+};
+
+dictionary TestArchiveResult {
+    string archive_path;
+    ArchiveFormat format;
+    string format_label;
+    boolean verified;
+    u64 tested_entries;
+    u64 skipped_entries;
+    u64 total_entries;
+    u64 tested_bytes;
     sequence<BridgeError> warnings;
 };
 

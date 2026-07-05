@@ -1136,6 +1136,210 @@ public func FfiConverterTypeListArchiveResult_lower(_ value: ListArchiveResult) 
     return FfiConverterTypeListArchiveResult.lower(value)
 }
 
+
+public struct TestArchiveRequest {
+    public var archivePath: String
+    public var password: String?
+    public var selectedPaths: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, password: String?, selectedPaths: [String]) {
+        self.archivePath = archivePath
+        self.password = password
+        self.selectedPaths = selectedPaths
+    }
+}
+
+#if compiler(>=6)
+extension TestArchiveRequest: Sendable {}
+#endif
+
+
+extension TestArchiveRequest: Equatable, Hashable {
+    public static func ==(lhs: TestArchiveRequest, rhs: TestArchiveRequest) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.selectedPaths != rhs.selectedPaths {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(password)
+        hasher.combine(selectedPaths)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTestArchiveRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TestArchiveRequest {
+        return
+            try TestArchiveRequest(
+                archivePath: FfiConverterString.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                selectedPaths: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TestArchiveRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterSequenceString.write(value.selectedPaths, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTestArchiveRequest_lift(_ buf: RustBuffer) throws -> TestArchiveRequest {
+    return try FfiConverterTypeTestArchiveRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTestArchiveRequest_lower(_ value: TestArchiveRequest) -> RustBuffer {
+    return FfiConverterTypeTestArchiveRequest.lower(value)
+}
+
+
+public struct TestArchiveResult {
+    public var archivePath: String
+    public var format: ArchiveFormat
+    public var formatLabel: String
+    public var verified: Bool
+    public var testedEntries: UInt64
+    public var skippedEntries: UInt64
+    public var totalEntries: UInt64
+    public var testedBytes: UInt64
+    public var warnings: [BridgeError]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, format: ArchiveFormat, formatLabel: String, verified: Bool, testedEntries: UInt64, skippedEntries: UInt64, totalEntries: UInt64, testedBytes: UInt64, warnings: [BridgeError]) {
+        self.archivePath = archivePath
+        self.format = format
+        self.formatLabel = formatLabel
+        self.verified = verified
+        self.testedEntries = testedEntries
+        self.skippedEntries = skippedEntries
+        self.totalEntries = totalEntries
+        self.testedBytes = testedBytes
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension TestArchiveResult: Sendable {}
+#endif
+
+
+extension TestArchiveResult: Equatable, Hashable {
+    public static func ==(lhs: TestArchiveResult, rhs: TestArchiveResult) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.formatLabel != rhs.formatLabel {
+            return false
+        }
+        if lhs.verified != rhs.verified {
+            return false
+        }
+        if lhs.testedEntries != rhs.testedEntries {
+            return false
+        }
+        if lhs.skippedEntries != rhs.skippedEntries {
+            return false
+        }
+        if lhs.totalEntries != rhs.totalEntries {
+            return false
+        }
+        if lhs.testedBytes != rhs.testedBytes {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(format)
+        hasher.combine(formatLabel)
+        hasher.combine(verified)
+        hasher.combine(testedEntries)
+        hasher.combine(skippedEntries)
+        hasher.combine(totalEntries)
+        hasher.combine(testedBytes)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTestArchiveResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TestArchiveResult {
+        return
+            try TestArchiveResult(
+                archivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeArchiveFormat.read(from: &buf),
+                formatLabel: FfiConverterString.read(from: &buf),
+                verified: FfiConverterBool.read(from: &buf),
+                testedEntries: FfiConverterUInt64.read(from: &buf),
+                skippedEntries: FfiConverterUInt64.read(from: &buf),
+                totalEntries: FfiConverterUInt64.read(from: &buf),
+                testedBytes: FfiConverterUInt64.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TestArchiveResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterTypeArchiveFormat.write(value.format, into: &buf)
+        FfiConverterString.write(value.formatLabel, into: &buf)
+        FfiConverterBool.write(value.verified, into: &buf)
+        FfiConverterUInt64.write(value.testedEntries, into: &buf)
+        FfiConverterUInt64.write(value.skippedEntries, into: &buf)
+        FfiConverterUInt64.write(value.totalEntries, into: &buf)
+        FfiConverterUInt64.write(value.testedBytes, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTestArchiveResult_lift(_ buf: RustBuffer) throws -> TestArchiveResult {
+    return try FfiConverterTypeTestArchiveResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTestArchiveResult_lower(_ value: TestArchiveResult) -> RustBuffer {
+    return FfiConverterTypeTestArchiveResult.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
@@ -1719,6 +1923,13 @@ public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult
     )
 })
 }
+public func testArchive(request: TestArchiveRequest)throws  -> TestArchiveResult  {
+    return try  FfiConverterTypeTestArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_testarchive(
+        FfiConverterTypeTestArchiveRequest_lower(request),$0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -1742,6 +1953,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995) {
         return InitializationResult.apiChecksumMismatch
     }
 

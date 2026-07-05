@@ -7,12 +7,12 @@ use thiserror::Error;
 use zmanager_core::archive_browser::{
     self, ArchiveBrowserError, BrowserEntryKind, BrowserListOptions,
 };
-use zmanager_core::libarchive_backend::LibarchiveError;
-use zmanager_core::raw_stream_backend::RawStreamError;
+use zmanager_core::libarchive_backend::{self, LibarchiveError, LibarchiveTestReport};
+use zmanager_core::raw_stream_backend::{self, RawStreamError};
 use zmanager_core::sevenz_backend::SevenZError;
 use zmanager_core::tar_zst_backend::TarZstdError;
-use zmanager_core::tzap_backend::TzapError;
-use zmanager_core::zip_backend::ZipBackendError;
+use zmanager_core::tzap_backend::{self, TzapError, TzapTestReport};
+use zmanager_core::zip_backend::{self, ZipBackendError, ZipTestReport};
 
 uniffi::include_scaffolding!("zmanager_mobile_core");
 
@@ -23,6 +23,7 @@ const ERROR_INVALID_PASSWORD: &str = "invalid_password";
 const ERROR_UNSAFE_ARCHIVE: &str = "unsafe_archive";
 const ERROR_IO_ERROR: &str = "io_error";
 const ERROR_UNSUPPORTED_FORMAT: &str = "unsupported_format";
+const ERROR_DAMAGED_ARCHIVE: &str = "damaged_archive";
 const ERROR_CANCELLED: &str = "cancelled";
 const ERROR_OPERATION_FAILED: &str = "operation_failed";
 
@@ -152,6 +153,26 @@ pub struct ListArchiveResult {
     pub warnings: Vec<BridgeError>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestArchiveRequest {
+    pub archive_path: String,
+    pub password: Option<String>,
+    pub selected_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestArchiveResult {
+    pub archive_path: String,
+    pub format: ArchiveFormat,
+    pub format_label: String,
+    pub verified: bool,
+    pub tested_entries: u64,
+    pub skipped_entries: u64,
+    pub total_entries: u64,
+    pub tested_bytes: u64,
+    pub warnings: Vec<BridgeError>,
+}
+
 pub fn healthcheck() -> HealthcheckResult {
     let report = zmanager_core::healthcheck();
     HealthcheckResult {
@@ -246,6 +267,159 @@ pub fn list_archive(request: ListArchiveRequest) -> Result<ListArchiveResult, Zm
 #[allow(non_snake_case)]
 pub fn listArchive(request: ListArchiveRequest) -> Result<ListArchiveResult, ZmanagerMobileError> {
     list_archive(request)
+}
+
+pub fn test_archive(request: TestArchiveRequest) -> Result<TestArchiveResult, ZmanagerMobileError> {
+    let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
+    let password = request
+        .password
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let selected_paths = sanitize_selected_paths(request.selected_paths);
+    let path = Path::new(&archive_path);
+    let (format, _warnings) = classify_archive_path(path);
+
+    let report = if matches!(format, ArchiveFormat::Zip) {
+        let selected_paths = selected_paths.as_slice();
+        TestArchiveReport::from_zip(
+            zip_backend::test_zip_with_password_filter(path, password, |entry_path| {
+                selected_path_matches(selected_paths, entry_path)
+            })
+            .map_err(map_zip_error)?,
+        )
+    } else if matches!(format, ArchiveFormat::Tzap) {
+        let selected_paths = selected_paths.as_slice();
+        TestArchiveReport::from_tzap(
+            tzap_backend::test_tzap_with_optional_password_filter_and_x509_trust(
+                path,
+                password,
+                |entry_path| selected_path_matches(selected_paths, entry_path),
+                None,
+            )
+            .map_err(map_tzap_error)?,
+        )
+    } else if let Some(raw_format) = raw_stream_backend::detect_raw_stream_format(path) {
+        test_raw_stream(path, raw_format, &selected_paths)?
+    } else {
+        let selected_paths = selected_paths.as_slice();
+        TestArchiveReport::from_libarchive(
+            libarchive_backend::test_archive_with_password_filter(path, password, |entry_path| {
+                selected_path_matches(selected_paths, entry_path)
+            })
+            .map_err(map_libarchive_error)?,
+        )
+    };
+
+    Ok(TestArchiveResult {
+        archive_path,
+        format,
+        format_label: format_label(format).to_string(),
+        verified: true,
+        tested_entries: report.tested_entries,
+        skipped_entries: report.skipped_entries,
+        total_entries: report.total_entries(),
+        tested_bytes: report.tested_bytes,
+        warnings: report.warnings,
+    })
+}
+
+#[allow(non_snake_case)]
+pub fn testArchive(request: TestArchiveRequest) -> Result<TestArchiveResult, ZmanagerMobileError> {
+    test_archive(request)
+}
+
+struct TestArchiveReport {
+    tested_entries: u64,
+    skipped_entries: u64,
+    tested_bytes: u64,
+    warnings: Vec<BridgeError>,
+}
+
+impl TestArchiveReport {
+    fn from_zip(report: ZipTestReport) -> Self {
+        Self {
+            tested_entries: usize_to_u64(report.tested_entries),
+            skipped_entries: usize_to_u64(report.skipped_entries),
+            tested_bytes: report.tested_bytes,
+            warnings: Vec::new(),
+        }
+    }
+
+    fn from_libarchive(report: LibarchiveTestReport) -> Self {
+        Self {
+            tested_entries: usize_to_u64(report.tested_entries),
+            skipped_entries: usize_to_u64(report.skipped_entries),
+            tested_bytes: report.tested_bytes,
+            warnings: Vec::new(),
+        }
+    }
+
+    fn from_tzap(report: TzapTestReport) -> Self {
+        let warnings = report
+            .x509_root_auth
+            .map(|verification| {
+                let mut warnings = Vec::with_capacity(1 + verification.diagnostics.len());
+                warnings.push(bridge_warning(format!(
+                    "TZAP root-auth verified for {}",
+                    verification.subject
+                )));
+                warnings.extend(verification.diagnostics.into_iter().map(bridge_warning));
+                warnings
+            })
+            .unwrap_or_default();
+
+        Self {
+            tested_entries: usize_to_u64(report.tested_entries),
+            skipped_entries: usize_to_u64(report.skipped_entries),
+            tested_bytes: report.tested_bytes,
+            warnings,
+        }
+    }
+
+    fn total_entries(&self) -> u64 {
+        self.tested_entries.saturating_add(self.skipped_entries)
+    }
+}
+
+fn test_raw_stream(
+    path: &Path,
+    format: raw_stream_backend::RawStreamFormat,
+    selected_paths: &[String],
+) -> Result<TestArchiveReport, ZmanagerMobileError> {
+    let synthetic_entry = raw_stream_backend::output_name_for_raw_stream(path, format)
+        .unwrap_or_else(|| format_label(classify_archive_path(path).0).to_string());
+
+    if !selected_path_matches(selected_paths, &synthetic_entry) {
+        return Ok(TestArchiveReport {
+            tested_entries: 0,
+            skipped_entries: 1,
+            tested_bytes: 0,
+            warnings: Vec::new(),
+        });
+    }
+
+    let tested_bytes =
+        raw_stream_backend::test_raw_stream(path, format).map_err(map_raw_stream_error)?;
+
+    Ok(TestArchiveReport {
+        tested_entries: 1,
+        skipped_entries: 0,
+        tested_bytes,
+        warnings: Vec::new(),
+    })
+}
+
+fn sanitize_selected_paths(selected_paths: Vec<String>) -> Vec<String> {
+    selected_paths
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn selected_path_matches(selected_paths: &[String], entry_path: &str) -> bool {
+    selected_paths.is_empty() || selected_paths.iter().any(|value| value == entry_path)
 }
 
 fn ensure_existing_file_path(value: String, field: &str) -> Result<String, ZmanagerMobileError> {
@@ -498,6 +672,9 @@ fn map_zip_error(error: ZipBackendError) -> ZmanagerMobileError {
             BridgeSeverity::Warning,
             false,
         ),
+        ZipBackendError::Zip(source) => {
+            damaged_archive(format!("ZIP archive could not be read: {source}"))
+        }
         ZipBackendError::Cancelled => bridge_error(
             ERROR_CANCELLED,
             "ZIP job was cancelled.",
@@ -581,6 +758,11 @@ fn map_tzap_error(error: TzapError) -> ZmanagerMobileError {
             BridgeSeverity::Warning,
             false,
         ),
+        TzapError::Format(source) => {
+            damaged_archive(format!("TZAP archive could not be verified: {source}"))
+        }
+        TzapError::X509RootAuth(_) => damaged_archive("TZAP root-auth verification failed."),
+        TzapError::KeyWrap(_) => damaged_archive("TZAP recipient key wrapping failed."),
         TzapError::Io { path, source } => map_io_error(path, source),
         TzapError::Safety(source) => bridge_error(
             ERROR_UNSAFE_ARCHIVE,
@@ -602,6 +784,9 @@ fn map_tzap_error(error: TzapError) -> ZmanagerMobileError {
 
 fn map_libarchive_error(error: LibarchiveError) -> ZmanagerMobileError {
     match error {
+        LibarchiveError::Archive(source) => {
+            damaged_archive(format!("Archive could not be read: {source}"))
+        }
         LibarchiveError::RawStream(source) => map_raw_stream_error(source),
         LibarchiveError::Io { path, source } => map_io_error(path, source),
         LibarchiveError::Safety(source) => bridge_error(
@@ -646,6 +831,9 @@ fn map_raw_stream_error(error: RawStreamError) -> ZmanagerMobileError {
             BridgeSeverity::Warning,
             false,
         ),
+        RawStreamError::ExternalToolFailed { tool, .. } => {
+            damaged_archive(format!("{tool} could not decode this stream."))
+        }
         source => operation_failed(format!("Raw stream operation failed: {source}")),
     }
 }
@@ -680,6 +868,26 @@ fn operation_failed(message: impl Into<String>) -> ZmanagerMobileError {
     )
 }
 
+fn damaged_archive(message: impl Into<String>) -> ZmanagerMobileError {
+    bridge_error(
+        ERROR_DAMAGED_ARCHIVE,
+        message,
+        hint("Choose a different archive or verify the source file."),
+        BridgeSeverity::Warning,
+        false,
+    )
+}
+
+fn bridge_warning(message: impl Into<String>) -> BridgeError {
+    BridgeError {
+        code: "warning".to_string(),
+        message: message.into(),
+        recovery_hint: None,
+        severity: BridgeSeverity::Warning,
+        retryable: false,
+    }
+}
+
 fn bridge_error(
     code: impl Into<String>,
     message: impl Into<String>,
@@ -699,6 +907,10 @@ fn bridge_error(
 
 fn hint(value: impl Into<String>) -> Option<String> {
     Some(value.into())
+}
+
+fn usize_to_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
 }
 
 fn is_retryable_io_error(kind: io::ErrorKind) -> bool {
@@ -820,10 +1032,81 @@ mod tests {
         assert!(result.total_size.is_some());
     }
 
+    #[test]
+    fn test_archive_reads_real_zip_through_core() {
+        let fixture = create_test_zip("test-archive-real-zip");
+
+        let result = test_archive(TestArchiveRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: Vec::new(),
+        })
+        .expect("core-backed archive test should succeed");
+
+        assert_eq!(result.format, ArchiveFormat::Zip);
+        assert!(result.verified);
+        assert!(result.tested_entries >= 1);
+        assert_eq!(
+            result.total_entries,
+            result.tested_entries + result.skipped_entries
+        );
+        assert!(result.tested_bytes > 0);
+    }
+
+    #[test]
+    fn test_archive_honors_selected_entry_filter() {
+        let fixture = create_test_zip("test-archive-selected-filter");
+
+        let result = test_archive(TestArchiveRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: vec!["missing.txt".to_string()],
+        })
+        .expect("skipping all entries is still a successful filtered test");
+
+        assert_eq!(result.tested_entries, 0);
+        assert!(result.skipped_entries >= 1);
+        assert_eq!(result.total_entries, result.skipped_entries);
+        assert_eq!(result.tested_bytes, 0);
+    }
+
+    #[test]
+    fn test_archive_reports_corrupt_zip_as_damaged_archive() {
+        let temp = TestDir::new("test-archive-corrupt-zip");
+        temp.write_file("broken.zip", b"this is not a zip archive");
+
+        let error = test_archive(TestArchiveRequest {
+            archive_path: temp.path("broken.zip").to_string_lossy().to_string(),
+            password: None,
+            selected_paths: Vec::new(),
+        })
+        .unwrap_err();
+
+        assert_bridge_error_code(error, ERROR_DAMAGED_ARCHIVE);
+    }
+
     fn assert_bridge_error_code(error: ZmanagerMobileError, expected: &str) {
         match error {
             ZmanagerMobileError::Bridge { code, .. } => assert_eq!(code, expected),
         }
+    }
+
+    fn create_test_zip(name: &str) -> TestArchiveFixture {
+        let temp = TestDir::new(name);
+        temp.create_dir("project");
+        temp.write_file("project/readme.txt", b"hello mobile bridge\n");
+        let archive = temp.path("archive.zip");
+        create_zip_from_path(temp.path("project"), &archive, &ZipCreateOptions::default())
+            .expect("fixture zip should be created through zmanager-core");
+        TestArchiveFixture {
+            _temp: temp,
+            archive,
+        }
+    }
+
+    struct TestArchiveFixture {
+        _temp: TestDir,
+        archive: PathBuf,
     }
 
     struct TestDir {

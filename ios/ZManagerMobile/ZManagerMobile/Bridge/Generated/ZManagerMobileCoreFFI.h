@@ -267,6 +267,11 @@ RustBuffer uniffi_zmanager_mobile_core_fn_func_healthcheck(RustCallStatus *_Nonn
 RustBuffer uniffi_zmanager_mobile_core_fn_func_listarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_TESTARCHIVE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_TESTARCHIVE
+RustBuffer uniffi_zmanager_mobile_core_fn_func_testarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_FFI_ZMANAGER_MOBILE_CORE_RUSTBUFFER_ALLOC
 #define UNIFFI_FFIDEF_FFI_ZMANAGER_MOBILE_CORE_RUSTBUFFER_ALLOC
 RustBuffer ffi_zmanager_mobile_core_rustbuffer_alloc(uint64_t size, RustCallStatus *_Nonnull out_status
@@ -562,6 +567,12 @@ uint16_t uniffi_zmanager_mobile_core_checksum_func_healthcheck(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_LISTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_LISTARCHIVE
 uint16_t uniffi_zmanager_mobile_core_checksum_func_listarchive(void
+
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_TESTARCHIVE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_TESTARCHIVE
+uint16_t uniffi_zmanager_mobile_core_checksum_func_testarchive(void
 
 );
 #endif

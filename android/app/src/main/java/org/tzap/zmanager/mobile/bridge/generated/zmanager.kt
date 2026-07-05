@@ -717,6 +717,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -737,6 +739,8 @@ internal interface IntegrityCheckingUniffiLib : Library {
 fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_testarchive(
 ): Short
 fun ffi_zmanager_mobile_core_uniffi_contract_version(
 ): Int
@@ -788,6 +792,8 @@ internal interface UniffiLib : Library {
 fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun ffi_zmanager_mobile_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -922,6 +928,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1416,6 +1425,102 @@ public object FfiConverterTypeListArchiveResult: FfiConverterRustBuffer<ListArch
 
 
 
+data class TestArchiveRequest (
+    var `archivePath`: kotlin.String,
+    var `password`: kotlin.String?,
+    var `selectedPaths`: List<kotlin.String>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTestArchiveRequest: FfiConverterRustBuffer<TestArchiveRequest> {
+    override fun read(buf: ByteBuffer): TestArchiveRequest {
+        return TestArchiveRequest(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: TestArchiveRequest) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterSequenceString.allocationSize(value.`selectedPaths`)
+    )
+
+    override fun write(value: TestArchiveRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterSequenceString.write(value.`selectedPaths`, buf)
+    }
+}
+
+
+
+data class TestArchiveResult (
+    var `archivePath`: kotlin.String,
+    var `format`: ArchiveFormat,
+    var `formatLabel`: kotlin.String,
+    var `verified`: kotlin.Boolean,
+    var `testedEntries`: kotlin.ULong,
+    var `skippedEntries`: kotlin.ULong,
+    var `totalEntries`: kotlin.ULong,
+    var `testedBytes`: kotlin.ULong,
+    var `warnings`: List<BridgeError>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTestArchiveResult: FfiConverterRustBuffer<TestArchiveResult> {
+    override fun read(buf: ByteBuffer): TestArchiveResult {
+        return TestArchiveResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeArchiveFormat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: TestArchiveResult) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterTypeArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`formatLabel`) +
+            FfiConverterBoolean.allocationSize(value.`verified`) +
+            FfiConverterULong.allocationSize(value.`testedEntries`) +
+            FfiConverterULong.allocationSize(value.`skippedEntries`) +
+            FfiConverterULong.allocationSize(value.`totalEntries`) +
+            FfiConverterULong.allocationSize(value.`testedBytes`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: TestArchiveResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterTypeArchiveFormat.write(value.`format`, buf)
+            FfiConverterString.write(value.`formatLabel`, buf)
+            FfiConverterBoolean.write(value.`verified`, buf)
+            FfiConverterULong.write(value.`testedEntries`, buf)
+            FfiConverterULong.write(value.`skippedEntries`, buf)
+            FfiConverterULong.write(value.`totalEntries`, buf)
+            FfiConverterULong.write(value.`testedBytes`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
 
 enum class ArchiveEntryKind {
 
@@ -1775,6 +1880,16 @@ public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<B
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `testArchive`(`request`: TestArchiveRequest): TestArchiveResult {
+            return FfiConverterTypeTestArchiveResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_testarchive(
+        FfiConverterTypeTestArchiveRequest.lower(`request`),_status)
 }
     )
     }
