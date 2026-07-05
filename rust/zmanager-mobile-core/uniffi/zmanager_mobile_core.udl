@@ -6,6 +6,8 @@ namespace zmanager {
     ListArchiveResult listArchive(ListArchiveRequest request);
     [Throws=ZmanagerMobileError]
     TestArchiveResult testArchive(TestArchiveRequest request);
+    [Throws=ZmanagerMobileError]
+    MaterializePreviewResult materializePreview(MaterializePreviewRequest request);
 };
 
 enum BridgeSeverity {
@@ -115,6 +117,22 @@ dictionary TestArchiveResult {
     u64 skipped_entries;
     u64 total_entries;
     u64 tested_bytes;
+    sequence<BridgeError> warnings;
+};
+
+dictionary MaterializePreviewRequest {
+    string archive_path;
+    string entry_path;
+    string? password;
+    u64 strip_components;
+};
+
+dictionary MaterializePreviewResult {
+    string archive_path;
+    string entry_path;
+    string cleanup_root;
+    string preview_path;
+    u64 written_bytes;
     sequence<BridgeError> warnings;
 };
 

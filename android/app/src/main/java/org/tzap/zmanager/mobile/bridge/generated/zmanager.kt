@@ -719,6 +719,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -739,6 +741,8 @@ internal interface IntegrityCheckingUniffiLib : Library {
 fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_materializepreview(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_testarchive(
 ): Short
@@ -792,6 +796,8 @@ internal interface UniffiLib : Library {
 fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -928,6 +934,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995.toShort()) {
@@ -1425,6 +1434,94 @@ public object FfiConverterTypeListArchiveResult: FfiConverterRustBuffer<ListArch
 
 
 
+data class MaterializePreviewRequest (
+    var `archivePath`: kotlin.String,
+    var `entryPath`: kotlin.String,
+    var `password`: kotlin.String?,
+    var `stripComponents`: kotlin.ULong
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMaterializePreviewRequest: FfiConverterRustBuffer<MaterializePreviewRequest> {
+    override fun read(buf: ByteBuffer): MaterializePreviewRequest {
+        return MaterializePreviewRequest(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MaterializePreviewRequest) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`entryPath`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterULong.allocationSize(value.`stripComponents`)
+    )
+
+    override fun write(value: MaterializePreviewRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`entryPath`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterULong.write(value.`stripComponents`, buf)
+    }
+}
+
+
+
+data class MaterializePreviewResult (
+    var `archivePath`: kotlin.String,
+    var `entryPath`: kotlin.String,
+    var `cleanupRoot`: kotlin.String,
+    var `previewPath`: kotlin.String,
+    var `writtenBytes`: kotlin.ULong,
+    var `warnings`: List<BridgeError>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer<MaterializePreviewResult> {
+    override fun read(buf: ByteBuffer): MaterializePreviewResult {
+        return MaterializePreviewResult(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MaterializePreviewResult) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`entryPath`) +
+            FfiConverterString.allocationSize(value.`cleanupRoot`) +
+            FfiConverterString.allocationSize(value.`previewPath`) +
+            FfiConverterULong.allocationSize(value.`writtenBytes`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: MaterializePreviewResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`entryPath`, buf)
+            FfiConverterString.write(value.`cleanupRoot`, buf)
+            FfiConverterString.write(value.`previewPath`, buf)
+            FfiConverterULong.write(value.`writtenBytes`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
 data class TestArchiveRequest (
     var `archivePath`: kotlin.String,
     var `password`: kotlin.String?,
@@ -1880,6 +1977,16 @@ public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<B
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `materializePreview`(`request`: MaterializePreviewRequest): MaterializePreviewResult {
+            return FfiConverterTypeMaterializePreviewResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_materializepreview(
+        FfiConverterTypeMaterializePreviewRequest.lower(`request`),_status)
 }
     )
     }

@@ -1137,6 +1137,194 @@ public func FfiConverterTypeListArchiveResult_lower(_ value: ListArchiveResult) 
 }
 
 
+public struct MaterializePreviewRequest {
+    public var archivePath: String
+    public var entryPath: String
+    public var password: String?
+    public var stripComponents: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, entryPath: String, password: String?, stripComponents: UInt64) {
+        self.archivePath = archivePath
+        self.entryPath = entryPath
+        self.password = password
+        self.stripComponents = stripComponents
+    }
+}
+
+#if compiler(>=6)
+extension MaterializePreviewRequest: Sendable {}
+#endif
+
+
+extension MaterializePreviewRequest: Equatable, Hashable {
+    public static func ==(lhs: MaterializePreviewRequest, rhs: MaterializePreviewRequest) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.entryPath != rhs.entryPath {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.stripComponents != rhs.stripComponents {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(entryPath)
+        hasher.combine(password)
+        hasher.combine(stripComponents)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMaterializePreviewRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MaterializePreviewRequest {
+        return
+            try MaterializePreviewRequest(
+                archivePath: FfiConverterString.read(from: &buf),
+                entryPath: FfiConverterString.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                stripComponents: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MaterializePreviewRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.entryPath, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterUInt64.write(value.stripComponents, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMaterializePreviewRequest_lift(_ buf: RustBuffer) throws -> MaterializePreviewRequest {
+    return try FfiConverterTypeMaterializePreviewRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMaterializePreviewRequest_lower(_ value: MaterializePreviewRequest) -> RustBuffer {
+    return FfiConverterTypeMaterializePreviewRequest.lower(value)
+}
+
+
+public struct MaterializePreviewResult {
+    public var archivePath: String
+    public var entryPath: String
+    public var cleanupRoot: String
+    public var previewPath: String
+    public var writtenBytes: UInt64
+    public var warnings: [BridgeError]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, entryPath: String, cleanupRoot: String, previewPath: String, writtenBytes: UInt64, warnings: [BridgeError]) {
+        self.archivePath = archivePath
+        self.entryPath = entryPath
+        self.cleanupRoot = cleanupRoot
+        self.previewPath = previewPath
+        self.writtenBytes = writtenBytes
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension MaterializePreviewResult: Sendable {}
+#endif
+
+
+extension MaterializePreviewResult: Equatable, Hashable {
+    public static func ==(lhs: MaterializePreviewResult, rhs: MaterializePreviewResult) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.entryPath != rhs.entryPath {
+            return false
+        }
+        if lhs.cleanupRoot != rhs.cleanupRoot {
+            return false
+        }
+        if lhs.previewPath != rhs.previewPath {
+            return false
+        }
+        if lhs.writtenBytes != rhs.writtenBytes {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(entryPath)
+        hasher.combine(cleanupRoot)
+        hasher.combine(previewPath)
+        hasher.combine(writtenBytes)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MaterializePreviewResult {
+        return
+            try MaterializePreviewResult(
+                archivePath: FfiConverterString.read(from: &buf),
+                entryPath: FfiConverterString.read(from: &buf),
+                cleanupRoot: FfiConverterString.read(from: &buf),
+                previewPath: FfiConverterString.read(from: &buf),
+                writtenBytes: FfiConverterUInt64.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MaterializePreviewResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.entryPath, into: &buf)
+        FfiConverterString.write(value.cleanupRoot, into: &buf)
+        FfiConverterString.write(value.previewPath, into: &buf)
+        FfiConverterUInt64.write(value.writtenBytes, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMaterializePreviewResult_lift(_ buf: RustBuffer) throws -> MaterializePreviewResult {
+    return try FfiConverterTypeMaterializePreviewResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMaterializePreviewResult_lower(_ value: MaterializePreviewResult) -> RustBuffer {
+    return FfiConverterTypeMaterializePreviewResult.lower(value)
+}
+
+
 public struct TestArchiveRequest {
     public var archivePath: String
     public var password: String?
@@ -1923,6 +2111,13 @@ public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult
     )
 })
 }
+public func materializePreview(request: MaterializePreviewRequest)throws  -> MaterializePreviewResult  {
+    return try  FfiConverterTypeMaterializePreviewResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_materializepreview(
+        FfiConverterTypeMaterializePreviewRequest_lower(request),$0
+    )
+})
+}
 public func testArchive(request: TestArchiveRequest)throws  -> TestArchiveResult  {
     return try  FfiConverterTypeTestArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_testarchive(
@@ -1953,6 +2148,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995) {

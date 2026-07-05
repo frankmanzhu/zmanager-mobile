@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zmanager_core::archive_browser::{
-    self, ArchiveBrowserError, BrowserEntryKind, BrowserListOptions,
+    self, ArchiveBrowserError, BrowserEntryKind, BrowserExtractOptions, BrowserListOptions,
 };
 use zmanager_core::libarchive_backend::{self, LibarchiveError, LibarchiveTestReport};
 use zmanager_core::raw_stream_backend::{self, RawStreamError};
@@ -173,6 +173,24 @@ pub struct TestArchiveResult {
     pub warnings: Vec<BridgeError>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterializePreviewRequest {
+    pub archive_path: String,
+    pub entry_path: String,
+    pub password: Option<String>,
+    pub strip_components: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaterializePreviewResult {
+    pub archive_path: String,
+    pub entry_path: String,
+    pub cleanup_root: String,
+    pub preview_path: String,
+    pub written_bytes: u64,
+    pub warnings: Vec<BridgeError>,
+}
+
 pub fn healthcheck() -> HealthcheckResult {
     let report = zmanager_core::healthcheck();
     HealthcheckResult {
@@ -329,6 +347,46 @@ pub fn testArchive(request: TestArchiveRequest) -> Result<TestArchiveResult, Zma
     test_archive(request)
 }
 
+pub fn materialize_preview(
+    request: MaterializePreviewRequest,
+) -> Result<MaterializePreviewResult, ZmanagerMobileError> {
+    let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
+    let entry_path = ensure_non_empty_entry_path(request.entry_path)?;
+    let strip_components = usize_from_u64(request.strip_components, "stripComponents")?;
+    let password = request
+        .password
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    let report = archive_browser::preview_entry_with_options(
+        Path::new(&archive_path),
+        &entry_path,
+        BrowserExtractOptions {
+            password,
+            strip_components,
+            ..BrowserExtractOptions::default()
+        },
+    )
+    .map_err(map_archive_browser_error)?;
+
+    Ok(MaterializePreviewResult {
+        archive_path,
+        entry_path,
+        cleanup_root: report.cleanup_root.to_string_lossy().to_string(),
+        preview_path: report.preview_path.to_string_lossy().to_string(),
+        written_bytes: report.written_bytes,
+        warnings: Vec::new(),
+    })
+}
+
+#[allow(non_snake_case)]
+pub fn materializePreview(
+    request: MaterializePreviewRequest,
+) -> Result<MaterializePreviewResult, ZmanagerMobileError> {
+    materialize_preview(request)
+}
+
 struct TestArchiveReport {
     tested_entries: u64,
     skipped_entries: u64,
@@ -420,6 +478,32 @@ fn sanitize_selected_paths(selected_paths: Vec<String>) -> Vec<String> {
 
 fn selected_path_matches(selected_paths: &[String], entry_path: &str) -> bool {
     selected_paths.is_empty() || selected_paths.iter().any(|value| value == entry_path)
+}
+
+fn ensure_non_empty_entry_path(value: String) -> Result<String, ZmanagerMobileError> {
+    if value.is_empty() {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "entryPath cannot be empty",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    Ok(value)
+}
+
+fn usize_from_u64(value: u64, field: &str) -> Result<usize, ZmanagerMobileError> {
+    usize::try_from(value).map_err(|_| {
+        bridge_error(
+            ERROR_INVALID_REQUEST,
+            format!("{field} is too large for this device"),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        )
+    })
 }
 
 fn ensure_existing_file_path(value: String, field: &str) -> Result<String, ZmanagerMobileError> {
@@ -1085,10 +1169,68 @@ mod tests {
         assert_bridge_error_code(error, ERROR_DAMAGED_ARCHIVE);
     }
 
+    #[test]
+    fn materialize_preview_extracts_one_entry_to_cleanup_root() {
+        let fixture = create_test_zip("materialize-preview-real-zip");
+        let entry_path = readme_entry_path(&fixture.archive);
+
+        let result = materialize_preview(MaterializePreviewRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            entry_path: entry_path.clone(),
+            password: None,
+            strip_components: 0,
+        })
+        .expect("preview should materialize through zmanager-core");
+
+        let cleanup_root = PathBuf::from(&result.cleanup_root);
+        let preview_path = PathBuf::from(&result.preview_path);
+        let canonical_cleanup_root =
+            fs::canonicalize(&cleanup_root).expect("cleanup root should exist");
+        let canonical_preview_path =
+            fs::canonicalize(&preview_path).expect("preview path should exist");
+        assert_eq!(result.entry_path, entry_path);
+        assert!(canonical_preview_path.starts_with(&canonical_cleanup_root));
+        assert_eq!(
+            fs::read_to_string(&preview_path).expect("preview file should be readable"),
+            "hello mobile bridge\n"
+        );
+        assert!(result.written_bytes > 0);
+
+        fs::remove_dir_all(cleanup_root).expect("preview cleanup root should be removable");
+    }
+
+    #[test]
+    fn materialize_preview_rejects_empty_entry_path() {
+        let fixture = create_test_zip("materialize-preview-empty-entry");
+
+        let error = materialize_preview(MaterializePreviewRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            entry_path: String::new(),
+            password: None,
+            strip_components: 0,
+        })
+        .unwrap_err();
+
+        assert_bridge_error_code(error, ERROR_INVALID_REQUEST);
+    }
+
     fn assert_bridge_error_code(error: ZmanagerMobileError, expected: &str) {
         match error {
             ZmanagerMobileError::Bridge { code, .. } => assert_eq!(code, expected),
         }
+    }
+
+    fn readme_entry_path(archive: &Path) -> String {
+        list_archive(ListArchiveRequest {
+            archive_path: archive.to_string_lossy().to_string(),
+            password: None,
+        })
+        .expect("fixture archive should list")
+        .entries
+        .into_iter()
+        .find(|entry| entry.path.ends_with("readme.txt"))
+        .expect("fixture archive should contain readme.txt")
+        .path
     }
 
     fn create_test_zip(name: &str) -> TestArchiveFixture {
