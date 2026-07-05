@@ -11,6 +11,7 @@
 		01A000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000102 /* ContentView.swift */; };
 		01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000103 /* ZManagerMobileTests.swift */; };
 		01A000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000107 /* Assets.xcassets */; };
+		01A000000000000000000005 /* ZManagerMobileCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000108 /* ZManagerMobileCore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,9 @@
 		01A000000000000000000105 /* ZManagerMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZManagerMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		01A000000000000000000106 /* ZManagerMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		01A000000000000000000107 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		01A000000000000000000108 /* ZManagerMobileCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileCore.swift; sourceTree = "<group>"; };
+		01A000000000000000000109 /* ZManagerMobileCoreFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZManagerMobileCoreFFI.h; sourceTree = "<group>"; };
+		01A00000000000000000010A /* ZManagerMobileCoreFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = ZManagerMobileCoreFFI.modulemap; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,8 +71,27 @@
 				01A000000000000000000102 /* ContentView.swift */,
 				01A000000000000000000104 /* Info.plist */,
 				01A000000000000000000107 /* Assets.xcassets */,
+				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000605 /* Bridge */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000606 /* Generated */,
+			);
+			path = Bridge;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000606 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000108 /* ZManagerMobileCore.swift */,
+				01A000000000000000000109 /* ZManagerMobileCoreFFI.h */,
+				01A00000000000000000010A /* ZManagerMobileCoreFFI.modulemap */,
+			);
+			path = Generated;
 			sourceTree = "<group>";
 		};
 		01A000000000000000000603 /* ZManagerMobileTests */ = {
@@ -95,6 +118,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 01A000000000000000000701 /* Build configuration list for PBXNativeTarget "ZManagerMobile" */;
 			buildPhases = (
+				01A000000000000000000903 /* Build Rust Bridge */,
 				01A000000000000000000801 /* Sources */,
 				01A000000000000000000501 /* Frameworks */,
 				01A000000000000000000901 /* Resources */,
@@ -182,6 +206,29 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		01A000000000000000000903 /* Build Rust Bridge */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Bridge";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/build/rust/libzmanager_mobile_core_sim.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd \"$SRCROOT/../..\" && ./scripts/build-ios-rust.sh\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		01A000000000000000000801 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -189,6 +236,7 @@
 			files = (
 				01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */,
 				01A000000000000000000002 /* ContentView.swift in Sources */,
+				01A000000000000000000005 /* ZManagerMobileCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,13 +302,39 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				INFOPLIST_FILE = ZManagerMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/build/rust",
+				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lzmanager_mobile_core_sim",
+					"-lz",
+					"-lbz2",
+					"-lc++",
+					"-liconv",
+					"-lxml2",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -272,13 +346,39 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				INFOPLIST_FILE = ZManagerMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/build/rust",
+				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lzmanager_mobile_core_sim",
+					"-lz",
+					"-lbz2",
+					"-lc++",
+					"-liconv",
+					"-lxml2",
+				);
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -290,10 +390,23 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
@@ -306,10 +419,23 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_INCLUDE_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
+				);
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
