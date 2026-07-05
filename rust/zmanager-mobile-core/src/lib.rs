@@ -41,6 +41,8 @@ const ERROR_UNSUPPORTED_FORMAT: &str = "unsupported_format";
 const ERROR_DAMAGED_ARCHIVE: &str = "damaged_archive";
 const ERROR_CANCELLED: &str = "cancelled";
 const ERROR_OPERATION_FAILED: &str = "operation_failed";
+const WARNING_GENERIC: &str = "warning";
+const WARNING_LAUNCH_GATED_FORMAT: &str = "launch_gated_format";
 const MAX_EVENTS_PER_JOB: usize = 512;
 
 static JOB_REGISTRY: OnceLock<Arc<MobileJobRegistry>> = OnceLock::new();
@@ -132,7 +134,7 @@ pub struct DetectArchiveResult {
     pub can_list: bool,
     pub can_extract: bool,
     pub can_create: bool,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<BridgeError>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -476,10 +478,10 @@ pub fn detect_archive(
     let (can_list, can_extract, can_create) = format_capabilities(format);
 
     if matches!(format, ArchiveFormat::AppleArchive | ArchiveFormat::Xip) {
-        warnings.push(
+        warnings.push(bridge_warning_with_code(
+            WARNING_LAUNCH_GATED_FORMAT,
             "This launch-scope format must be handled by zmanager-core before mobile exposes it."
-                .to_string(),
-        );
+        ));
     }
 
     Ok(DetectArchiveResult {
@@ -2581,7 +2583,7 @@ fn ensure_existing_file_path(value: String, field: &str) -> Result<String, Zmana
     Ok(value)
 }
 
-fn classify_archive_path(path: &Path) -> (ArchiveFormat, Vec<String>) {
+fn classify_archive_path(path: &Path) -> (ArchiveFormat, Vec<BridgeError>) {
     let file_name = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -3054,8 +3056,12 @@ fn bridge_error_from_mobile(error: ZmanagerMobileError) -> BridgeError {
 }
 
 fn bridge_warning(message: impl Into<String>) -> BridgeError {
+    bridge_warning_with_code(WARNING_GENERIC, message)
+}
+
+fn bridge_warning_with_code(code: impl Into<String>, message: impl Into<String>) -> BridgeError {
     BridgeError {
-        code: "warning".to_string(),
+        code: code.into(),
         message: message.into(),
         recovery_hint: None,
         severity: BridgeSeverity::Warning,
@@ -3179,6 +3185,24 @@ mod tests {
         assert!(result.can_list);
         assert!(result.can_extract);
         assert!(result.can_create);
+    }
+
+    #[test]
+    fn detect_archive_returns_normalized_launch_gated_warning() {
+        let temp = TestDir::new("detect-launch-gated-warning");
+        temp.write_file("archive.aar", b"not parsed during detection");
+
+        let result = detect_archive(DetectArchiveRequest {
+            archive_path: temp.path("archive.aar").to_string_lossy().to_string(),
+        })
+        .expect("detection should classify launch-gated app-controlled path");
+
+        assert_eq!(result.format, ArchiveFormat::AppleArchive);
+        assert_eq!(result.warnings.len(), 1);
+        let warning = &result.warnings[0];
+        assert_eq!(warning.code, WARNING_LAUNCH_GATED_FORMAT);
+        assert!(matches!(warning.severity, BridgeSeverity::Warning));
+        assert!(!warning.retryable);
     }
 
     #[test]

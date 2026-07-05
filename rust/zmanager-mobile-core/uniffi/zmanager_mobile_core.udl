@@ -80,7 +80,7 @@ dictionary DetectArchiveResult {
     boolean can_list;
     boolean can_extract;
     boolean can_create;
-    sequence<string> warnings;
+    sequence<BridgeError> warnings;
 };
 
 enum ArchiveEntryKind {

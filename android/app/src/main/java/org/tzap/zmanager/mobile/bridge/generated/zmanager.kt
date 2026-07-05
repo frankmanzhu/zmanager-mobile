@@ -1458,7 +1458,7 @@ data class DetectArchiveResult (
     var `canList`: kotlin.Boolean,
     var `canExtract`: kotlin.Boolean,
     var `canCreate`: kotlin.Boolean,
-    var `warnings`: List<kotlin.String>
+    var `warnings`: List<BridgeError>
 ) {
 
     companion object
@@ -1478,7 +1478,7 @@ public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<Detect
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
-            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
         )
     }
 
@@ -1491,7 +1491,7 @@ public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<Detect
             FfiConverterBoolean.allocationSize(value.`canList`) +
             FfiConverterBoolean.allocationSize(value.`canExtract`) +
             FfiConverterBoolean.allocationSize(value.`canCreate`) +
-            FfiConverterSequenceString.allocationSize(value.`warnings`)
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
     )
 
     override fun write(value: DetectArchiveResult, buf: ByteBuffer) {
@@ -1503,7 +1503,7 @@ public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<Detect
             FfiConverterBoolean.write(value.`canList`, buf)
             FfiConverterBoolean.write(value.`canExtract`, buf)
             FfiConverterBoolean.write(value.`canCreate`, buf)
-            FfiConverterSequenceString.write(value.`warnings`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
     }
 }
 

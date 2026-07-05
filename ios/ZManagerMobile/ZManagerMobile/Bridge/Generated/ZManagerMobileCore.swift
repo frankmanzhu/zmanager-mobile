@@ -1050,11 +1050,11 @@ public struct DetectArchiveResult {
     public var canList: Bool
     public var canExtract: Bool
     public var canCreate: Bool
-    public var warnings: [String]
+    public var warnings: [BridgeError]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(archivePath: String, format: ArchiveFormat, formatLabel: String, exists: Bool, isFile: Bool, canList: Bool, canExtract: Bool, canCreate: Bool, warnings: [String]) {
+    public init(archivePath: String, format: ArchiveFormat, formatLabel: String, exists: Bool, isFile: Bool, canList: Bool, canExtract: Bool, canCreate: Bool, warnings: [BridgeError]) {
         self.archivePath = archivePath
         self.format = format
         self.formatLabel = formatLabel
@@ -1134,7 +1134,7 @@ public struct FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer {
                 canList: FfiConverterBool.read(from: &buf),
                 canExtract: FfiConverterBool.read(from: &buf),
                 canCreate: FfiConverterBool.read(from: &buf),
-                warnings: FfiConverterSequenceString.read(from: &buf)
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
 
@@ -1147,7 +1147,7 @@ public struct FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer {
         FfiConverterBool.write(value.canList, into: &buf)
         FfiConverterBool.write(value.canExtract, into: &buf)
         FfiConverterBool.write(value.canCreate, into: &buf)
-        FfiConverterSequenceString.write(value.warnings, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
     }
 }
 
