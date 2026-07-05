@@ -20,6 +20,7 @@ namespace zmanager {
     PollJobEventsResult pollJobEvents(PollJobEventsRequest request);
     [Throws=ZmanagerMobileError]
     CancelJobResult cancelJob(CancelJobRequest request);
+    ClearSensitiveStateResult clearSensitiveState();
 };
 
 enum BridgeSeverity {
@@ -359,6 +360,12 @@ dictionary CancelJobResult {
     string job_id;
     MobileJobStatus status;
     boolean cancel_requested;
+};
+
+dictionary ClearSensitiveStateResult {
+    u64 cleared_terminal_jobs;
+    u64 cancel_requested_jobs;
+    u64 retained_active_jobs;
 };
 
 [Error]

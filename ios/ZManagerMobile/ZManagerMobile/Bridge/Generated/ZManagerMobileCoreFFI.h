@@ -256,6 +256,12 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
 RustBuffer uniffi_zmanager_mobile_core_fn_func_canceljob(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_CLEARSENSITIVESTATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_CLEARSENSITIVESTATE
+RustBuffer uniffi_zmanager_mobile_core_fn_func_clearsensitivestate(RustCallStatus *_Nonnull out_status
+
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
 RustBuffer uniffi_zmanager_mobile_core_fn_func_detectarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
@@ -590,6 +596,12 @@ void ffi_zmanager_mobile_core_rust_future_complete_void(uint64_t handle, RustCal
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CANCELJOB
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CANCELJOB
 uint16_t uniffi_zmanager_mobile_core_checksum_func_canceljob(void
+
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CLEARSENSITIVESTATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CLEARSENSITIVESTATE
+uint16_t uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate(void
 
 );
 #endif

@@ -733,6 +733,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -749,6 +751,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
     fun uniffi_zmanager_mobile_core_checksum_func_canceljob(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_detectarchive(
 ): Short
@@ -816,6 +820,8 @@ internal interface UniffiLib : Library {
 
     // FFI functions
     fun uniffi_zmanager_mobile_core_fn_func_canceljob(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_clearsensitivestate(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -964,6 +970,9 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate() != 51151.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112.toShort()) {
@@ -1331,6 +1340,42 @@ public object FfiConverterTypeCancelJobResult: FfiConverterRustBuffer<CancelJobR
             FfiConverterString.write(value.`jobId`, buf)
             FfiConverterTypeMobileJobStatus.write(value.`status`, buf)
             FfiConverterBoolean.write(value.`cancelRequested`, buf)
+    }
+}
+
+
+
+data class ClearSensitiveStateResult (
+    var `clearedTerminalJobs`: kotlin.ULong,
+    var `cancelRequestedJobs`: kotlin.ULong,
+    var `retainedActiveJobs`: kotlin.ULong
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeClearSensitiveStateResult: FfiConverterRustBuffer<ClearSensitiveStateResult> {
+    override fun read(buf: ByteBuffer): ClearSensitiveStateResult {
+        return ClearSensitiveStateResult(
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ClearSensitiveStateResult) = (
+            FfiConverterULong.allocationSize(value.`clearedTerminalJobs`) +
+            FfiConverterULong.allocationSize(value.`cancelRequestedJobs`) +
+            FfiConverterULong.allocationSize(value.`retainedActiveJobs`)
+    )
+
+    override fun write(value: ClearSensitiveStateResult, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`clearedTerminalJobs`, buf)
+            FfiConverterULong.write(value.`cancelRequestedJobs`, buf)
+            FfiConverterULong.write(value.`retainedActiveJobs`, buf)
     }
 }
 
@@ -3238,6 +3283,15 @@ public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<Lis
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_canceljob(
         FfiConverterTypeCancelJobRequest.lower(`request`),_status)
+}
+    )
+    }
+
+ fun `clearSensitiveState`(): ClearSensitiveStateResult {
+            return FfiConverterTypeClearSensitiveStateResult.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_clearsensitivestate(
+        _status)
 }
     )
     }

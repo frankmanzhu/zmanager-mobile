@@ -449,6 +449,13 @@ pub struct CancelJobResult {
     pub cancel_requested: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClearSensitiveStateResult {
+    pub cleared_terminal_jobs: u64,
+    pub cancel_requested_jobs: u64,
+    pub retained_active_jobs: u64,
+}
+
 pub fn healthcheck() -> HealthcheckResult {
     let report = zmanager_core::healthcheck();
     HealthcheckResult {
@@ -807,10 +814,11 @@ pub fn start_create(request: StartCreateRequest) -> Result<StartJobResult, Zmana
     }
 
     let password = sanitize_password(request.password);
+    let contains_sensitive_input = password.is_some();
     let token = CancellationToken::new();
     let kind = mobile_create_job_kind(request.format);
     let registry = job_registry();
-    let result = registry.create_job(kind, token.clone());
+    let result = registry.create_job(kind, token.clone(), contains_sensitive_input);
     let job_id = result.job_id.clone();
     let input = CreateJobInput {
         source_paths: source_paths.iter().map(PathBuf::from).collect(),
@@ -887,7 +895,7 @@ pub fn start_extract(request: StartExtractRequest) -> Result<StartJobResult, Zma
     let token = CancellationToken::new();
     let kind = mobile_extract_job_kind(path, format);
     let registry = job_registry();
-    let result = registry.create_job(kind, token.clone());
+    let result = registry.create_job(kind, token.clone(), password.is_some());
     let job_id = result.job_id.clone();
     let input = ExtractJobInput {
         archive_path,
@@ -959,6 +967,15 @@ pub fn cancelJob(request: CancelJobRequest) -> Result<CancelJobResult, ZmanagerM
     cancel_job(request)
 }
 
+pub fn clear_sensitive_state() -> ClearSensitiveStateResult {
+    job_registry().clear_sensitive_state()
+}
+
+#[allow(non_snake_case)]
+pub fn clearSensitiveState() -> ClearSensitiveStateResult {
+    clear_sensitive_state()
+}
+
 #[derive(Default)]
 struct MobileJobRegistry {
     inner: Mutex<MobileJobRegistryInner>,
@@ -977,6 +994,7 @@ struct MobileJobRecord {
     next_sequence: u64,
     token: CancellationToken,
     terminal_summary: Option<JobTerminalSummary>,
+    contains_sensitive_input: bool,
 }
 
 struct RegistryJobEventSink {
@@ -991,7 +1009,12 @@ impl jobs::JobEventSink for RegistryJobEventSink {
 }
 
 impl MobileJobRegistry {
-    fn create_job(&self, kind: MobileJobKind, token: CancellationToken) -> StartJobResult {
+    fn create_job(
+        &self,
+        kind: MobileJobKind,
+        token: CancellationToken,
+        contains_sensitive_input: bool,
+    ) -> StartJobResult {
         let mut inner = self.inner.lock().expect("job registry mutex poisoned");
         inner.next_job_index = inner.next_job_index.saturating_add(1);
         let job_id = format!("job-{}-{}", std::process::id(), inner.next_job_index);
@@ -1004,6 +1027,7 @@ impl MobileJobRegistry {
                 next_sequence: 1,
                 token,
                 terminal_summary: None,
+                contains_sensitive_input,
             },
         );
 
@@ -1082,6 +1106,36 @@ impl MobileJobRegistry {
             status: record.status,
             cancel_requested,
         })
+    }
+
+    fn clear_sensitive_state(&self) -> ClearSensitiveStateResult {
+        let mut inner = self.inner.lock().expect("job registry mutex poisoned");
+        let mut cleared_terminal_jobs = 0u64;
+        let mut cancel_requested_jobs = 0u64;
+        let mut retained_active_jobs = 0u64;
+
+        inner.jobs.retain(|_, record| {
+            if record.status.is_terminal() {
+                cleared_terminal_jobs = cleared_terminal_jobs.saturating_add(1);
+                return false;
+            }
+
+            if record.contains_sensitive_input {
+                record.token.cancel();
+                cancel_requested_jobs = cancel_requested_jobs.saturating_add(1);
+                return false;
+            } else {
+                retained_active_jobs = retained_active_jobs.saturating_add(1);
+            }
+
+            true
+        });
+
+        ClearSensitiveStateResult {
+            cleared_terminal_jobs,
+            cancel_requested_jobs,
+            retained_active_jobs,
+        }
     }
 
     fn emit_core_event(&self, job_id: &str, event: CoreJobEvent) {
@@ -3055,8 +3109,11 @@ fn is_retryable_io_error(kind: io::ErrorKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use zmanager_core::zip_backend::{ZipCreateOptions, create_zip_from_path};
+
+    static JOB_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn healthcheck_reports_real_core() {
@@ -3400,6 +3457,7 @@ mod tests {
 
     #[test]
     fn start_extract_job_extracts_zip_and_reports_terminal_summary() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let fixture = create_test_zip("start-extract-real-zip");
         let entry_path = readme_entry_path(&fixture.archive);
         let destination = fixture.temp.path("out");
@@ -3444,6 +3502,7 @@ mod tests {
 
     #[test]
     fn start_create_job_creates_zip_and_reports_terminal_summary() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let temp = TestDir::new("start-create-zip");
         temp.create_dir("project");
         temp.write_file("project/readme.txt", b"hello mobile bridge\n");
@@ -3493,6 +3552,7 @@ mod tests {
 
     #[test]
     fn start_create_job_honors_clean_source_for_zip() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let temp = TestDir::new("start-create-clean-source-zip");
         temp.create_dir("project/src");
         temp.create_dir("project/target");
@@ -3536,6 +3596,7 @@ mod tests {
 
     #[test]
     fn start_create_job_preserves_encrypted_zip_password_whitespace() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let temp = TestDir::new("start-create-encrypted-zip");
         temp.create_dir("project");
         temp.write_file("project/readme.txt", b"hello mobile bridge\n");
@@ -3588,6 +3649,7 @@ mod tests {
 
     #[test]
     fn start_extract_job_honors_selected_paths() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let fixture = create_test_zip("start-extract-selected-zip");
         let entry_path = readme_entry_path(&fixture.archive);
         let destination = fixture.temp.path("out");
@@ -3616,7 +3678,73 @@ mod tests {
     }
 
     #[test]
+    fn clear_sensitive_state_removes_retained_terminal_jobs() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
+        let fixture = create_test_zip("clear-sensitive-terminal-job");
+        let destination = fixture.temp.path("out");
+
+        let started = start_extract(StartExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: Some(" secret ".to_string()),
+            selected_paths: Vec::new(),
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("sensitive extract job should start");
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert!(terminal.is_terminal);
+
+        let result = clear_sensitive_state();
+        assert!(result.cleared_terminal_jobs >= 1);
+        assert_eq!(result.cancel_requested_jobs, 0);
+
+        let error = poll_job_events(PollJobEventsRequest {
+            job_id: started.job_id,
+            cursor: 0,
+        })
+        .unwrap_err();
+        assert_bridge_error_code(error, ERROR_NOT_FOUND);
+    }
+
+    #[test]
+    fn clear_sensitive_state_cancels_and_removes_active_sensitive_jobs() {
+        let registry = MobileJobRegistry::default();
+        let sensitive_token = CancellationToken::new();
+        let regular_token = CancellationToken::new();
+        let sensitive_job =
+            registry.create_job(MobileJobKind::ZipExtract, sensitive_token.clone(), true);
+        let regular_job =
+            registry.create_job(MobileJobKind::ZipCreate, regular_token.clone(), false);
+
+        let result = registry.clear_sensitive_state();
+
+        assert_eq!(result.cleared_terminal_jobs, 0);
+        assert_eq!(result.cancel_requested_jobs, 1);
+        assert_eq!(result.retained_active_jobs, 1);
+        assert!(sensitive_token.is_cancelled());
+        assert!(!regular_token.is_cancelled());
+
+        let sensitive_error = registry
+            .poll_events(PollJobEventsRequest {
+                job_id: sensitive_job.job_id,
+                cursor: 0,
+            })
+            .unwrap_err();
+        assert_bridge_error_code(sensitive_error, ERROR_NOT_FOUND);
+
+        let regular_result = registry
+            .poll_events(PollJobEventsRequest {
+                job_id: regular_job.job_id,
+                cursor: 0,
+            })
+            .expect("non-sensitive active job should stay pollable");
+        assert_eq!(regular_result.status, MobileJobStatus::Queued);
+    }
+
+    #[test]
     fn poll_job_events_uses_sequence_cursor() {
+        let _guard = JOB_TEST_LOCK.lock().expect("job test lock poisoned");
         let fixture = create_test_zip("poll-job-cursor");
         let destination = fixture.temp.path("out");
 

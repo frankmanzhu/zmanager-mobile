@@ -815,6 +815,84 @@ public func FfiConverterTypeCancelJobResult_lower(_ value: CancelJobResult) -> R
 }
 
 
+public struct ClearSensitiveStateResult {
+    public var clearedTerminalJobs: UInt64
+    public var cancelRequestedJobs: UInt64
+    public var retainedActiveJobs: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(clearedTerminalJobs: UInt64, cancelRequestedJobs: UInt64, retainedActiveJobs: UInt64) {
+        self.clearedTerminalJobs = clearedTerminalJobs
+        self.cancelRequestedJobs = cancelRequestedJobs
+        self.retainedActiveJobs = retainedActiveJobs
+    }
+}
+
+#if compiler(>=6)
+extension ClearSensitiveStateResult: Sendable {}
+#endif
+
+
+extension ClearSensitiveStateResult: Equatable, Hashable {
+    public static func ==(lhs: ClearSensitiveStateResult, rhs: ClearSensitiveStateResult) -> Bool {
+        if lhs.clearedTerminalJobs != rhs.clearedTerminalJobs {
+            return false
+        }
+        if lhs.cancelRequestedJobs != rhs.cancelRequestedJobs {
+            return false
+        }
+        if lhs.retainedActiveJobs != rhs.retainedActiveJobs {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(clearedTerminalJobs)
+        hasher.combine(cancelRequestedJobs)
+        hasher.combine(retainedActiveJobs)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeClearSensitiveStateResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ClearSensitiveStateResult {
+        return
+            try ClearSensitiveStateResult(
+                clearedTerminalJobs: FfiConverterUInt64.read(from: &buf),
+                cancelRequestedJobs: FfiConverterUInt64.read(from: &buf),
+                retainedActiveJobs: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ClearSensitiveStateResult, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.clearedTerminalJobs, into: &buf)
+        FfiConverterUInt64.write(value.cancelRequestedJobs, into: &buf)
+        FfiConverterUInt64.write(value.retainedActiveJobs, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeClearSensitiveStateResult_lift(_ buf: RustBuffer) throws -> ClearSensitiveStateResult {
+    return try FfiConverterTypeClearSensitiveStateResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeClearSensitiveStateResult_lower(_ value: ClearSensitiveStateResult) -> RustBuffer {
+    return FfiConverterTypeClearSensitiveStateResult.lower(value)
+}
+
+
 public struct CreatePlanEntry {
     public var archivePath: String
     public var sourcePath: String
@@ -4577,6 +4655,12 @@ public func cancelJob(request: CancelJobRequest)throws  -> CancelJobResult  {
     )
 })
 }
+public func clearSensitiveState() -> ClearSensitiveStateResult  {
+    return try!  FfiConverterTypeClearSensitiveStateResult_lift(try! rustCall() {
+    uniffi_zmanager_mobile_core_fn_func_clearsensitivestate($0
+    )
+})
+}
 public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchiveResult  {
     return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_detectarchive(
@@ -4663,6 +4747,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.contractVersionMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate() != 51151) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112) {
