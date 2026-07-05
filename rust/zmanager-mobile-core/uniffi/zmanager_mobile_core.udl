@@ -212,6 +212,7 @@ dictionary PlanCreateRequest {
     boolean preserve_metadata;
     boolean replace_existing;
     boolean clean_source;
+    boolean verify_after_create;
 };
 
 dictionary CreatePlanEntry {
@@ -237,6 +238,8 @@ dictionary PlanCreateResult {
     boolean encrypted;
     boolean preserve_metadata;
     boolean clean_source;
+    boolean verify_after_create;
+    boolean verify_supported;
     boolean can_start;
     sequence<BridgeError> warnings;
 };
@@ -249,6 +252,7 @@ dictionary StartCreateRequest {
     boolean preserve_metadata;
     boolean replace_existing;
     boolean clean_source;
+    boolean verify_after_create;
 };
 
 enum MobileJobStatus {
@@ -310,6 +314,9 @@ dictionary JobTerminalSummary {
     u64? volume_size;
     u64? volume_count;
     sequence<string> output_paths;
+    boolean? verified;
+    u64? verified_entries;
+    u64? verified_bytes;
     sequence<BridgeError> warnings;
 };
 

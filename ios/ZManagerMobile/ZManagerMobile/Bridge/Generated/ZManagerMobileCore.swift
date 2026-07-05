@@ -1317,11 +1317,14 @@ public struct JobTerminalSummary {
     public var volumeSize: UInt64?
     public var volumeCount: UInt64?
     public var outputPaths: [String]
+    public var verified: Bool?
+    public var verifiedEntries: UInt64?
+    public var verifiedBytes: UInt64?
     public var warnings: [BridgeError]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(writtenEntries: UInt64, skippedEntries: UInt64?, writtenBytes: UInt64, encrypted: Bool?, volumeSize: UInt64?, volumeCount: UInt64?, outputPaths: [String], warnings: [BridgeError]) {
+    public init(writtenEntries: UInt64, skippedEntries: UInt64?, writtenBytes: UInt64, encrypted: Bool?, volumeSize: UInt64?, volumeCount: UInt64?, outputPaths: [String], verified: Bool?, verifiedEntries: UInt64?, verifiedBytes: UInt64?, warnings: [BridgeError]) {
         self.writtenEntries = writtenEntries
         self.skippedEntries = skippedEntries
         self.writtenBytes = writtenBytes
@@ -1329,6 +1332,9 @@ public struct JobTerminalSummary {
         self.volumeSize = volumeSize
         self.volumeCount = volumeCount
         self.outputPaths = outputPaths
+        self.verified = verified
+        self.verifiedEntries = verifiedEntries
+        self.verifiedBytes = verifiedBytes
         self.warnings = warnings
     }
 }
@@ -1361,6 +1367,15 @@ extension JobTerminalSummary: Equatable, Hashable {
         if lhs.outputPaths != rhs.outputPaths {
             return false
         }
+        if lhs.verified != rhs.verified {
+            return false
+        }
+        if lhs.verifiedEntries != rhs.verifiedEntries {
+            return false
+        }
+        if lhs.verifiedBytes != rhs.verifiedBytes {
+            return false
+        }
         if lhs.warnings != rhs.warnings {
             return false
         }
@@ -1375,6 +1390,9 @@ extension JobTerminalSummary: Equatable, Hashable {
         hasher.combine(volumeSize)
         hasher.combine(volumeCount)
         hasher.combine(outputPaths)
+        hasher.combine(verified)
+        hasher.combine(verifiedEntries)
+        hasher.combine(verifiedBytes)
         hasher.combine(warnings)
     }
 }
@@ -1395,6 +1413,9 @@ public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
                 volumeSize: FfiConverterOptionUInt64.read(from: &buf),
                 volumeCount: FfiConverterOptionUInt64.read(from: &buf),
                 outputPaths: FfiConverterSequenceString.read(from: &buf),
+                verified: FfiConverterOptionBool.read(from: &buf),
+                verifiedEntries: FfiConverterOptionUInt64.read(from: &buf),
+                verifiedBytes: FfiConverterOptionUInt64.read(from: &buf),
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1407,6 +1428,9 @@ public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.volumeSize, into: &buf)
         FfiConverterOptionUInt64.write(value.volumeCount, into: &buf)
         FfiConverterSequenceString.write(value.outputPaths, into: &buf)
+        FfiConverterOptionBool.write(value.verified, into: &buf)
+        FfiConverterOptionUInt64.write(value.verifiedEntries, into: &buf)
+        FfiConverterOptionUInt64.write(value.verifiedBytes, into: &buf)
         FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
     }
 }
@@ -1945,10 +1969,11 @@ public struct PlanCreateRequest {
     public var preserveMetadata: Bool
     public var replaceExisting: Bool
     public var cleanSource: Bool
+    public var verifyAfterCreate: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool) {
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool, verifyAfterCreate: Bool) {
         self.sourcePaths = sourcePaths
         self.destinationArchivePath = destinationArchivePath
         self.format = format
@@ -1956,6 +1981,7 @@ public struct PlanCreateRequest {
         self.preserveMetadata = preserveMetadata
         self.replaceExisting = replaceExisting
         self.cleanSource = cleanSource
+        self.verifyAfterCreate = verifyAfterCreate
     }
 }
 
@@ -1987,6 +2013,9 @@ extension PlanCreateRequest: Equatable, Hashable {
         if lhs.cleanSource != rhs.cleanSource {
             return false
         }
+        if lhs.verifyAfterCreate != rhs.verifyAfterCreate {
+            return false
+        }
         return true
     }
 
@@ -1998,6 +2027,7 @@ extension PlanCreateRequest: Equatable, Hashable {
         hasher.combine(preserveMetadata)
         hasher.combine(replaceExisting)
         hasher.combine(cleanSource)
+        hasher.combine(verifyAfterCreate)
     }
 }
 
@@ -2016,7 +2046,8 @@ public struct FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer {
                 password: FfiConverterOptionString.read(from: &buf),
                 preserveMetadata: FfiConverterBool.read(from: &buf),
                 replaceExisting: FfiConverterBool.read(from: &buf),
-                cleanSource: FfiConverterBool.read(from: &buf)
+                cleanSource: FfiConverterBool.read(from: &buf),
+                verifyAfterCreate: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2028,6 +2059,7 @@ public struct FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer {
         FfiConverterBool.write(value.preserveMetadata, into: &buf)
         FfiConverterBool.write(value.replaceExisting, into: &buf)
         FfiConverterBool.write(value.cleanSource, into: &buf)
+        FfiConverterBool.write(value.verifyAfterCreate, into: &buf)
     }
 }
 
@@ -2063,12 +2095,14 @@ public struct PlanCreateResult {
     public var encrypted: Bool
     public var preserveMetadata: Bool
     public var cleanSource: Bool
+    public var verifyAfterCreate: Bool
+    public var verifySupported: Bool
     public var canStart: Bool
     public var warnings: [BridgeError]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(planId: String, sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, formatLabel: String, entries: [CreatePlanEntry], totalEntries: UInt64, totalBytes: UInt64, excludedEntries: UInt64, excludedBytes: UInt64, outputExists: Bool, replaceExisting: Bool, encrypted: Bool, preserveMetadata: Bool, cleanSource: Bool, canStart: Bool, warnings: [BridgeError]) {
+    public init(planId: String, sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, formatLabel: String, entries: [CreatePlanEntry], totalEntries: UInt64, totalBytes: UInt64, excludedEntries: UInt64, excludedBytes: UInt64, outputExists: Bool, replaceExisting: Bool, encrypted: Bool, preserveMetadata: Bool, cleanSource: Bool, verifyAfterCreate: Bool, verifySupported: Bool, canStart: Bool, warnings: [BridgeError]) {
         self.planId = planId
         self.sourcePaths = sourcePaths
         self.destinationArchivePath = destinationArchivePath
@@ -2084,6 +2118,8 @@ public struct PlanCreateResult {
         self.encrypted = encrypted
         self.preserveMetadata = preserveMetadata
         self.cleanSource = cleanSource
+        self.verifyAfterCreate = verifyAfterCreate
+        self.verifySupported = verifySupported
         self.canStart = canStart
         self.warnings = warnings
     }
@@ -2141,6 +2177,12 @@ extension PlanCreateResult: Equatable, Hashable {
         if lhs.cleanSource != rhs.cleanSource {
             return false
         }
+        if lhs.verifyAfterCreate != rhs.verifyAfterCreate {
+            return false
+        }
+        if lhs.verifySupported != rhs.verifySupported {
+            return false
+        }
         if lhs.canStart != rhs.canStart {
             return false
         }
@@ -2166,6 +2208,8 @@ extension PlanCreateResult: Equatable, Hashable {
         hasher.combine(encrypted)
         hasher.combine(preserveMetadata)
         hasher.combine(cleanSource)
+        hasher.combine(verifyAfterCreate)
+        hasher.combine(verifySupported)
         hasher.combine(canStart)
         hasher.combine(warnings)
     }
@@ -2195,6 +2239,8 @@ public struct FfiConverterTypePlanCreateResult: FfiConverterRustBuffer {
                 encrypted: FfiConverterBool.read(from: &buf),
                 preserveMetadata: FfiConverterBool.read(from: &buf),
                 cleanSource: FfiConverterBool.read(from: &buf),
+                verifyAfterCreate: FfiConverterBool.read(from: &buf),
+                verifySupported: FfiConverterBool.read(from: &buf),
                 canStart: FfiConverterBool.read(from: &buf),
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
@@ -2216,6 +2262,8 @@ public struct FfiConverterTypePlanCreateResult: FfiConverterRustBuffer {
         FfiConverterBool.write(value.encrypted, into: &buf)
         FfiConverterBool.write(value.preserveMetadata, into: &buf)
         FfiConverterBool.write(value.cleanSource, into: &buf)
+        FfiConverterBool.write(value.verifyAfterCreate, into: &buf)
+        FfiConverterBool.write(value.verifySupported, into: &buf)
         FfiConverterBool.write(value.canStart, into: &buf)
         FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
     }
@@ -2693,10 +2741,11 @@ public struct StartCreateRequest {
     public var preserveMetadata: Bool
     public var replaceExisting: Bool
     public var cleanSource: Bool
+    public var verifyAfterCreate: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool) {
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool, verifyAfterCreate: Bool) {
         self.sourcePaths = sourcePaths
         self.destinationArchivePath = destinationArchivePath
         self.format = format
@@ -2704,6 +2753,7 @@ public struct StartCreateRequest {
         self.preserveMetadata = preserveMetadata
         self.replaceExisting = replaceExisting
         self.cleanSource = cleanSource
+        self.verifyAfterCreate = verifyAfterCreate
     }
 }
 
@@ -2735,6 +2785,9 @@ extension StartCreateRequest: Equatable, Hashable {
         if lhs.cleanSource != rhs.cleanSource {
             return false
         }
+        if lhs.verifyAfterCreate != rhs.verifyAfterCreate {
+            return false
+        }
         return true
     }
 
@@ -2746,6 +2799,7 @@ extension StartCreateRequest: Equatable, Hashable {
         hasher.combine(preserveMetadata)
         hasher.combine(replaceExisting)
         hasher.combine(cleanSource)
+        hasher.combine(verifyAfterCreate)
     }
 }
 
@@ -2764,7 +2818,8 @@ public struct FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer {
                 password: FfiConverterOptionString.read(from: &buf),
                 preserveMetadata: FfiConverterBool.read(from: &buf),
                 replaceExisting: FfiConverterBool.read(from: &buf),
-                cleanSource: FfiConverterBool.read(from: &buf)
+                cleanSource: FfiConverterBool.read(from: &buf),
+                verifyAfterCreate: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2776,6 +2831,7 @@ public struct FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer {
         FfiConverterBool.write(value.preserveMetadata, into: &buf)
         FfiConverterBool.write(value.replaceExisting, into: &buf)
         FfiConverterBool.write(value.cleanSource, into: &buf)
+        FfiConverterBool.write(value.verifyAfterCreate, into: &buf)
     }
 }
 

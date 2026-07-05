@@ -280,6 +280,7 @@ pub struct PlanCreateRequest {
     pub preserve_metadata: bool,
     pub replace_existing: bool,
     pub clean_source: bool,
+    pub verify_after_create: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +308,8 @@ pub struct PlanCreateResult {
     pub encrypted: bool,
     pub preserve_metadata: bool,
     pub clean_source: bool,
+    pub verify_after_create: bool,
+    pub verify_supported: bool,
     pub can_start: bool,
     pub warnings: Vec<BridgeError>,
 }
@@ -320,6 +323,7 @@ pub struct StartCreateRequest {
     pub preserve_metadata: bool,
     pub replace_existing: bool,
     pub clean_source: bool,
+    pub verify_after_create: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -392,6 +396,9 @@ pub struct JobTerminalSummary {
     pub volume_size: Option<u64>,
     pub volume_count: Option<u64>,
     pub output_paths: Vec<String>,
+    pub verified: Option<bool>,
+    pub verified_entries: Option<u64>,
+    pub verified_bytes: Option<u64>,
     pub warnings: Vec<BridgeError>,
 }
 
@@ -773,6 +780,8 @@ pub fn plan_create(request: PlanCreateRequest) -> Result<PlanCreateResult, Zmana
         encrypted,
         preserve_metadata: request.preserve_metadata,
         clean_source: request.clean_source,
+        verify_after_create: request.verify_after_create,
+        verify_supported: create_verify_supported(request.format),
         can_start: total_entries > 0 && (!output_exists || request.replace_existing),
         warnings,
     })
@@ -811,6 +820,7 @@ pub fn start_create(request: StartCreateRequest) -> Result<StartJobResult, Zmana
         preserve_metadata: request.preserve_metadata,
         replace_existing: request.replace_existing,
         clean_source: request.clean_source,
+        verify_after_create: request.verify_after_create,
     };
     let worker_registry = Arc::clone(&registry);
 
@@ -1153,6 +1163,9 @@ impl MobileJobRegistry {
                         volume_size: None,
                         volume_count: None,
                         output_paths: Vec::new(),
+                        verified: None,
+                        verified_entries: None,
+                        verified_bytes: None,
                         warnings: Vec::new(),
                     });
                 }
@@ -1194,6 +1207,7 @@ struct CreateJobInput {
     preserve_metadata: bool,
     replace_existing: bool,
     clean_source: bool,
+    verify_after_create: bool,
 }
 
 fn job_registry() -> Arc<MobileJobRegistry> {
@@ -1209,7 +1223,11 @@ fn run_create_job(
 ) -> Result<JobTerminalSummary, ZmanagerMobileError> {
     let destination = Path::new(&input.destination_archive_path);
     let plan_options = create_plan_options(input.clean_source);
-    match input.format {
+    let verify_after_create = input.verify_after_create;
+    let verify_password = verify_after_create
+        .then(|| input.password.clone())
+        .flatten();
+    let mut summary = match input.format {
         CreateArchiveFormat::Zip => {
             let options = ZipCreateOptions {
                 preserve_metadata: input.preserve_metadata,
@@ -1226,9 +1244,7 @@ fn run_create_job(
                 sink,
             )
             .map_err(map_zip_error)?;
-            Ok(JobTerminalSummary::from(
-                ArchiveJobReport::from(report).with_output_path(destination),
-            ))
+            JobTerminalSummary::from(ArchiveJobReport::from(report).with_output_path(destination))
         }
         CreateArchiveFormat::SevenZ => {
             let options = SevenZCreateOptions {
@@ -1246,9 +1262,7 @@ fn run_create_job(
                 sink,
             )
             .map_err(map_7z_error)?;
-            Ok(JobTerminalSummary::from(
-                ArchiveJobReport::from(report).with_output_path(destination),
-            ))
+            JobTerminalSummary::from(ArchiveJobReport::from(report).with_output_path(destination))
         }
         CreateArchiveFormat::TarZst => {
             let options = TarZstdCreateOptions {
@@ -1265,9 +1279,7 @@ fn run_create_job(
                 sink,
             )
             .map_err(map_tar_zst_error)?;
-            Ok(JobTerminalSummary::from(
-                ArchiveJobReport::from(report).with_output_path(destination),
-            ))
+            JobTerminalSummary::from(ArchiveJobReport::from(report).with_output_path(destination))
         }
         CreateArchiveFormat::Tzap => {
             let options = TzapCreateOptions {
@@ -1292,11 +1304,15 @@ fn run_create_job(
                 sink,
             )
             .map_err(map_tzap_error)?;
-            Ok(JobTerminalSummary::from(
-                ArchiveJobReport::from(report).with_output_path(destination),
-            ))
+            JobTerminalSummary::from(ArchiveJobReport::from(report).with_output_path(destination))
         }
+    };
+
+    if verify_after_create {
+        apply_create_verification(&mut summary, destination, verify_password, sink);
     }
+
+    Ok(summary)
 }
 
 fn run_extract_job(
@@ -1499,6 +1515,9 @@ fn run_selected_extract_job(
         volume_size: None,
         volume_count: None,
         output_paths: Vec::new(),
+        verified: None,
+        verified_entries: None,
+        verified_bytes: None,
         warnings: Vec::new(),
     })
 }
@@ -1696,6 +1715,9 @@ impl From<ArchiveJobReport> for JobTerminalSummary {
             volume_size: report.volume_size,
             volume_count: report.volume_count.map(usize_to_u64),
             output_paths: report.output_paths,
+            verified: None,
+            verified_entries: None,
+            verified_bytes: None,
             warnings: report.warnings.into_iter().map(bridge_warning).collect(),
         }
     }
@@ -1927,6 +1949,38 @@ fn create_plan_options(clean_source: bool) -> PlanOptions {
         PlanOptions::clean_source()
     } else {
         PlanOptions::default()
+    }
+}
+
+fn create_verify_supported(_format: CreateArchiveFormat) -> bool {
+    true
+}
+
+fn apply_create_verification(
+    summary: &mut JobTerminalSummary,
+    destination: &Path,
+    password: Option<String>,
+    sink: &mut dyn jobs::JobEventSink,
+) {
+    match test_archive(TestArchiveRequest {
+        archive_path: destination.to_string_lossy().to_string(),
+        password,
+        selected_paths: Vec::new(),
+    }) {
+        Ok(report) => {
+            summary.verified = Some(true);
+            summary.verified_entries = Some(report.tested_entries);
+            summary.verified_bytes = Some(report.tested_bytes);
+            summary.warnings.extend(report.warnings);
+        }
+        Err(error) => {
+            let error = bridge_error_from_mobile(error);
+            summary.verified = Some(false);
+            summary.warnings.push(error.clone());
+            sink.emit(CoreJobEvent::Warning {
+                message: format!("Created archive verification failed: {}", error.message),
+            });
+        }
     }
 }
 
@@ -3296,6 +3350,7 @@ mod tests {
             preserve_metadata: true,
             replace_existing: false,
             clean_source: false,
+            verify_after_create: false,
         })
         .expect("create planning should succeed");
 
@@ -3304,6 +3359,7 @@ mod tests {
         assert_eq!(result.format_label, "ZIP");
         assert!(result.can_start);
         assert!(!result.encrypted);
+        assert!(result.verify_supported);
         assert!(result.total_entries >= 1);
         assert!(result.total_bytes > 0);
         assert!(result.entries.iter().any(|entry| {
@@ -3328,6 +3384,7 @@ mod tests {
             preserve_metadata: true,
             replace_existing: false,
             clean_source: false,
+            verify_after_create: false,
         })
         .expect("create planning should surface output collision");
 
@@ -3400,11 +3457,13 @@ mod tests {
             preserve_metadata: true,
             replace_existing: false,
             clean_source: false,
+            verify_after_create: false,
         })
         .expect("create job should start");
 
         assert_eq!(started.kind, MobileJobKind::ZipCreate);
-        let terminal = wait_for_terminal_job(&started.job_id);
+        let terminal =
+            wait_for_terminal_summary(&started.job_id, |summary| summary.encrypted == Some(false));
         assert_eq!(terminal.status, MobileJobStatus::Completed);
         assert!(destination.exists());
         let summary = terminal
@@ -3413,6 +3472,7 @@ mod tests {
         assert!(summary.written_entries >= 1);
         assert!(summary.written_bytes > 0);
         assert_eq!(summary.encrypted, Some(false));
+        assert_eq!(summary.verified, None);
         assert_eq!(
             summary.output_paths,
             vec![destination.to_string_lossy().to_string()]
@@ -3448,6 +3508,7 @@ mod tests {
             preserve_metadata: true,
             replace_existing: false,
             clean_source: true,
+            verify_after_create: false,
         })
         .expect("clean source create job should start");
 
@@ -3489,10 +3550,12 @@ mod tests {
             preserve_metadata: true,
             replace_existing: false,
             clean_source: false,
+            verify_after_create: true,
         })
         .expect("encrypted create job should start");
 
-        let terminal = wait_for_terminal_job(&started.job_id);
+        let terminal =
+            wait_for_terminal_summary(&started.job_id, |summary| summary.verified == Some(true));
         assert_eq!(terminal.status, MobileJobStatus::Completed);
         assert!(
             !format!("{terminal:?}").contains(password),
@@ -3503,6 +3566,13 @@ mod tests {
                 .terminal_summary
                 .as_ref()
                 .and_then(|summary| summary.encrypted),
+            Some(true)
+        );
+        assert_eq!(
+            terminal
+                .terminal_summary
+                .as_ref()
+                .and_then(|summary| summary.verified),
             Some(true)
         );
 
@@ -3605,6 +3675,27 @@ mod tests {
         }
 
         panic!("job did not finish within the test timeout");
+    }
+
+    fn wait_for_terminal_summary(
+        job_id: &str,
+        predicate: impl Fn(&JobTerminalSummary) -> bool,
+    ) -> PollJobEventsResult {
+        for _ in 0..100 {
+            let poll = poll_job_events(PollJobEventsRequest {
+                job_id: job_id.to_string(),
+                cursor: 0,
+            })
+            .expect("job should remain pollable");
+
+            if poll.is_terminal && poll.terminal_summary.as_ref().is_some_and(&predicate) {
+                return poll;
+            }
+
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        panic!("job terminal summary did not settle within the test timeout");
     }
 
     fn readme_entry_path(archive: &Path) -> String {

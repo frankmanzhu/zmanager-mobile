@@ -1576,6 +1576,9 @@ data class JobTerminalSummary (
     var `volumeSize`: kotlin.ULong?,
     var `volumeCount`: kotlin.ULong?,
     var `outputPaths`: List<kotlin.String>,
+    var `verified`: kotlin.Boolean?,
+    var `verifiedEntries`: kotlin.ULong?,
+    var `verifiedBytes`: kotlin.ULong?,
     var `warnings`: List<BridgeError>
 ) {
 
@@ -1595,6 +1598,9 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
             FfiConverterSequenceTypeBridgeError.read(buf),
         )
     }
@@ -1607,6 +1613,9 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterOptionalULong.allocationSize(value.`volumeSize`) +
             FfiConverterOptionalULong.allocationSize(value.`volumeCount`) +
             FfiConverterSequenceString.allocationSize(value.`outputPaths`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`verified`) +
+            FfiConverterOptionalULong.allocationSize(value.`verifiedEntries`) +
+            FfiConverterOptionalULong.allocationSize(value.`verifiedBytes`) +
             FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
     )
 
@@ -1618,6 +1627,9 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterOptionalULong.write(value.`volumeSize`, buf)
             FfiConverterOptionalULong.write(value.`volumeCount`, buf)
             FfiConverterSequenceString.write(value.`outputPaths`, buf)
+            FfiConverterOptionalBoolean.write(value.`verified`, buf)
+            FfiConverterOptionalULong.write(value.`verifiedEntries`, buf)
+            FfiConverterOptionalULong.write(value.`verifiedBytes`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
     }
 }
@@ -1871,7 +1883,8 @@ data class PlanCreateRequest (
     var `password`: kotlin.String?,
     var `preserveMetadata`: kotlin.Boolean,
     var `replaceExisting`: kotlin.Boolean,
-    var `cleanSource`: kotlin.Boolean
+    var `cleanSource`: kotlin.Boolean,
+    var `verifyAfterCreate`: kotlin.Boolean
 ) {
 
     companion object
@@ -1890,6 +1903,7 @@ public object FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer<PlanCrea
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -1900,7 +1914,8 @@ public object FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer<PlanCrea
             FfiConverterOptionalString.allocationSize(value.`password`) +
             FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
             FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
-            FfiConverterBoolean.allocationSize(value.`cleanSource`)
+            FfiConverterBoolean.allocationSize(value.`cleanSource`) +
+            FfiConverterBoolean.allocationSize(value.`verifyAfterCreate`)
     )
 
     override fun write(value: PlanCreateRequest, buf: ByteBuffer) {
@@ -1911,6 +1926,7 @@ public object FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer<PlanCrea
             FfiConverterBoolean.write(value.`preserveMetadata`, buf)
             FfiConverterBoolean.write(value.`replaceExisting`, buf)
             FfiConverterBoolean.write(value.`cleanSource`, buf)
+            FfiConverterBoolean.write(value.`verifyAfterCreate`, buf)
     }
 }
 
@@ -1932,6 +1948,8 @@ data class PlanCreateResult (
     var `encrypted`: kotlin.Boolean,
     var `preserveMetadata`: kotlin.Boolean,
     var `cleanSource`: kotlin.Boolean,
+    var `verifyAfterCreate`: kotlin.Boolean,
+    var `verifySupported`: kotlin.Boolean,
     var `canStart`: kotlin.Boolean,
     var `warnings`: List<BridgeError>
 ) {
@@ -1961,6 +1979,8 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterSequenceTypeBridgeError.read(buf),
         )
     }
@@ -1981,6 +2001,8 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
             FfiConverterBoolean.allocationSize(value.`encrypted`) +
             FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
             FfiConverterBoolean.allocationSize(value.`cleanSource`) +
+            FfiConverterBoolean.allocationSize(value.`verifyAfterCreate`) +
+            FfiConverterBoolean.allocationSize(value.`verifySupported`) +
             FfiConverterBoolean.allocationSize(value.`canStart`) +
             FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
     )
@@ -2001,6 +2023,8 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
             FfiConverterBoolean.write(value.`encrypted`, buf)
             FfiConverterBoolean.write(value.`preserveMetadata`, buf)
             FfiConverterBoolean.write(value.`cleanSource`, buf)
+            FfiConverterBoolean.write(value.`verifyAfterCreate`, buf)
+            FfiConverterBoolean.write(value.`verifySupported`, buf)
             FfiConverterBoolean.write(value.`canStart`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
     }
@@ -2227,7 +2251,8 @@ data class StartCreateRequest (
     var `password`: kotlin.String?,
     var `preserveMetadata`: kotlin.Boolean,
     var `replaceExisting`: kotlin.Boolean,
-    var `cleanSource`: kotlin.Boolean
+    var `cleanSource`: kotlin.Boolean,
+    var `verifyAfterCreate`: kotlin.Boolean
 ) {
 
     companion object
@@ -2246,6 +2271,7 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2256,7 +2282,8 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterOptionalString.allocationSize(value.`password`) +
             FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
             FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
-            FfiConverterBoolean.allocationSize(value.`cleanSource`)
+            FfiConverterBoolean.allocationSize(value.`cleanSource`) +
+            FfiConverterBoolean.allocationSize(value.`verifyAfterCreate`)
     )
 
     override fun write(value: StartCreateRequest, buf: ByteBuffer) {
@@ -2267,6 +2294,7 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterBoolean.write(value.`preserveMetadata`, buf)
             FfiConverterBoolean.write(value.`replaceExisting`, buf)
             FfiConverterBoolean.write(value.`cleanSource`, buf)
+            FfiConverterBoolean.write(value.`verifyAfterCreate`, buf)
     }
 }
 
