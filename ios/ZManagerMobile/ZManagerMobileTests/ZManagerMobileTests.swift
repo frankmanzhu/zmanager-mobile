@@ -180,6 +180,55 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertTrue(error.retryable)
     }
 
+    func testArchiveTestLoaderReturnsReadyStateAndPassesSelectedPaths() {
+        let entry = testEntry(id: "file", path: "readme.txt")
+        let bridge = FakeArchiveBridgeClient(
+            testResult: TestArchiveResult(
+                archivePath: "/cache/archive.zip",
+                format: .zip,
+                formatLabel: "ZIP",
+                verified: true,
+                testedEntries: 1,
+                skippedEntries: 0,
+                totalEntries: 1,
+                testedBytes: 12,
+                warnings: []
+            )
+        )
+        let loader = ArchiveTestLoader(bridge: bridge)
+
+        let state = loader.test(archive: testImportedArchive(), selectedEntries: [entry], password: nil)
+
+        guard case .ready(let summary) = state else {
+            return XCTFail("Expected ready test state.")
+        }
+        XCTAssertTrue(summary.verified)
+        XCTAssertEqual(summary.testedEntries, 1)
+        XCTAssertEqual(bridge.testedSelectedPaths, ["readme.txt"])
+    }
+
+    func testArchiveTestLoaderMapsPasswordRequired() {
+        let loader = ArchiveTestLoader(
+            bridge: FakeArchiveBridgeClient(
+                testError: ZmanagerMobileError.Bridge(
+                    code: "password_required",
+                    userMessage: "This archive requires a password.",
+                    recoveryHint: "Enter the archive password.",
+                    severity: .warning,
+                    retryable: true
+                )
+            )
+        )
+
+        let state = loader.test(archive: testImportedArchive(), selectedEntries: [], password: nil)
+
+        guard case .passwordRequired(let error) = state else {
+            return XCTFail("Expected password-required test state.")
+        }
+        XCTAssertEqual(error.code, "password_required")
+        XCTAssertTrue(error.retryable)
+    }
+
     private func testImportedArchive() -> ImportedArchive {
         ImportedArchive(
             id: UUID(),
@@ -226,7 +275,7 @@ final class ZManagerMobileTests: XCTestCase {
     }
 }
 
-private struct FakeArchiveBridgeClient: ArchiveBridgeClient {
+private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
     var detection = DetectArchiveResult(
         archivePath: "/cache/archive.zip",
         format: .zip,
@@ -255,9 +304,50 @@ private struct FakeArchiveBridgeClient: ArchiveBridgeClient {
         writtenBytes: 0,
         warnings: []
     )
+    var testResult = TestArchiveResult(
+        archivePath: "/cache/archive.zip",
+        format: .zip,
+        formatLabel: "ZIP",
+        verified: true,
+        testedEntries: 0,
+        skippedEntries: 0,
+        totalEntries: 0,
+        testedBytes: 0,
+        warnings: []
+    )
     var detectError: Error?
     var listError: Error?
     var previewError: Error?
+    var testError: Error?
+    private(set) var testedSelectedPaths: [String] = []
+
+    init(
+        detection: DetectArchiveResult? = nil,
+        listing: ListArchiveResult? = nil,
+        preview: MaterializePreviewResult? = nil,
+        testResult: TestArchiveResult? = nil,
+        detectError: Error? = nil,
+        listError: Error? = nil,
+        previewError: Error? = nil,
+        testError: Error? = nil
+    ) {
+        if let detection = detection {
+            self.detection = detection
+        }
+        if let listing = listing {
+            self.listing = listing
+        }
+        if let preview = preview {
+            self.preview = preview
+        }
+        if let testResult = testResult {
+            self.testResult = testResult
+        }
+        self.detectError = detectError
+        self.listError = listError
+        self.previewError = previewError
+        self.testError = testError
+    }
 
     func detectArchiveMetadata(path: String) throws -> DetectArchiveResult {
         if let detectError = detectError {
@@ -282,5 +372,17 @@ private struct FakeArchiveBridgeClient: ArchiveBridgeClient {
             throw previewError
         }
         return preview
+    }
+
+    func testArchiveContents(
+        path: String,
+        selectedPaths: [String],
+        password: String?
+    ) throws -> TestArchiveResult {
+        if let testError = testError {
+            throw testError
+        }
+        testedSelectedPaths = selectedPaths
+        return testResult
     }
 }

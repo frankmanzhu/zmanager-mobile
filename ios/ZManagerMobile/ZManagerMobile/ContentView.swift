@@ -44,9 +44,13 @@ struct ContentView: View {
                 selectedEntryIds: $importModel.selectedEntryIds,
                 previewState: importModel.previewState,
                 previewPassword: $importModel.previewPasswordInput,
+                testState: importModel.testState,
+                testPassword: $importModel.testPasswordInput,
                 onSubmitPassword: importModel.retryListingWithPassword,
                 onPreviewEntry: { importModel.startPreview(entry: $0) },
-                onSubmitPreviewPassword: { importModel.retryPreviewWithPassword(entry: $0) }
+                onSubmitPreviewPassword: { importModel.retryPreviewWithPassword(entry: $0) },
+                onTestEntries: { importModel.startTest(selectedEntries: $0) },
+                onSubmitTestPassword: { importModel.retryTestWithPassword(selectedEntries: $0) }
             )
 
             Spacer()
@@ -157,9 +161,13 @@ struct ArchiveListingPanel: View {
     @Binding var selectedEntryIds: Set<String>
     let previewState: ArchivePreviewState
     @Binding var previewPassword: String
+    let testState: ArchiveTestState
+    @Binding var testPassword: String
     let onSubmitPassword: () -> Void
     let onPreviewEntry: (ArchiveEntrySummary) -> Void
     let onSubmitPreviewPassword: (ArchiveEntrySummary) -> Void
+    let onTestEntries: ([ArchiveEntrySummary]) -> Void
+    let onSubmitTestPassword: ([ArchiveEntrySummary]) -> Void
 
     var body: some View {
         switch state {
@@ -178,8 +186,12 @@ struct ArchiveListingPanel: View {
                 selectedEntryIds: $selectedEntryIds,
                 previewState: previewState,
                 previewPassword: $previewPassword,
+                testState: testState,
+                testPassword: $testPassword,
                 onPreviewEntry: onPreviewEntry,
-                onSubmitPreviewPassword: onSubmitPreviewPassword
+                onSubmitPreviewPassword: onSubmitPreviewPassword,
+                onTestEntries: onTestEntries,
+                onSubmitTestPassword: onSubmitTestPassword
             )
         case .passwordRequired(let error):
             VStack(alignment: .leading, spacing: 8) {
@@ -220,8 +232,12 @@ struct ArchiveListingReadyPanel: View {
     @Binding var selectedEntryIds: Set<String>
     let previewState: ArchivePreviewState
     @Binding var previewPassword: String
+    let testState: ArchiveTestState
+    @Binding var testPassword: String
     let onPreviewEntry: (ArchiveEntrySummary) -> Void
     let onSubmitPreviewPassword: (ArchiveEntrySummary) -> Void
+    let onTestEntries: ([ArchiveEntrySummary]) -> Void
+    let onSubmitTestPassword: ([ArchiveEntrySummary]) -> Void
 
     private var groups: [ArchiveEntryGroup] {
         summary.visibleGroups(searchQuery: searchQuery, sort: sort, viewMode: viewMode)
@@ -281,11 +297,21 @@ struct ArchiveListingReadyPanel: View {
                     }
                 }
                 .disabled(previewEntry == nil || previewState.isLoading)
+                Button("Test") {
+                    onTestEntries(selectedEntries)
+                }
+                .disabled(testState.isLoading)
             }
             ArchivePreviewPanel(
                 state: previewState,
                 password: $previewPassword,
                 onSubmitPassword: onSubmitPreviewPassword
+            )
+            ArchiveTestPanel(
+                state: testState,
+                selectedEntries: selectedEntries,
+                password: $testPassword,
+                onSubmitPassword: onSubmitTestPassword
             )
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
@@ -366,6 +392,64 @@ struct ArchivePreviewPanel: View {
                 .disabled(password.isEmpty)
             }
         case .failed(_, let error):
+            VStack(alignment: .leading, spacing: 4) {
+                Text(error.message)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+                if let recoveryHint = error.recoveryHint {
+                    Text(recoveryHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+struct ArchiveTestPanel: View {
+    let state: ArchiveTestState
+    let selectedEntries: [ArchiveEntrySummary]
+    @Binding var password: String
+    let onSubmitPassword: ([ArchiveEntrySummary]) -> Void
+
+    var body: some View {
+        switch state {
+        case .idle:
+            EmptyView()
+        case .loading(let selectedCount):
+            Text(selectedCount == 0 ? "Testing archive" : "Testing \(selectedCount) selected entries")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        case .ready(let summary):
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.verified ? "Archive verified" : "Archive verification failed")
+                    .font(.subheadline)
+                Text("\(summary.testedEntries) tested - \(summary.skippedEntries) skipped - \(summary.testedBytes) bytes")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(summary.warnings, id: \.self) { warning in
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        case .passwordRequired(let error):
+            VStack(alignment: .leading, spacing: 8) {
+                Text(error.message)
+                    .font(.subheadline)
+                if let recoveryHint = error.recoveryHint {
+                    Text(recoveryHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                Button("Retry Test") {
+                    onSubmitPassword(selectedEntries)
+                }
+                .disabled(password.isEmpty)
+            }
+        case .failed(let error):
             VStack(alignment: .leading, spacing: 4) {
                 Text(error.message)
                     .font(.subheadline)
@@ -537,11 +621,37 @@ enum ArchivePreviewState: Equatable {
     }
 }
 
+enum ArchiveTestState: Equatable {
+    case idle
+    case loading(Int)
+    case ready(ArchiveTestSummary)
+    case passwordRequired(ArchiveListingError)
+    case failed(ArchiveListingError)
+
+    var isLoading: Bool {
+        if case .loading = self {
+            return true
+        }
+        return false
+    }
+}
+
 struct ArchivePreviewSummary: Equatable {
     let entry: ArchiveEntrySummary
     let cleanupRoot: String
     let previewPath: String
     let writtenBytes: UInt64
+    let warnings: [String]
+}
+
+struct ArchiveTestSummary: Equatable {
+    let formatLabel: String
+    let verified: Bool
+    let testedEntries: UInt64
+    let skippedEntries: UInt64
+    let totalEntries: UInt64
+    let testedBytes: UInt64
+    let selectedCount: Int
     let warnings: [String]
 }
 
@@ -638,6 +748,11 @@ protocol ArchiveBridgeClient {
         entryPath: String,
         password: String?
     ) throws -> MaterializePreviewResult
+    func testArchiveContents(
+        path: String,
+        selectedPaths: [String],
+        password: String?
+    ) throws -> TestArchiveResult
 }
 
 struct GeneratedArchiveBridgeClient: ArchiveBridgeClient {
@@ -662,6 +777,20 @@ struct GeneratedArchiveBridgeClient: ArchiveBridgeClient {
                 entryPath: entryPath,
                 password: password,
                 stripComponents: 0
+            )
+        )
+    }
+
+    func testArchiveContents(
+        path: String,
+        selectedPaths: [String],
+        password: String?
+    ) throws -> TestArchiveResult {
+        try testArchive(
+            request: TestArchiveRequest(
+                archivePath: path,
+                password: password,
+                selectedPaths: selectedPaths
             )
         )
     }
@@ -779,6 +908,59 @@ struct ArchivePreviewLoader {
     }
 }
 
+struct ArchiveTestLoader {
+    private static let passwordRequiredCode = "password_required"
+    private static let invalidPasswordCode = "invalid_password"
+    private static let unknownErrorCode = "unknown_error"
+
+    private let bridge: ArchiveBridgeClient
+
+    init(bridge: ArchiveBridgeClient = GeneratedArchiveBridgeClient()) {
+        self.bridge = bridge
+    }
+
+    func test(
+        archive: ImportedArchive,
+        selectedEntries: [ArchiveEntrySummary],
+        password: String?
+    ) -> ArchiveTestState {
+        do {
+            let result = try bridge.testArchiveContents(
+                path: archive.localPath,
+                selectedPaths: selectedEntries.map(\.path),
+                password: password
+            )
+            return .ready(result.summary(selectedCount: selectedEntries.count))
+        } catch ZmanagerMobileError.Bridge(
+            let code,
+            let userMessage,
+            let recoveryHint,
+            _,
+            let retryable
+        ) {
+            let error = ArchiveListingError(
+                code: code,
+                message: userMessage,
+                recoveryHint: recoveryHint,
+                retryable: retryable
+            )
+            if code == Self.passwordRequiredCode || code == Self.invalidPasswordCode {
+                return .passwordRequired(error)
+            }
+            return .failed(error)
+        } catch {
+            return .failed(
+                ArchiveListingError(
+                    code: Self.unknownErrorCode,
+                    message: "Unable to test that archive.",
+                    recoveryHint: nil,
+                    retryable: false
+                )
+            )
+        }
+    }
+}
+
 private extension ListArchiveResult {
     var summary: ArchiveListingSummary {
         ArchiveListingSummary(
@@ -824,6 +1006,21 @@ private extension MaterializePreviewResult {
     }
 }
 
+private extension TestArchiveResult {
+    func summary(selectedCount: Int) -> ArchiveTestSummary {
+        return ArchiveTestSummary(
+            formatLabel: formatLabel,
+            verified: verified,
+            testedEntries: testedEntries,
+            skippedEntries: skippedEntries,
+            totalEntries: totalEntries,
+            testedBytes: testedBytes,
+            selectedCount: selectedCount,
+            warnings: warnings.map(\.message)
+        )
+    }
+}
+
 private extension ArchiveEntryKind {
     var displayLabel: String {
         switch self {
@@ -849,29 +1046,35 @@ final class ArchiveImportModel: ObservableObject {
     @Published var listingState: ArchiveListingState = .idle
     @Published var passwordInput = ""
     @Published var previewPasswordInput = ""
+    @Published var testPasswordInput = ""
     @Published var entrySearchQuery = ""
     @Published var entrySort: ArchiveEntrySort = .pathAscending
     @Published var entryViewMode: ArchiveEntryViewMode = .folders
     @Published var selectedEntryIds = Set<String>()
     @Published var previewState: ArchivePreviewState = .idle
+    @Published var testState: ArchiveTestState = .idle
     @Published var previewDocument: PreviewDocument?
 
     private let importStore: ArchiveImportStore
     private let listingLoader: ArchiveListingLoader
     private let previewLoader: ArchivePreviewLoader
+    private let testLoader: ArchiveTestLoader
     private var importGeneration = 0
     private var listingGeneration = 0
     private var previewGeneration = 0
+    private var testGeneration = 0
     private var activePreviewCleanupRoot: URL?
 
     init(
         importStore: ArchiveImportStore = ArchiveImportStore(),
         listingLoader: ArchiveListingLoader = ArchiveListingLoader(),
-        previewLoader: ArchivePreviewLoader = ArchivePreviewLoader()
+        previewLoader: ArchivePreviewLoader = ArchivePreviewLoader(),
+        testLoader: ArchiveTestLoader = ArchiveTestLoader()
     ) {
         self.importStore = importStore
         self.listingLoader = listingLoader
         self.previewLoader = previewLoader
+        self.testLoader = testLoader
     }
 
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
@@ -891,6 +1094,7 @@ final class ArchiveImportModel: ObservableObject {
         importGeneration += 1
         listingGeneration += 1
         clearPreviewState()
+        clearTestState()
         let currentImportGeneration = importGeneration
         isImporting = true
         errorMessage = nil
@@ -948,6 +1152,22 @@ final class ArchiveImportModel: ObservableObject {
         loadPreview(for: archive, entry: entry, password: password)
     }
 
+    func startTest(selectedEntries: [ArchiveEntrySummary]) {
+        guard let archive = importedArchive else {
+            return
+        }
+        loadTest(for: archive, selectedEntries: selectedEntries, password: nil)
+    }
+
+    func retryTestWithPassword(selectedEntries: [ArchiveEntrySummary]) {
+        guard let archive = importedArchive else {
+            return
+        }
+        let password = testPasswordInput.isEmpty ? nil : testPasswordInput
+        testPasswordInput = ""
+        loadTest(for: archive, selectedEntries: selectedEntries, password: password)
+    }
+
     func cleanupActivePreview() {
         guard let activePreviewCleanupRoot else {
             return
@@ -965,6 +1185,7 @@ final class ArchiveImportModel: ObservableObject {
         let currentListingGeneration = listingGeneration
         selectedEntryIds.removeAll()
         clearPreviewState()
+        clearTestState()
         listingState = .loading
         let listingLoader = listingLoader
         Task {
@@ -1005,12 +1226,39 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
+    private func loadTest(
+        for archive: ImportedArchive,
+        selectedEntries: [ArchiveEntrySummary],
+        password: String?
+    ) {
+        testGeneration += 1
+        let currentTestGeneration = testGeneration
+        testPasswordInput = ""
+        testState = .loading(selectedEntries.count)
+        let testLoader = testLoader
+        Task {
+            let state = await Task.detached(priority: .userInitiated) {
+                testLoader.test(archive: archive, selectedEntries: selectedEntries, password: password)
+            }.value
+            guard currentTestGeneration == testGeneration, importedArchive?.id == archive.id else {
+                return
+            }
+            testState = state
+        }
+    }
+
     private func clearPreviewState() {
         previewGeneration += 1
         cleanupActivePreview()
         previewDocument = nil
         previewPasswordInput = ""
         previewState = .idle
+    }
+
+    private func clearTestState() {
+        testGeneration += 1
+        testPasswordInput = ""
+        testState = .idle
     }
 }
 

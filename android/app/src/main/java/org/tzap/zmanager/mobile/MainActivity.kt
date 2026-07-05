@@ -88,14 +88,17 @@ private fun ZManagerApp(
     var isImporting by remember { mutableStateOf(false) }
     var passwordInput by remember { mutableStateOf("") }
     var previewPasswordInput by remember { mutableStateOf("") }
+    var testPasswordInput by remember { mutableStateOf("") }
     var entrySearchQuery by remember { mutableStateOf("") }
     var entrySort by remember { mutableStateOf(ArchiveEntrySort.PATH_ASCENDING) }
     var entryViewMode by remember { mutableStateOf(ArchiveEntryViewMode.FOLDERS) }
     var selectedEntryIds by remember { mutableStateOf(emptySet<String>()) }
     var previewState by remember { mutableStateOf<ArchivePreviewState>(ArchivePreviewState.Idle) }
+    var testState by remember { mutableStateOf<ArchiveTestState>(ArchiveTestState.Idle) }
     var importRequestId by remember { mutableStateOf(0L) }
     var listingRequestId by remember { mutableStateOf(0L) }
     var previewRequestId by remember { mutableStateOf(0L) }
+    var testRequestId by remember { mutableStateOf(0L) }
 
     fun clearPreviewState() {
         cleanupPreview(previewState)
@@ -104,11 +107,18 @@ private fun ZManagerApp(
         previewRequestId += 1
     }
 
+    fun clearTestState() {
+        testState = ArchiveTestState.Idle
+        testPasswordInput = ""
+        testRequestId += 1
+    }
+
     fun loadArchiveListing(archive: ImportedArchive, password: String?) {
         listingRequestId += 1
         val currentListingRequestId = listingRequestId
         selectedEntryIds = emptySet()
         clearPreviewState()
+        clearTestState()
         listingState = ArchiveListingState.Loading
         scope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -147,11 +157,34 @@ private fun ZManagerApp(
         }
     }
 
+    fun startArchiveTest(
+        archive: ImportedArchive,
+        selectedEntries: List<ArchiveEntrySummary>,
+        password: String?
+    ) {
+        testRequestId += 1
+        val currentTestRequestId = testRequestId
+        testState = ArchiveTestState.Loading(selectedEntries.size)
+        testPasswordInput = ""
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                listingRepository.testArchive(archive, selectedEntries, password)
+            }
+            if (
+                currentTestRequestId == testRequestId &&
+                importedArchive?.id == archive.id
+            ) {
+                testState = result
+            }
+        }
+    }
+
     fun startImport(uri: Uri) {
         importRequestId += 1
         val currentImportRequestId = importRequestId
         listingRequestId += 1
         clearPreviewState()
+        clearTestState()
         isImporting = true
         importError = null
         importedArchive = null
@@ -277,6 +310,21 @@ private fun ZManagerApp(
                                 previewPasswordInput = ""
                                 startPreview(archive, entry, password)
                             }
+                        },
+                        testState = testState,
+                        testPasswordInput = testPasswordInput,
+                        onTestPasswordInputChanged = { testPasswordInput = it },
+                        onTestEntries = { entries ->
+                            importedArchive?.let { archive ->
+                                startArchiveTest(archive, entries, null)
+                            }
+                        },
+                        onSubmitTestPassword = { entries ->
+                            importedArchive?.let { archive ->
+                                val password = testPasswordInput.takeIf { it.isNotEmpty() }
+                                testPasswordInput = ""
+                                startArchiveTest(archive, entries, password)
+                            }
                         }
                     )
                 }
@@ -317,7 +365,12 @@ private fun ArchiveListingPanel(
     previewPasswordInput: String,
     onPreviewPasswordInputChanged: (String) -> Unit,
     onPreviewEntry: (ArchiveEntrySummary) -> Unit,
-    onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit
+    onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit,
+    testState: ArchiveTestState,
+    testPasswordInput: String,
+    onTestPasswordInputChanged: (String) -> Unit,
+    onTestEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit
 ) {
     when (state) {
         ArchiveListingState.Idle -> Unit
@@ -343,7 +396,12 @@ private fun ArchiveListingPanel(
             previewPasswordInput = previewPasswordInput,
             onPreviewPasswordInputChanged = onPreviewPasswordInputChanged,
             onPreviewEntry = onPreviewEntry,
-            onSubmitPreviewPassword = onSubmitPreviewPassword
+            onSubmitPreviewPassword = onSubmitPreviewPassword,
+            testState = testState,
+            testPasswordInput = testPasswordInput,
+            onTestPasswordInputChanged = onTestPasswordInputChanged,
+            onTestEntries = onTestEntries,
+            onSubmitTestPassword = onSubmitTestPassword
         )
         is ArchiveListingState.PasswordRequired -> {
             Spacer(modifier = Modifier.height(8.dp))
@@ -406,7 +464,12 @@ private fun ArchiveListingReadyPanel(
     previewPasswordInput: String,
     onPreviewPasswordInputChanged: (String) -> Unit,
     onPreviewEntry: (ArchiveEntrySummary) -> Unit,
-    onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit
+    onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit,
+    testState: ArchiveTestState,
+    testPasswordInput: String,
+    onTestPasswordInputChanged: (String) -> Unit,
+    onTestEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit
 ) {
     val groups = summary.visibleGroups(searchQuery, sort, viewMode)
     val selectedEntries = summary.selectedEntries(selectedEntryIds)
@@ -474,12 +537,25 @@ private fun ArchiveListingReadyPanel(
         ) {
             Text("Preview")
         }
+        Button(
+            enabled = testState !is ArchiveTestState.Loading,
+            onClick = { onTestEntries(selectedEntries) }
+        ) {
+            Text("Test")
+        }
     }
     ArchivePreviewPanel(
         state = previewState,
         passwordInput = previewPasswordInput,
         onPasswordInputChanged = onPreviewPasswordInputChanged,
         onSubmitPassword = onSubmitPreviewPassword
+    )
+    ArchiveTestPanel(
+        state = testState,
+        selectedEntries = selectedEntries,
+        passwordInput = testPasswordInput,
+        onPasswordInputChanged = onTestPasswordInputChanged,
+        onSubmitPassword = onSubmitTestPassword
     )
     LazyColumn(
         modifier = Modifier
@@ -622,6 +698,94 @@ private fun ArchivePreviewPanel(
             }
         }
         is ArchivePreviewState.Failed -> {
+            Text(
+                text = state.error.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            state.error.recoveryHint?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchiveTestPanel(
+    state: ArchiveTestState,
+    selectedEntries: List<ArchiveEntrySummary>,
+    passwordInput: String,
+    onPasswordInputChanged: (String) -> Unit,
+    onSubmitPassword: (List<ArchiveEntrySummary>) -> Unit
+) {
+    when (state) {
+        ArchiveTestState.Idle -> Unit
+        is ArchiveTestState.Loading -> {
+            Text(
+                text = if (state.selectedCount == 0) {
+                    "Testing archive"
+                } else {
+                    "Testing ${state.selectedCount} selected entries"
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        is ArchiveTestState.Ready -> {
+            Text(
+                text = if (state.summary.verified) {
+                    "Archive verified"
+                } else {
+                    "Archive verification failed"
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = listOf(
+                    "${state.summary.testedEntries} tested",
+                    "${state.summary.skippedEntries} skipped",
+                    "${state.summary.testedBytes} bytes"
+                ).joinToString(" - "),
+                style = MaterialTheme.typography.bodySmall
+            )
+            state.summary.warnings.forEach { warning ->
+                Text(
+                    text = warning,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        is ArchiveTestState.PasswordRequired -> {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = state.error.message,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            state.error.recoveryHint?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            OutlinedTextField(
+                value = passwordInput,
+                onValueChange = onPasswordInputChanged,
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                enabled = passwordInput.isNotEmpty(),
+                onClick = { onSubmitPassword(selectedEntries) }
+            ) {
+                Text("Retry test")
+            }
+        }
+        is ArchiveTestState.Failed -> {
             Text(
                 text = state.error.message,
                 style = MaterialTheme.typography.bodyMedium,

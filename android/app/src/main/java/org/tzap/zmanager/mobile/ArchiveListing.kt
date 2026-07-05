@@ -8,10 +8,13 @@ import org.tzap.zmanager.mobile.bridge.generated.ListArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewRequest
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
+import org.tzap.zmanager.mobile.bridge.generated.TestArchiveRequest
+import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerMobileException
 import org.tzap.zmanager.mobile.bridge.generated.detectArchive as bridgeDetectArchive
 import org.tzap.zmanager.mobile.bridge.generated.listArchive as bridgeListArchive
 import org.tzap.zmanager.mobile.bridge.generated.materializePreview as bridgeMaterializePreview
+import org.tzap.zmanager.mobile.bridge.generated.testArchive as bridgeTestArchive
 import java.util.Locale
 
 private const val ERROR_PASSWORD_REQUIRED = "password_required"
@@ -87,11 +90,30 @@ sealed interface ArchivePreviewState {
     ) : ArchivePreviewState
 }
 
+sealed interface ArchiveTestState {
+    data object Idle : ArchiveTestState
+    data class Loading(val selectedCount: Int) : ArchiveTestState
+    data class Ready(val summary: ArchiveTestSummary) : ArchiveTestState
+    data class PasswordRequired(val error: ArchiveListingError) : ArchiveTestState
+    data class Failed(val error: ArchiveListingError) : ArchiveTestState
+}
+
 data class ArchivePreviewSummary(
     val entry: ArchiveEntrySummary,
     val cleanupRoot: String,
     val previewPath: String,
     val writtenBytes: ULong,
+    val warnings: List<String>
+)
+
+data class ArchiveTestSummary(
+    val formatLabel: String,
+    val verified: Boolean,
+    val testedEntries: ULong,
+    val skippedEntries: ULong,
+    val totalEntries: ULong,
+    val testedBytes: ULong,
+    val selectedCount: Int,
     val warnings: List<String>
 )
 
@@ -103,6 +125,11 @@ interface ArchiveBridgeGateway {
         entryPath: String,
         password: String?
     ): MaterializePreviewResult
+    fun testArchive(
+        archivePath: String,
+        selectedPaths: List<String>,
+        password: String?
+    ): TestArchiveResult
 }
 
 class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
@@ -125,6 +152,20 @@ class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
                 entryPath = entryPath,
                 password = password,
                 stripComponents = 0UL
+            )
+        )
+    }
+
+    override fun testArchive(
+        archivePath: String,
+        selectedPaths: List<String>,
+        password: String?
+    ): TestArchiveResult {
+        return bridgeTestArchive(
+            TestArchiveRequest(
+                archivePath = archivePath,
+                password = password,
+                selectedPaths = selectedPaths
             )
         )
     }
@@ -210,6 +251,46 @@ class ArchiveListingRepository(
         }
     }
 
+    fun testArchive(
+        archive: ImportedArchive,
+        selectedEntries: List<ArchiveEntrySummary>,
+        password: String?
+    ): ArchiveTestState {
+        return try {
+            val result = bridge.testArchive(
+                archivePath = archive.localPath,
+                selectedPaths = selectedEntries.map { it.path },
+                password = password
+            )
+            ArchiveTestState.Ready(result.toSummary(selectedEntries.size))
+        } catch (error: ZmanagerMobileException.Bridge) {
+            val listingError = error.toListingError()
+            if (listingError.code == ERROR_PASSWORD_REQUIRED || listingError.code == ERROR_INVALID_PASSWORD) {
+                ArchiveTestState.PasswordRequired(listingError)
+            } else {
+                ArchiveTestState.Failed(listingError)
+            }
+        } catch (error: LinkageError) {
+            ArchiveTestState.Failed(
+                ArchiveListingError(
+                    code = ERROR_BRIDGE_UNAVAILABLE,
+                    message = "The archive engine is not available in this build.",
+                    recoveryHint = "Install a build with the mobile core native library.",
+                    retryable = false
+                )
+            )
+        } catch (error: RuntimeException) {
+            ArchiveTestState.Failed(
+                ArchiveListingError(
+                    code = ERROR_UNKNOWN,
+                    message = "Unable to test that archive.",
+                    recoveryHint = null,
+                    retryable = false
+                )
+            )
+        }
+    }
+
     private fun ListArchiveResult.toSummary(): ArchiveListingSummary {
         return ArchiveListingSummary(
             formatLabel = formatLabel,
@@ -240,6 +321,19 @@ class ArchiveListingRepository(
             cleanupRoot = cleanupRoot,
             previewPath = previewPath,
             writtenBytes = writtenBytes,
+            warnings = warnings.map { it.message }
+        )
+    }
+
+    private fun TestArchiveResult.toSummary(selectedCount: Int): ArchiveTestSummary {
+        return ArchiveTestSummary(
+            formatLabel = formatLabel,
+            verified = verified,
+            testedEntries = testedEntries,
+            skippedEntries = skippedEntries,
+            totalEntries = totalEntries,
+            testedBytes = testedBytes,
+            selectedCount = selectedCount,
             warnings = warnings.map { it.message }
         )
     }

@@ -11,6 +11,7 @@ import org.tzap.zmanager.mobile.bridge.generated.BridgeSeverity
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
+import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerMobileException
 
 class ArchiveListingTest {
@@ -175,6 +176,55 @@ class ArchiveListingTest {
         assertTrue(error.retryable)
     }
 
+    @Test
+    fun testArchiveReturnsReadyStateAndPassesSelectedPaths() {
+        val entry = testEntry(id = "file", path = "readme.txt")
+        val gateway = FakeArchiveBridgeGateway(
+            testResult = TestArchiveResult(
+                archivePath = "/cache/archive.zip",
+                format = ArchiveFormat.ZIP,
+                formatLabel = "ZIP",
+                verified = true,
+                testedEntries = 1UL,
+                skippedEntries = 0UL,
+                totalEntries = 1UL,
+                testedBytes = 12UL,
+                warnings = emptyList()
+            )
+        )
+        val repository = ArchiveListingRepository(gateway)
+
+        val state = repository.testArchive(testImportedArchive(), listOf(entry), password = null)
+
+        assertTrue(state is ArchiveTestState.Ready)
+        val summary = (state as ArchiveTestState.Ready).summary
+        assertTrue(summary.verified)
+        assertEquals(1UL, summary.testedEntries)
+        assertEquals(listOf("readme.txt"), gateway.testedSelectedPaths)
+    }
+
+    @Test
+    fun testArchiveMapsPasswordErrorsToPasswordRequiredState() {
+        val repository = ArchiveListingRepository(
+            FakeArchiveBridgeGateway(
+                testError = ZmanagerMobileException.Bridge(
+                    code = "password_required",
+                    userMessage = "This archive requires a password.",
+                    recoveryHint = "Enter the archive password.",
+                    severity = BridgeSeverity.WARNING,
+                    retryable = true
+                )
+            )
+        )
+
+        val state = repository.testArchive(testImportedArchive(), selectedEntries = emptyList(), password = null)
+
+        assertTrue(state is ArchiveTestState.PasswordRequired)
+        val error = (state as ArchiveTestState.PasswordRequired).error
+        assertEquals("password_required", error.code)
+        assertTrue(error.retryable)
+    }
+
     private fun testImportedArchive(): ImportedArchive {
         return ImportedArchive(
             id = "archive-id",
@@ -218,10 +268,15 @@ class ArchiveListingTest {
         ),
         private val listing: ListArchiveResult? = null,
         private val preview: MaterializePreviewResult? = null,
+        private val testResult: TestArchiveResult? = null,
         private val detectError: Throwable? = null,
         private val listError: Throwable? = null,
-        private val previewError: Throwable? = null
+        private val previewError: Throwable? = null,
+        private val testError: Throwable? = null
     ) : ArchiveBridgeGateway {
+        var testedSelectedPaths: List<String> = emptyList()
+            private set
+
         override fun detectArchive(path: String): DetectArchiveResult {
             detectError?.let { throw it }
             return detection
@@ -252,6 +307,26 @@ class ArchiveListingTest {
                 cleanupRoot = "/cache/previews/preview-id",
                 previewPath = "/cache/previews/preview-id/$entryPath",
                 writtenBytes = 0UL,
+                warnings = emptyList()
+            )
+        }
+
+        override fun testArchive(
+            archivePath: String,
+            selectedPaths: List<String>,
+            password: String?
+        ): TestArchiveResult {
+            testError?.let { throw it }
+            testedSelectedPaths = selectedPaths
+            return testResult ?: TestArchiveResult(
+                archivePath = archivePath,
+                format = ArchiveFormat.ZIP,
+                formatLabel = "ZIP",
+                verified = true,
+                testedEntries = 0UL,
+                skippedEntries = 0UL,
+                totalEntries = 0UL,
+                testedBytes = 0UL,
                 warnings = emptyList()
             )
         }
