@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "org.tzap.zmanager.mobile.bridge.generated"
+cdylib_name = "zmanager_mobile_core"
+android = true
+
+[bindings.swift]
+module_name = "ZManagerMobileCore"
+ffi_module_name = "ZManagerMobileCoreFFI"

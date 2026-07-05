@@ -10,6 +10,7 @@
 		01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000101 /* ZManagerMobileApp.swift */; };
 		01A000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000102 /* ContentView.swift */; };
 		01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000103 /* ZManagerMobileTests.swift */; };
+		01A000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000107 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,6 +30,7 @@
 		01A000000000000000000104 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		01A000000000000000000105 /* ZManagerMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZManagerMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		01A000000000000000000106 /* ZManagerMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		01A000000000000000000107 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +66,7 @@
 				01A000000000000000000101 /* ZManagerMobileApp.swift */,
 				01A000000000000000000102 /* ContentView.swift */,
 				01A000000000000000000104 /* Info.plist */,
+				01A000000000000000000107 /* Assets.xcassets */,
 			);
 			path = ZManagerMobile;
 			sourceTree = "<group>";
@@ -166,6 +169,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01A000000000000000000004 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -346,4 +350,3 @@
 	};
 	rootObject = 01A000000000000000000301 /* Project object */;
 }
-
