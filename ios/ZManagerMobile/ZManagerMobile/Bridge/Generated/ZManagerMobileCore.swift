@@ -815,6 +815,92 @@ public func FfiConverterTypeCancelJobResult_lower(_ value: CancelJobResult) -> R
 }
 
 
+public struct CreatePlanEntry {
+    public var archivePath: String
+    public var sourcePath: String
+    public var kind: ArchiveEntryKind
+    public var size: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, sourcePath: String, kind: ArchiveEntryKind, size: UInt64) {
+        self.archivePath = archivePath
+        self.sourcePath = sourcePath
+        self.kind = kind
+        self.size = size
+    }
+}
+
+#if compiler(>=6)
+extension CreatePlanEntry: Sendable {}
+#endif
+
+
+extension CreatePlanEntry: Equatable, Hashable {
+    public static func ==(lhs: CreatePlanEntry, rhs: CreatePlanEntry) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.sourcePath != rhs.sourcePath {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.size != rhs.size {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(sourcePath)
+        hasher.combine(kind)
+        hasher.combine(size)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCreatePlanEntry: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreatePlanEntry {
+        return
+            try CreatePlanEntry(
+                archivePath: FfiConverterString.read(from: &buf),
+                sourcePath: FfiConverterString.read(from: &buf),
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
+                size: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CreatePlanEntry, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.sourcePath, into: &buf)
+        FfiConverterTypeArchiveEntryKind.write(value.kind, into: &buf)
+        FfiConverterUInt64.write(value.size, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCreatePlanEntry_lift(_ buf: RustBuffer) throws -> CreatePlanEntry {
+    return try FfiConverterTypeCreatePlanEntry.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCreatePlanEntry_lower(_ value: CreatePlanEntry) -> RustBuffer {
+    return FfiConverterTypeCreatePlanEntry.lower(value)
+}
+
+
 public struct DetectArchiveRequest {
     public var archivePath: String
 
@@ -1227,14 +1313,22 @@ public struct JobTerminalSummary {
     public var writtenEntries: UInt64
     public var skippedEntries: UInt64?
     public var writtenBytes: UInt64
+    public var encrypted: Bool?
+    public var volumeSize: UInt64?
+    public var volumeCount: UInt64?
+    public var outputPaths: [String]
     public var warnings: [BridgeError]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(writtenEntries: UInt64, skippedEntries: UInt64?, writtenBytes: UInt64, warnings: [BridgeError]) {
+    public init(writtenEntries: UInt64, skippedEntries: UInt64?, writtenBytes: UInt64, encrypted: Bool?, volumeSize: UInt64?, volumeCount: UInt64?, outputPaths: [String], warnings: [BridgeError]) {
         self.writtenEntries = writtenEntries
         self.skippedEntries = skippedEntries
         self.writtenBytes = writtenBytes
+        self.encrypted = encrypted
+        self.volumeSize = volumeSize
+        self.volumeCount = volumeCount
+        self.outputPaths = outputPaths
         self.warnings = warnings
     }
 }
@@ -1255,6 +1349,18 @@ extension JobTerminalSummary: Equatable, Hashable {
         if lhs.writtenBytes != rhs.writtenBytes {
             return false
         }
+        if lhs.encrypted != rhs.encrypted {
+            return false
+        }
+        if lhs.volumeSize != rhs.volumeSize {
+            return false
+        }
+        if lhs.volumeCount != rhs.volumeCount {
+            return false
+        }
+        if lhs.outputPaths != rhs.outputPaths {
+            return false
+        }
         if lhs.warnings != rhs.warnings {
             return false
         }
@@ -1265,6 +1371,10 @@ extension JobTerminalSummary: Equatable, Hashable {
         hasher.combine(writtenEntries)
         hasher.combine(skippedEntries)
         hasher.combine(writtenBytes)
+        hasher.combine(encrypted)
+        hasher.combine(volumeSize)
+        hasher.combine(volumeCount)
+        hasher.combine(outputPaths)
         hasher.combine(warnings)
     }
 }
@@ -1281,6 +1391,10 @@ public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
                 writtenEntries: FfiConverterUInt64.read(from: &buf),
                 skippedEntries: FfiConverterOptionUInt64.read(from: &buf),
                 writtenBytes: FfiConverterUInt64.read(from: &buf),
+                encrypted: FfiConverterOptionBool.read(from: &buf),
+                volumeSize: FfiConverterOptionUInt64.read(from: &buf),
+                volumeCount: FfiConverterOptionUInt64.read(from: &buf),
+                outputPaths: FfiConverterSequenceString.read(from: &buf),
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1289,6 +1403,10 @@ public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.writtenEntries, into: &buf)
         FfiConverterOptionUInt64.write(value.skippedEntries, into: &buf)
         FfiConverterUInt64.write(value.writtenBytes, into: &buf)
+        FfiConverterOptionBool.write(value.encrypted, into: &buf)
+        FfiConverterOptionUInt64.write(value.volumeSize, into: &buf)
+        FfiConverterOptionUInt64.write(value.volumeCount, into: &buf)
+        FfiConverterSequenceString.write(value.outputPaths, into: &buf)
         FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
     }
 }
@@ -1819,6 +1937,306 @@ public func FfiConverterTypeMobileJobEvent_lower(_ value: MobileJobEvent) -> Rus
 }
 
 
+public struct PlanCreateRequest {
+    public var sourcePaths: [String]
+    public var destinationArchivePath: String
+    public var format: CreateArchiveFormat
+    public var password: String?
+    public var preserveMetadata: Bool
+    public var replaceExisting: Bool
+    public var cleanSource: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool) {
+        self.sourcePaths = sourcePaths
+        self.destinationArchivePath = destinationArchivePath
+        self.format = format
+        self.password = password
+        self.preserveMetadata = preserveMetadata
+        self.replaceExisting = replaceExisting
+        self.cleanSource = cleanSource
+    }
+}
+
+#if compiler(>=6)
+extension PlanCreateRequest: Sendable {}
+#endif
+
+
+extension PlanCreateRequest: Equatable, Hashable {
+    public static func ==(lhs: PlanCreateRequest, rhs: PlanCreateRequest) -> Bool {
+        if lhs.sourcePaths != rhs.sourcePaths {
+            return false
+        }
+        if lhs.destinationArchivePath != rhs.destinationArchivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.preserveMetadata != rhs.preserveMetadata {
+            return false
+        }
+        if lhs.replaceExisting != rhs.replaceExisting {
+            return false
+        }
+        if lhs.cleanSource != rhs.cleanSource {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sourcePaths)
+        hasher.combine(destinationArchivePath)
+        hasher.combine(format)
+        hasher.combine(password)
+        hasher.combine(preserveMetadata)
+        hasher.combine(replaceExisting)
+        hasher.combine(cleanSource)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanCreateRequest {
+        return
+            try PlanCreateRequest(
+                sourcePaths: FfiConverterSequenceString.read(from: &buf),
+                destinationArchivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                preserveMetadata: FfiConverterBool.read(from: &buf),
+                replaceExisting: FfiConverterBool.read(from: &buf),
+                cleanSource: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PlanCreateRequest, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.sourcePaths, into: &buf)
+        FfiConverterString.write(value.destinationArchivePath, into: &buf)
+        FfiConverterTypeCreateArchiveFormat.write(value.format, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterBool.write(value.preserveMetadata, into: &buf)
+        FfiConverterBool.write(value.replaceExisting, into: &buf)
+        FfiConverterBool.write(value.cleanSource, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanCreateRequest_lift(_ buf: RustBuffer) throws -> PlanCreateRequest {
+    return try FfiConverterTypePlanCreateRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanCreateRequest_lower(_ value: PlanCreateRequest) -> RustBuffer {
+    return FfiConverterTypePlanCreateRequest.lower(value)
+}
+
+
+public struct PlanCreateResult {
+    public var planId: String
+    public var sourcePaths: [String]
+    public var destinationArchivePath: String
+    public var format: CreateArchiveFormat
+    public var formatLabel: String
+    public var entries: [CreatePlanEntry]
+    public var totalEntries: UInt64
+    public var totalBytes: UInt64
+    public var excludedEntries: UInt64
+    public var excludedBytes: UInt64
+    public var outputExists: Bool
+    public var replaceExisting: Bool
+    public var encrypted: Bool
+    public var preserveMetadata: Bool
+    public var cleanSource: Bool
+    public var canStart: Bool
+    public var warnings: [BridgeError]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(planId: String, sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, formatLabel: String, entries: [CreatePlanEntry], totalEntries: UInt64, totalBytes: UInt64, excludedEntries: UInt64, excludedBytes: UInt64, outputExists: Bool, replaceExisting: Bool, encrypted: Bool, preserveMetadata: Bool, cleanSource: Bool, canStart: Bool, warnings: [BridgeError]) {
+        self.planId = planId
+        self.sourcePaths = sourcePaths
+        self.destinationArchivePath = destinationArchivePath
+        self.format = format
+        self.formatLabel = formatLabel
+        self.entries = entries
+        self.totalEntries = totalEntries
+        self.totalBytes = totalBytes
+        self.excludedEntries = excludedEntries
+        self.excludedBytes = excludedBytes
+        self.outputExists = outputExists
+        self.replaceExisting = replaceExisting
+        self.encrypted = encrypted
+        self.preserveMetadata = preserveMetadata
+        self.cleanSource = cleanSource
+        self.canStart = canStart
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension PlanCreateResult: Sendable {}
+#endif
+
+
+extension PlanCreateResult: Equatable, Hashable {
+    public static func ==(lhs: PlanCreateResult, rhs: PlanCreateResult) -> Bool {
+        if lhs.planId != rhs.planId {
+            return false
+        }
+        if lhs.sourcePaths != rhs.sourcePaths {
+            return false
+        }
+        if lhs.destinationArchivePath != rhs.destinationArchivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.formatLabel != rhs.formatLabel {
+            return false
+        }
+        if lhs.entries != rhs.entries {
+            return false
+        }
+        if lhs.totalEntries != rhs.totalEntries {
+            return false
+        }
+        if lhs.totalBytes != rhs.totalBytes {
+            return false
+        }
+        if lhs.excludedEntries != rhs.excludedEntries {
+            return false
+        }
+        if lhs.excludedBytes != rhs.excludedBytes {
+            return false
+        }
+        if lhs.outputExists != rhs.outputExists {
+            return false
+        }
+        if lhs.replaceExisting != rhs.replaceExisting {
+            return false
+        }
+        if lhs.encrypted != rhs.encrypted {
+            return false
+        }
+        if lhs.preserveMetadata != rhs.preserveMetadata {
+            return false
+        }
+        if lhs.cleanSource != rhs.cleanSource {
+            return false
+        }
+        if lhs.canStart != rhs.canStart {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(planId)
+        hasher.combine(sourcePaths)
+        hasher.combine(destinationArchivePath)
+        hasher.combine(format)
+        hasher.combine(formatLabel)
+        hasher.combine(entries)
+        hasher.combine(totalEntries)
+        hasher.combine(totalBytes)
+        hasher.combine(excludedEntries)
+        hasher.combine(excludedBytes)
+        hasher.combine(outputExists)
+        hasher.combine(replaceExisting)
+        hasher.combine(encrypted)
+        hasher.combine(preserveMetadata)
+        hasher.combine(cleanSource)
+        hasher.combine(canStart)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePlanCreateResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanCreateResult {
+        return
+            try PlanCreateResult(
+                planId: FfiConverterString.read(from: &buf),
+                sourcePaths: FfiConverterSequenceString.read(from: &buf),
+                destinationArchivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
+                formatLabel: FfiConverterString.read(from: &buf),
+                entries: FfiConverterSequenceTypeCreatePlanEntry.read(from: &buf),
+                totalEntries: FfiConverterUInt64.read(from: &buf),
+                totalBytes: FfiConverterUInt64.read(from: &buf),
+                excludedEntries: FfiConverterUInt64.read(from: &buf),
+                excludedBytes: FfiConverterUInt64.read(from: &buf),
+                outputExists: FfiConverterBool.read(from: &buf),
+                replaceExisting: FfiConverterBool.read(from: &buf),
+                encrypted: FfiConverterBool.read(from: &buf),
+                preserveMetadata: FfiConverterBool.read(from: &buf),
+                cleanSource: FfiConverterBool.read(from: &buf),
+                canStart: FfiConverterBool.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PlanCreateResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.planId, into: &buf)
+        FfiConverterSequenceString.write(value.sourcePaths, into: &buf)
+        FfiConverterString.write(value.destinationArchivePath, into: &buf)
+        FfiConverterTypeCreateArchiveFormat.write(value.format, into: &buf)
+        FfiConverterString.write(value.formatLabel, into: &buf)
+        FfiConverterSequenceTypeCreatePlanEntry.write(value.entries, into: &buf)
+        FfiConverterUInt64.write(value.totalEntries, into: &buf)
+        FfiConverterUInt64.write(value.totalBytes, into: &buf)
+        FfiConverterUInt64.write(value.excludedEntries, into: &buf)
+        FfiConverterUInt64.write(value.excludedBytes, into: &buf)
+        FfiConverterBool.write(value.outputExists, into: &buf)
+        FfiConverterBool.write(value.replaceExisting, into: &buf)
+        FfiConverterBool.write(value.encrypted, into: &buf)
+        FfiConverterBool.write(value.preserveMetadata, into: &buf)
+        FfiConverterBool.write(value.cleanSource, into: &buf)
+        FfiConverterBool.write(value.canStart, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanCreateResult_lift(_ buf: RustBuffer) throws -> PlanCreateResult {
+    return try FfiConverterTypePlanCreateResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePlanCreateResult_lower(_ value: PlanCreateResult) -> RustBuffer {
+    return FfiConverterTypePlanCreateResult.lower(value)
+}
+
+
 public struct PlanExtractRequest {
     public var archivePath: String
     public var destinationRoot: String
@@ -2264,6 +2682,116 @@ public func FfiConverterTypePollJobEventsResult_lift(_ buf: RustBuffer) throws -
 #endif
 public func FfiConverterTypePollJobEventsResult_lower(_ value: PollJobEventsResult) -> RustBuffer {
     return FfiConverterTypePollJobEventsResult.lower(value)
+}
+
+
+public struct StartCreateRequest {
+    public var sourcePaths: [String]
+    public var destinationArchivePath: String
+    public var format: CreateArchiveFormat
+    public var password: String?
+    public var preserveMetadata: Bool
+    public var replaceExisting: Bool
+    public var cleanSource: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool) {
+        self.sourcePaths = sourcePaths
+        self.destinationArchivePath = destinationArchivePath
+        self.format = format
+        self.password = password
+        self.preserveMetadata = preserveMetadata
+        self.replaceExisting = replaceExisting
+        self.cleanSource = cleanSource
+    }
+}
+
+#if compiler(>=6)
+extension StartCreateRequest: Sendable {}
+#endif
+
+
+extension StartCreateRequest: Equatable, Hashable {
+    public static func ==(lhs: StartCreateRequest, rhs: StartCreateRequest) -> Bool {
+        if lhs.sourcePaths != rhs.sourcePaths {
+            return false
+        }
+        if lhs.destinationArchivePath != rhs.destinationArchivePath {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.preserveMetadata != rhs.preserveMetadata {
+            return false
+        }
+        if lhs.replaceExisting != rhs.replaceExisting {
+            return false
+        }
+        if lhs.cleanSource != rhs.cleanSource {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sourcePaths)
+        hasher.combine(destinationArchivePath)
+        hasher.combine(format)
+        hasher.combine(password)
+        hasher.combine(preserveMetadata)
+        hasher.combine(replaceExisting)
+        hasher.combine(cleanSource)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartCreateRequest {
+        return
+            try StartCreateRequest(
+                sourcePaths: FfiConverterSequenceString.read(from: &buf),
+                destinationArchivePath: FfiConverterString.read(from: &buf),
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                preserveMetadata: FfiConverterBool.read(from: &buf),
+                replaceExisting: FfiConverterBool.read(from: &buf),
+                cleanSource: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StartCreateRequest, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.sourcePaths, into: &buf)
+        FfiConverterString.write(value.destinationArchivePath, into: &buf)
+        FfiConverterTypeCreateArchiveFormat.write(value.format, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterBool.write(value.preserveMetadata, into: &buf)
+        FfiConverterBool.write(value.replaceExisting, into: &buf)
+        FfiConverterBool.write(value.cleanSource, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartCreateRequest_lift(_ buf: RustBuffer) throws -> StartCreateRequest {
+    return try FfiConverterTypeStartCreateRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartCreateRequest_lower(_ value: StartCreateRequest) -> RustBuffer {
+    return FfiConverterTypeStartCreateRequest.lower(value)
 }
 
 
@@ -3010,6 +3538,90 @@ extension BridgeSeverity: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum CreateArchiveFormat {
+
+    case zip
+    case sevenZ
+    case tarZst
+    case tzap
+}
+
+
+#if compiler(>=6)
+extension CreateArchiveFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCreateArchiveFormat: FfiConverterRustBuffer {
+    typealias SwiftType = CreateArchiveFormat
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreateArchiveFormat {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .zip
+
+        case 2: return .sevenZ
+
+        case 3: return .tarZst
+
+        case 4: return .tzap
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CreateArchiveFormat, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .zip:
+            writeInt(&buf, Int32(1))
+
+
+        case .sevenZ:
+            writeInt(&buf, Int32(2))
+
+
+        case .tarZst:
+            writeInt(&buf, Int32(3))
+
+
+        case .tzap:
+            writeInt(&buf, Int32(4))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCreateArchiveFormat_lift(_ buf: RustBuffer) throws -> CreateArchiveFormat {
+    return try FfiConverterTypeCreateArchiveFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCreateArchiveFormat_lower(_ value: CreateArchiveFormat) -> RustBuffer {
+    return FfiConverterTypeCreateArchiveFormat.lower(value)
+}
+
+
+extension CreateArchiveFormat: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum ExtractionCollisionPolicy {
 
     case refuse
@@ -3636,6 +4248,30 @@ fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionBool: FfiConverterRustBuffer {
+    typealias SwiftType = Bool?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterBool.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterBool.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
@@ -3807,6 +4443,31 @@ fileprivate struct FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeCreatePlanEntry: FfiConverterRustBuffer {
+    typealias SwiftType = [CreatePlanEntry]
+
+    public static func write(_ value: [CreatePlanEntry], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeCreatePlanEntry.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [CreatePlanEntry] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [CreatePlanEntry]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeCreatePlanEntry.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffer {
     typealias SwiftType = [ExtractionPlanEntry]
 
@@ -3887,6 +4548,13 @@ public func materializePreview(request: MaterializePreviewRequest)throws  -> Mat
     )
 })
 }
+public func planCreate(request: PlanCreateRequest)throws  -> PlanCreateResult  {
+    return try  FfiConverterTypePlanCreateResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_plancreate(
+        FfiConverterTypePlanCreateRequest_lower(request),$0
+    )
+})
+}
 public func planExtract(request: PlanExtractRequest)throws  -> PlanExtractResult  {
     return try  FfiConverterTypePlanExtractResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_planextract(
@@ -3898,6 +4566,13 @@ public func pollJobEvents(request: PollJobEventsRequest)throws  -> PollJobEvents
     return try  FfiConverterTypePollJobEventsResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_polljobevents(
         FfiConverterTypePollJobEventsRequest_lower(request),$0
+    )
+})
+}
+public func startCreate(request: StartCreateRequest)throws  -> StartJobResult  {
+    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_startcreate(
+        FfiConverterTypeStartCreateRequest_lower(request),$0
     )
 })
 }
@@ -3946,10 +4621,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_zmanager_mobile_core_checksum_func_plancreate() != 54463) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_startcreate() != 40262) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310) {

@@ -729,6 +729,10 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -754,9 +758,13 @@ fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_materializepreview(
 ): Short
+fun uniffi_zmanager_mobile_core_checksum_func_plancreate(
+): Short
 fun uniffi_zmanager_mobile_core_checksum_func_planextract(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_polljobevents(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_startcreate(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_startextract(
 ): Short
@@ -817,9 +825,13 @@ fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValu
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_plancreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_planextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_polljobevents(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_startcreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_startextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -966,10 +978,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_plancreate() != 54463.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_startcreate() != 40262.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310.toShort()) {
@@ -1318,6 +1336,46 @@ public object FfiConverterTypeCancelJobResult: FfiConverterRustBuffer<CancelJobR
 
 
 
+data class CreatePlanEntry (
+    var `archivePath`: kotlin.String,
+    var `sourcePath`: kotlin.String,
+    var `kind`: ArchiveEntryKind,
+    var `size`: kotlin.ULong
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCreatePlanEntry: FfiConverterRustBuffer<CreatePlanEntry> {
+    override fun read(buf: ByteBuffer): CreatePlanEntry {
+        return CreatePlanEntry(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeArchiveEntryKind.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CreatePlanEntry) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`sourcePath`) +
+            FfiConverterTypeArchiveEntryKind.allocationSize(value.`kind`) +
+            FfiConverterULong.allocationSize(value.`size`)
+    )
+
+    override fun write(value: CreatePlanEntry, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`sourcePath`, buf)
+            FfiConverterTypeArchiveEntryKind.write(value.`kind`, buf)
+            FfiConverterULong.write(value.`size`, buf)
+    }
+}
+
+
+
 data class DetectArchiveRequest (
     var `archivePath`: kotlin.String
 ) {
@@ -1514,6 +1572,10 @@ data class JobTerminalSummary (
     var `writtenEntries`: kotlin.ULong,
     var `skippedEntries`: kotlin.ULong?,
     var `writtenBytes`: kotlin.ULong,
+    var `encrypted`: kotlin.Boolean?,
+    var `volumeSize`: kotlin.ULong?,
+    var `volumeCount`: kotlin.ULong?,
+    var `outputPaths`: List<kotlin.String>,
     var `warnings`: List<BridgeError>
 ) {
 
@@ -1529,6 +1591,10 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterULong.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterSequenceString.read(buf),
             FfiConverterSequenceTypeBridgeError.read(buf),
         )
     }
@@ -1537,6 +1603,10 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterULong.allocationSize(value.`writtenEntries`) +
             FfiConverterOptionalULong.allocationSize(value.`skippedEntries`) +
             FfiConverterULong.allocationSize(value.`writtenBytes`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`encrypted`) +
+            FfiConverterOptionalULong.allocationSize(value.`volumeSize`) +
+            FfiConverterOptionalULong.allocationSize(value.`volumeCount`) +
+            FfiConverterSequenceString.allocationSize(value.`outputPaths`) +
             FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
     )
 
@@ -1544,6 +1614,10 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
             FfiConverterULong.write(value.`writtenEntries`, buf)
             FfiConverterOptionalULong.write(value.`skippedEntries`, buf)
             FfiConverterULong.write(value.`writtenBytes`, buf)
+            FfiConverterOptionalBoolean.write(value.`encrypted`, buf)
+            FfiConverterOptionalULong.write(value.`volumeSize`, buf)
+            FfiConverterOptionalULong.write(value.`volumeCount`, buf)
+            FfiConverterSequenceString.write(value.`outputPaths`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
     }
 }
@@ -1790,6 +1864,150 @@ public object FfiConverterTypeMobileJobEvent: FfiConverterRustBuffer<MobileJobEv
 
 
 
+data class PlanCreateRequest (
+    var `sourcePaths`: List<kotlin.String>,
+    var `destinationArchivePath`: kotlin.String,
+    var `format`: CreateArchiveFormat,
+    var `password`: kotlin.String?,
+    var `preserveMetadata`: kotlin.Boolean,
+    var `replaceExisting`: kotlin.Boolean,
+    var `cleanSource`: kotlin.Boolean
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer<PlanCreateRequest> {
+    override fun read(buf: ByteBuffer): PlanCreateRequest {
+        return PlanCreateRequest(
+            FfiConverterSequenceString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeCreateArchiveFormat.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PlanCreateRequest) = (
+            FfiConverterSequenceString.allocationSize(value.`sourcePaths`) +
+            FfiConverterString.allocationSize(value.`destinationArchivePath`) +
+            FfiConverterTypeCreateArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
+            FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
+            FfiConverterBoolean.allocationSize(value.`cleanSource`)
+    )
+
+    override fun write(value: PlanCreateRequest, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`sourcePaths`, buf)
+            FfiConverterString.write(value.`destinationArchivePath`, buf)
+            FfiConverterTypeCreateArchiveFormat.write(value.`format`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterBoolean.write(value.`preserveMetadata`, buf)
+            FfiConverterBoolean.write(value.`replaceExisting`, buf)
+            FfiConverterBoolean.write(value.`cleanSource`, buf)
+    }
+}
+
+
+
+data class PlanCreateResult (
+    var `planId`: kotlin.String,
+    var `sourcePaths`: List<kotlin.String>,
+    var `destinationArchivePath`: kotlin.String,
+    var `format`: CreateArchiveFormat,
+    var `formatLabel`: kotlin.String,
+    var `entries`: List<CreatePlanEntry>,
+    var `totalEntries`: kotlin.ULong,
+    var `totalBytes`: kotlin.ULong,
+    var `excludedEntries`: kotlin.ULong,
+    var `excludedBytes`: kotlin.ULong,
+    var `outputExists`: kotlin.Boolean,
+    var `replaceExisting`: kotlin.Boolean,
+    var `encrypted`: kotlin.Boolean,
+    var `preserveMetadata`: kotlin.Boolean,
+    var `cleanSource`: kotlin.Boolean,
+    var `canStart`: kotlin.Boolean,
+    var `warnings`: List<BridgeError>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreateResult> {
+    override fun read(buf: ByteBuffer): PlanCreateResult {
+        return PlanCreateResult(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeCreateArchiveFormat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeCreatePlanEntry.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PlanCreateResult) = (
+            FfiConverterString.allocationSize(value.`planId`) +
+            FfiConverterSequenceString.allocationSize(value.`sourcePaths`) +
+            FfiConverterString.allocationSize(value.`destinationArchivePath`) +
+            FfiConverterTypeCreateArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterString.allocationSize(value.`formatLabel`) +
+            FfiConverterSequenceTypeCreatePlanEntry.allocationSize(value.`entries`) +
+            FfiConverterULong.allocationSize(value.`totalEntries`) +
+            FfiConverterULong.allocationSize(value.`totalBytes`) +
+            FfiConverterULong.allocationSize(value.`excludedEntries`) +
+            FfiConverterULong.allocationSize(value.`excludedBytes`) +
+            FfiConverterBoolean.allocationSize(value.`outputExists`) +
+            FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
+            FfiConverterBoolean.allocationSize(value.`encrypted`) +
+            FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
+            FfiConverterBoolean.allocationSize(value.`cleanSource`) +
+            FfiConverterBoolean.allocationSize(value.`canStart`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: PlanCreateResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`planId`, buf)
+            FfiConverterSequenceString.write(value.`sourcePaths`, buf)
+            FfiConverterString.write(value.`destinationArchivePath`, buf)
+            FfiConverterTypeCreateArchiveFormat.write(value.`format`, buf)
+            FfiConverterString.write(value.`formatLabel`, buf)
+            FfiConverterSequenceTypeCreatePlanEntry.write(value.`entries`, buf)
+            FfiConverterULong.write(value.`totalEntries`, buf)
+            FfiConverterULong.write(value.`totalBytes`, buf)
+            FfiConverterULong.write(value.`excludedEntries`, buf)
+            FfiConverterULong.write(value.`excludedBytes`, buf)
+            FfiConverterBoolean.write(value.`outputExists`, buf)
+            FfiConverterBoolean.write(value.`replaceExisting`, buf)
+            FfiConverterBoolean.write(value.`encrypted`, buf)
+            FfiConverterBoolean.write(value.`preserveMetadata`, buf)
+            FfiConverterBoolean.write(value.`cleanSource`, buf)
+            FfiConverterBoolean.write(value.`canStart`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
 data class PlanExtractRequest (
     var `archivePath`: kotlin.String,
     var `destinationRoot`: kotlin.String,
@@ -1997,6 +2215,58 @@ public object FfiConverterTypePollJobEventsResult: FfiConverterRustBuffer<PollJo
             FfiConverterULong.write(value.`minRetainedSequence`, buf)
             FfiConverterBoolean.write(value.`isTerminal`, buf)
             FfiConverterOptionalTypeJobTerminalSummary.write(value.`terminalSummary`, buf)
+    }
+}
+
+
+
+data class StartCreateRequest (
+    var `sourcePaths`: List<kotlin.String>,
+    var `destinationArchivePath`: kotlin.String,
+    var `format`: CreateArchiveFormat,
+    var `password`: kotlin.String?,
+    var `preserveMetadata`: kotlin.Boolean,
+    var `replaceExisting`: kotlin.Boolean,
+    var `cleanSource`: kotlin.Boolean
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCreateRequest> {
+    override fun read(buf: ByteBuffer): StartCreateRequest {
+        return StartCreateRequest(
+            FfiConverterSequenceString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeCreateArchiveFormat.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StartCreateRequest) = (
+            FfiConverterSequenceString.allocationSize(value.`sourcePaths`) +
+            FfiConverterString.allocationSize(value.`destinationArchivePath`) +
+            FfiConverterTypeCreateArchiveFormat.allocationSize(value.`format`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
+            FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
+            FfiConverterBoolean.allocationSize(value.`cleanSource`)
+    )
+
+    override fun write(value: StartCreateRequest, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`sourcePaths`, buf)
+            FfiConverterString.write(value.`destinationArchivePath`, buf)
+            FfiConverterTypeCreateArchiveFormat.write(value.`format`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterBoolean.write(value.`preserveMetadata`, buf)
+            FfiConverterBoolean.write(value.`replaceExisting`, buf)
+            FfiConverterBoolean.write(value.`cleanSource`, buf)
     }
 }
 
@@ -2294,6 +2564,38 @@ public object FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer<BridgeSever
 
 
 
+enum class CreateArchiveFormat {
+
+    ZIP,
+    SEVEN_Z,
+    TAR_ZST,
+    TZAP;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCreateArchiveFormat: FfiConverterRustBuffer<CreateArchiveFormat> {
+    override fun read(buf: ByteBuffer) = try {
+        CreateArchiveFormat.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: CreateArchiveFormat) = 4UL
+
+    override fun write(value: CreateArchiveFormat, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 enum class ExtractionCollisionPolicy {
 
     REFUSE,
@@ -2582,6 +2884,38 @@ public object FfiConverterOptionalULong: FfiConverterRustBuffer<kotlin.ULong?> {
 /**
  * @suppress
  */
+public object FfiConverterOptionalBoolean: FfiConverterRustBuffer<kotlin.Boolean?> {
+    override fun read(buf: ByteBuffer): kotlin.Boolean? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterBoolean.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.Boolean?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterBoolean.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.Boolean?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterBoolean.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
     override fun read(buf: ByteBuffer): kotlin.String? {
         if (buf.get().toInt() == 0) {
@@ -2794,6 +3128,34 @@ public object FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer<List<B
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeCreatePlanEntry: FfiConverterRustBuffer<List<CreatePlanEntry>> {
+    override fun read(buf: ByteBuffer): List<CreatePlanEntry> {
+        val len = buf.getInt()
+        return List<CreatePlanEntry>(len) {
+            FfiConverterTypeCreatePlanEntry.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CreatePlanEntry>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCreatePlanEntry.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CreatePlanEntry>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCreatePlanEntry.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffer<List<ExtractionPlanEntry>> {
     override fun read(buf: ByteBuffer): List<ExtractionPlanEntry> {
         val len = buf.getInt()
@@ -2892,6 +3254,16 @@ public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<Lis
     }
 
 
+    @Throws(ZmanagerMobileException::class) fun `planCreate`(`request`: PlanCreateRequest): PlanCreateResult {
+            return FfiConverterTypePlanCreateResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_plancreate(
+        FfiConverterTypePlanCreateRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
     @Throws(ZmanagerMobileException::class) fun `planExtract`(`request`: PlanExtractRequest): PlanExtractResult {
             return FfiConverterTypePlanExtractResult.lift(
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
@@ -2907,6 +3279,16 @@ public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<Lis
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_polljobevents(
         FfiConverterTypePollJobEventsRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `startCreate`(`request`: StartCreateRequest): StartJobResult {
+            return FfiConverterTypeStartJobResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_startcreate(
+        FfiConverterTypeStartCreateRequest.lower(`request`),_status)
 }
     )
     }

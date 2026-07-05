@@ -11,6 +11,10 @@ namespace zmanager {
     [Throws=ZmanagerMobileError]
     PlanExtractResult planExtract(PlanExtractRequest request);
     [Throws=ZmanagerMobileError]
+    PlanCreateResult planCreate(PlanCreateRequest request);
+    [Throws=ZmanagerMobileError]
+    StartJobResult startCreate(StartCreateRequest request);
+    [Throws=ZmanagerMobileError]
     StartJobResult startExtract(StartExtractRequest request);
     [Throws=ZmanagerMobileError]
     PollJobEventsResult pollJobEvents(PollJobEventsRequest request);
@@ -193,6 +197,60 @@ dictionary PlanExtractResult {
     sequence<BridgeError> warnings;
 };
 
+enum CreateArchiveFormat {
+    "Zip",
+    "SevenZ",
+    "TarZst",
+    "Tzap"
+};
+
+dictionary PlanCreateRequest {
+    sequence<string> source_paths;
+    string destination_archive_path;
+    CreateArchiveFormat format;
+    string? password;
+    boolean preserve_metadata;
+    boolean replace_existing;
+    boolean clean_source;
+};
+
+dictionary CreatePlanEntry {
+    string archive_path;
+    string source_path;
+    ArchiveEntryKind kind;
+    u64 size;
+};
+
+dictionary PlanCreateResult {
+    string plan_id;
+    sequence<string> source_paths;
+    string destination_archive_path;
+    CreateArchiveFormat format;
+    string format_label;
+    sequence<CreatePlanEntry> entries;
+    u64 total_entries;
+    u64 total_bytes;
+    u64 excluded_entries;
+    u64 excluded_bytes;
+    boolean output_exists;
+    boolean replace_existing;
+    boolean encrypted;
+    boolean preserve_metadata;
+    boolean clean_source;
+    boolean can_start;
+    sequence<BridgeError> warnings;
+};
+
+dictionary StartCreateRequest {
+    sequence<string> source_paths;
+    string destination_archive_path;
+    CreateArchiveFormat format;
+    string? password;
+    boolean preserve_metadata;
+    boolean replace_existing;
+    boolean clean_source;
+};
+
 enum MobileJobStatus {
     "Queued",
     "Running",
@@ -248,6 +306,10 @@ dictionary JobTerminalSummary {
     u64 written_entries;
     u64? skipped_entries;
     u64 written_bytes;
+    boolean? encrypted;
+    u64? volume_size;
+    u64? volume_count;
+    sequence<string> output_paths;
     sequence<BridgeError> warnings;
 };
 

@@ -14,16 +14,20 @@ use zmanager_core::jobs::{
     self, CancellationToken, JobEvent as CoreJobEvent, JobKind as CoreJobKind,
 };
 use zmanager_core::libarchive_backend::{self, LibarchiveError, LibarchiveTestReport};
+use zmanager_core::manifest::{self, ManifestFileType, PlanError, PlanOptions};
 use zmanager_core::rar_backend::RarBackendError;
 use zmanager_core::raw_stream_backend::{self, RawStreamError};
 use zmanager_core::safety::{
     ExtractionDecision, ExtractionEntry, ExtractionEntryKind, ExtractionPolicy,
     ExtractionSafetyError, ExtractionSafetyPlanner, OverwritePolicy,
 };
-use zmanager_core::sevenz_backend::SevenZError;
-use zmanager_core::tar_zst_backend::TarZstdError;
-use zmanager_core::tzap_backend::{self, TzapError, TzapTestReport};
-use zmanager_core::zip_backend::{self, ZipBackendError, ZipTestReport};
+use zmanager_core::secrets::SecretString;
+use zmanager_core::sevenz_backend::{SevenZCreateOptions, SevenZError};
+use zmanager_core::tar_zst_backend::{TarZstdCreateOptions, TarZstdError};
+use zmanager_core::tzap_backend::{
+    self, TzapCreateOptions, TzapError, TzapKeySource, TzapTestReport,
+};
+use zmanager_core::zip_backend::{self, ZipBackendError, ZipCreateOptions, ZipTestReport};
 
 uniffi::include_scaffolding!("zmanager_mobile_core");
 
@@ -260,6 +264,65 @@ pub struct PlanExtractResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CreateArchiveFormat {
+    Zip,
+    SevenZ,
+    TarZst,
+    Tzap,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanCreateRequest {
+    pub source_paths: Vec<String>,
+    pub destination_archive_path: String,
+    pub format: CreateArchiveFormat,
+    pub password: Option<String>,
+    pub preserve_metadata: bool,
+    pub replace_existing: bool,
+    pub clean_source: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePlanEntry {
+    pub archive_path: String,
+    pub source_path: String,
+    pub kind: ArchiveEntryKind,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanCreateResult {
+    pub plan_id: String,
+    pub source_paths: Vec<String>,
+    pub destination_archive_path: String,
+    pub format: CreateArchiveFormat,
+    pub format_label: String,
+    pub entries: Vec<CreatePlanEntry>,
+    pub total_entries: u64,
+    pub total_bytes: u64,
+    pub excluded_entries: u64,
+    pub excluded_bytes: u64,
+    pub output_exists: bool,
+    pub replace_existing: bool,
+    pub encrypted: bool,
+    pub preserve_metadata: bool,
+    pub clean_source: bool,
+    pub can_start: bool,
+    pub warnings: Vec<BridgeError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartCreateRequest {
+    pub source_paths: Vec<String>,
+    pub destination_archive_path: String,
+    pub format: CreateArchiveFormat,
+    pub password: Option<String>,
+    pub preserve_metadata: bool,
+    pub replace_existing: bool,
+    pub clean_source: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MobileJobStatus {
     Queued,
     Running,
@@ -325,6 +388,10 @@ pub struct JobTerminalSummary {
     pub written_entries: u64,
     pub skipped_entries: Option<u64>,
     pub written_bytes: u64,
+    pub encrypted: Option<bool>,
+    pub volume_size: Option<u64>,
+    pub volume_count: Option<u64>,
+    pub output_paths: Vec<String>,
     pub warnings: Vec<BridgeError>,
 }
 
@@ -649,6 +716,141 @@ pub fn planExtract(request: PlanExtractRequest) -> Result<PlanExtractResult, Zma
     plan_extract(request)
 }
 
+pub fn plan_create(request: PlanCreateRequest) -> Result<PlanCreateResult, ZmanagerMobileError> {
+    let source_paths = ensure_existing_source_paths(request.source_paths)?;
+    let destination_archive_path =
+        ensure_destination_archive_path(request.destination_archive_path)?;
+    let destination_path = Path::new(&destination_archive_path);
+    let output_exists = destination_path.exists();
+    let plan_options = create_plan_options(request.clean_source);
+    let source_path_bufs = source_paths.iter().map(PathBuf::from).collect::<Vec<_>>();
+    let manifest =
+        manifest::plan_archives(&source_path_bufs, &plan_options).map_err(map_plan_error)?;
+    let mut warnings = manifest
+        .warnings
+        .iter()
+        .map(|warning| {
+            bridge_warning(format!(
+                "{}: {}",
+                warning.source_path.display(),
+                warning.message
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    if output_exists && !request.replace_existing {
+        warnings.push(bridge_warning(
+            "Destination archive already exists and replaceExisting is false.",
+        ));
+    }
+
+    let entries = manifest
+        .entries
+        .iter()
+        .map(|entry| CreatePlanEntry {
+            archive_path: entry.archive_path.clone(),
+            source_path: entry.source_path.to_string_lossy().to_string(),
+            kind: map_manifest_file_type(entry.file_type),
+            size: entry.size,
+        })
+        .collect::<Vec<_>>();
+    let total_entries = usize_to_u64(entries.len());
+    let encrypted = password_ref(&request.password).is_some();
+
+    Ok(PlanCreateResult {
+        plan_id: new_plan_id("create"),
+        source_paths,
+        destination_archive_path,
+        format: request.format,
+        format_label: create_format_label(request.format).to_string(),
+        entries,
+        total_entries,
+        total_bytes: manifest.total_bytes,
+        excluded_entries: usize_to_u64(manifest.excluded_count()),
+        excluded_bytes: manifest.excluded_bytes,
+        output_exists,
+        replace_existing: request.replace_existing,
+        encrypted,
+        preserve_metadata: request.preserve_metadata,
+        clean_source: request.clean_source,
+        can_start: total_entries > 0 && (!output_exists || request.replace_existing),
+        warnings,
+    })
+}
+
+#[allow(non_snake_case)]
+pub fn planCreate(request: PlanCreateRequest) -> Result<PlanCreateResult, ZmanagerMobileError> {
+    plan_create(request)
+}
+
+pub fn start_create(request: StartCreateRequest) -> Result<StartJobResult, ZmanagerMobileError> {
+    let source_paths = ensure_existing_source_paths(request.source_paths)?;
+    let destination_archive_path =
+        ensure_destination_archive_path(request.destination_archive_path)?;
+    if Path::new(&destination_archive_path).exists() && !request.replace_existing {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "Destination archive already exists.",
+            hint("Choose a different output name or enable replaceExisting."),
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let password = sanitize_password(request.password);
+    let token = CancellationToken::new();
+    let kind = mobile_create_job_kind(request.format);
+    let registry = job_registry();
+    let result = registry.create_job(kind, token.clone());
+    let job_id = result.job_id.clone();
+    let input = CreateJobInput {
+        source_paths: source_paths.iter().map(PathBuf::from).collect(),
+        destination_archive_path,
+        format: request.format,
+        password,
+        preserve_metadata: request.preserve_metadata,
+        replace_existing: request.replace_existing,
+        clean_source: request.clean_source,
+    };
+    let worker_registry = Arc::clone(&registry);
+
+    thread::spawn(move || {
+        let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut sink = RegistryJobEventSink {
+                registry: Arc::clone(&worker_registry),
+                job_id: job_id.clone(),
+            };
+            run_create_job(input, &token, &mut sink)
+        }));
+
+        match worker_result {
+            Ok(Ok(summary)) => worker_registry.set_terminal_summary(&job_id, summary),
+            Ok(Err(error)) => {
+                worker_registry.finish_with_error(&job_id, bridge_error_from_mobile(error));
+            }
+            Err(_) => {
+                worker_registry.finish_with_error(
+                    &job_id,
+                    BridgeError {
+                        code: ERROR_OPERATION_FAILED.to_string(),
+                        message: "Create worker failed unexpectedly.".to_string(),
+                        recovery_hint: hint("Retry the operation and report this if it repeats."),
+                        severity: BridgeSeverity::Error,
+                        retryable: true,
+                    },
+                );
+            }
+        }
+    });
+
+    Ok(result)
+}
+
+#[allow(non_snake_case)]
+pub fn startCreate(request: StartCreateRequest) -> Result<StartJobResult, ZmanagerMobileError> {
+    start_create(request)
+}
+
 pub fn start_extract(request: StartExtractRequest) -> Result<StartJobResult, ZmanagerMobileError> {
     let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
     let destination_root = ensure_destination_root_path(request.destination_root)?;
@@ -947,6 +1149,10 @@ impl MobileJobRegistry {
                         written_entries: event.entries.unwrap_or(0),
                         skipped_entries: None,
                         written_bytes: event.bytes.unwrap_or(0),
+                        encrypted: None,
+                        volume_size: None,
+                        volume_count: None,
+                        output_paths: Vec::new(),
                         warnings: Vec::new(),
                     });
                 }
@@ -980,10 +1186,117 @@ struct ExtractJobInput {
     format: ArchiveFormat,
 }
 
+struct CreateJobInput {
+    source_paths: Vec<PathBuf>,
+    destination_archive_path: String,
+    format: CreateArchiveFormat,
+    password: Option<String>,
+    preserve_metadata: bool,
+    replace_existing: bool,
+    clean_source: bool,
+}
+
 fn job_registry() -> Arc<MobileJobRegistry> {
     JOB_REGISTRY
         .get_or_init(|| Arc::new(MobileJobRegistry::default()))
         .clone()
+}
+
+fn run_create_job(
+    input: CreateJobInput,
+    token: &CancellationToken,
+    sink: &mut dyn jobs::JobEventSink,
+) -> Result<JobTerminalSummary, ZmanagerMobileError> {
+    let destination = Path::new(&input.destination_archive_path);
+    let plan_options = create_plan_options(input.clean_source);
+    match input.format {
+        CreateArchiveFormat::Zip => {
+            let options = ZipCreateOptions {
+                preserve_metadata: input.preserve_metadata,
+                replace_existing: input.replace_existing,
+                password: input.password.map(SecretString::from),
+                ..ZipCreateOptions::default()
+            };
+            let report = jobs::run_zip_create_job_from_sources_with_plan_options(
+                &input.source_paths,
+                destination,
+                &options,
+                &plan_options,
+                token,
+                sink,
+            )
+            .map_err(map_zip_error)?;
+            Ok(JobTerminalSummary::from(
+                ArchiveJobReport::from(report).with_output_path(destination),
+            ))
+        }
+        CreateArchiveFormat::SevenZ => {
+            let options = SevenZCreateOptions {
+                preserve_metadata: input.preserve_metadata,
+                replace_existing: input.replace_existing,
+                password: input.password.map(SecretString::from),
+                ..SevenZCreateOptions::default()
+            };
+            let report = jobs::run_7z_create_job_from_sources_with_plan_options(
+                &input.source_paths,
+                destination,
+                &options,
+                &plan_options,
+                token,
+                sink,
+            )
+            .map_err(map_7z_error)?;
+            Ok(JobTerminalSummary::from(
+                ArchiveJobReport::from(report).with_output_path(destination),
+            ))
+        }
+        CreateArchiveFormat::TarZst => {
+            let options = TarZstdCreateOptions {
+                preserve_metadata: input.preserve_metadata,
+                replace_existing: input.replace_existing,
+                ..TarZstdCreateOptions::default()
+            };
+            let report = jobs::run_tar_zst_create_job_from_sources_with_plan_options(
+                &input.source_paths,
+                destination,
+                &options,
+                &plan_options,
+                token,
+                sink,
+            )
+            .map_err(map_tar_zst_error)?;
+            Ok(JobTerminalSummary::from(
+                ArchiveJobReport::from(report).with_output_path(destination),
+            ))
+        }
+        CreateArchiveFormat::Tzap => {
+            let options = TzapCreateOptions {
+                key_source: input
+                    .password
+                    .map(|password| TzapKeySource::Passphrase(SecretString::from(password)))
+                    .unwrap_or(TzapKeySource::NoPassword),
+                level: 3,
+                preserve_metadata: input.preserve_metadata,
+                replace_existing: input.replace_existing,
+                volume_size: None,
+                recovery_percentage: 0,
+                volume_loss_tolerance: 0,
+                x509_signing: None,
+            };
+            let report = jobs::run_tzap_create_job_from_sources_with_plan_options(
+                &input.source_paths,
+                destination,
+                &options,
+                &plan_options,
+                token,
+                sink,
+            )
+            .map_err(map_tzap_error)?;
+            Ok(JobTerminalSummary::from(
+                ArchiveJobReport::from(report).with_output_path(destination),
+            ))
+        }
+    }
 }
 
 fn run_extract_job(
@@ -1017,7 +1330,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_zip_error)
         .map(JobTerminalSummary::from)
     } else if matches!(input.format, ArchiveFormat::TarZst) {
@@ -1028,7 +1341,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_tar_zst_error)
         .map(JobTerminalSummary::from)
     } else if matches!(input.format, ArchiveFormat::SevenZ) {
@@ -1040,7 +1353,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_7z_error)
         .map(JobTerminalSummary::from)
     } else if matches!(
@@ -1055,7 +1368,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_rar_error)
         .map(JobTerminalSummary::from)
     } else if matches!(input.format, ArchiveFormat::Tzap) {
@@ -1067,7 +1380,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_tzap_error)
         .map(JobTerminalSummary::from)
     } else if let Some(raw_format) = raw_stream_backend::detect_raw_stream_format(archive_path) {
@@ -1079,7 +1392,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_raw_stream_error)
         .map(JobTerminalSummary::from)
     } else {
@@ -1091,7 +1404,7 @@ fn run_full_extract_job(
             token,
             sink,
         )
-        .map(ZipExtractJobReport::from)
+        .map(ArchiveJobReport::from)
         .map_err(map_libarchive_error)
         .map(JobTerminalSummary::from)
     }
@@ -1182,100 +1495,207 @@ fn run_selected_extract_job(
         written_entries: usize_to_u64(written_entries),
         skipped_entries: Some(0),
         written_bytes,
+        encrypted: None,
+        volume_size: None,
+        volume_count: None,
+        output_paths: Vec::new(),
         warnings: Vec::new(),
     })
 }
 
-struct ZipExtractJobReport {
+struct ArchiveJobReport {
     written_entries: usize,
     skipped_entries: usize,
     written_bytes: u64,
+    encrypted: Option<bool>,
+    volume_size: Option<u64>,
+    volume_count: Option<usize>,
+    output_paths: Vec<String>,
     warnings: Vec<String>,
 }
 
-impl From<zip_backend::ZipExtractReport> for ZipExtractJobReport {
+impl ArchiveJobReport {
+    fn with_output_path(mut self, path: &Path) -> Self {
+        self.output_paths.push(path.to_string_lossy().to_string());
+        self
+    }
+}
+
+impl From<zip_backend::ZipExtractReport> for ArchiveJobReport {
     fn from(report: zip_backend::ZipExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<zmanager_core::tar_zst_backend::TarZstdExtractReport> for ZipExtractJobReport {
+impl From<zmanager_core::tar_zst_backend::TarZstdExtractReport> for ArchiveJobReport {
     fn from(report: zmanager_core::tar_zst_backend::TarZstdExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<zmanager_core::sevenz_backend::SevenZExtractReport> for ZipExtractJobReport {
+impl From<zmanager_core::sevenz_backend::SevenZExtractReport> for ArchiveJobReport {
     fn from(report: zmanager_core::sevenz_backend::SevenZExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<zmanager_core::rar_backend::RarExtractReport> for ZipExtractJobReport {
+impl From<zmanager_core::rar_backend::RarExtractReport> for ArchiveJobReport {
     fn from(report: zmanager_core::rar_backend::RarExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<tzap_backend::TzapExtractReport> for ZipExtractJobReport {
+impl From<tzap_backend::TzapExtractReport> for ArchiveJobReport {
     fn from(report: tzap_backend::TzapExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<raw_stream_backend::RawStreamExtractReport> for ZipExtractJobReport {
+impl From<raw_stream_backend::RawStreamExtractReport> for ArchiveJobReport {
     fn from(report: raw_stream_backend::RawStreamExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<libarchive_backend::LibarchiveExtractReport> for ZipExtractJobReport {
+impl From<libarchive_backend::LibarchiveExtractReport> for ArchiveJobReport {
     fn from(report: libarchive_backend::LibarchiveExtractReport) -> Self {
         Self {
             written_entries: report.written_entries,
             skipped_entries: report.skipped_entries,
             written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: None,
+            volume_count: None,
+            output_paths: Vec::new(),
             warnings: report.warnings,
         }
     }
 }
 
-impl From<ZipExtractJobReport> for JobTerminalSummary {
-    fn from(report: ZipExtractJobReport) -> Self {
+impl From<zip_backend::ZipCreateReport> for ArchiveJobReport {
+    fn from(report: zip_backend::ZipCreateReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: 0,
+            written_bytes: report.written_bytes,
+            encrypted: Some(report.encrypted),
+            volume_size: report.volume_size,
+            volume_count: Some(report.volume_count),
+            output_paths: Vec::new(),
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<zmanager_core::sevenz_backend::SevenZCreateReport> for ArchiveJobReport {
+    fn from(report: zmanager_core::sevenz_backend::SevenZCreateReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: 0,
+            written_bytes: report.written_bytes,
+            encrypted: Some(report.encrypted),
+            volume_size: report.volume_size,
+            volume_count: Some(report.volume_count),
+            output_paths: Vec::new(),
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<zmanager_core::tar_zst_backend::TarZstdCreateReport> for ArchiveJobReport {
+    fn from(report: zmanager_core::tar_zst_backend::TarZstdCreateReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: 0,
+            written_bytes: report.written_bytes,
+            encrypted: Some(false),
+            volume_size: None,
+            volume_count: Some(1),
+            output_paths: Vec::new(),
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<tzap_backend::TzapCreateReport> for ArchiveJobReport {
+    fn from(report: tzap_backend::TzapCreateReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: 0,
+            written_bytes: report.written_bytes,
+            encrypted: None,
+            volume_size: report.volume_size,
+            volume_count: Some(report.volume_count),
+            output_paths: Vec::new(),
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<ArchiveJobReport> for JobTerminalSummary {
+    fn from(report: ArchiveJobReport) -> Self {
         Self {
             written_entries: usize_to_u64(report.written_entries),
             skipped_entries: Some(usize_to_u64(report.skipped_entries)),
             written_bytes: report.written_bytes,
+            encrypted: report.encrypted,
+            volume_size: report.volume_size,
+            volume_count: report.volume_count.map(usize_to_u64),
+            output_paths: report.output_paths,
             warnings: report.warnings.into_iter().map(bridge_warning).collect(),
         }
     }
@@ -1499,6 +1919,41 @@ fn extraction_policy_for_request(
         overwrite: map_collision_policy(collision_policy),
         strip_components,
         ..ExtractionPolicy::default()
+    }
+}
+
+fn create_plan_options(clean_source: bool) -> PlanOptions {
+    if clean_source {
+        PlanOptions::clean_source()
+    } else {
+        PlanOptions::default()
+    }
+}
+
+fn mobile_create_job_kind(format: CreateArchiveFormat) -> MobileJobKind {
+    match format {
+        CreateArchiveFormat::Zip => MobileJobKind::ZipCreate,
+        CreateArchiveFormat::SevenZ => MobileJobKind::SevenZCreate,
+        CreateArchiveFormat::TarZst => MobileJobKind::TarZstdCreate,
+        CreateArchiveFormat::Tzap => MobileJobKind::TzapCreate,
+    }
+}
+
+fn create_format_label(format: CreateArchiveFormat) -> &'static str {
+    match format {
+        CreateArchiveFormat::Zip => "ZIP",
+        CreateArchiveFormat::SevenZ => "7z",
+        CreateArchiveFormat::TarZst => "TAR.ZST",
+        CreateArchiveFormat::Tzap => "TZAP",
+    }
+}
+
+fn map_manifest_file_type(file_type: ManifestFileType) -> ArchiveEntryKind {
+    match file_type {
+        ManifestFileType::File => ArchiveEntryKind::File,
+        ManifestFileType::Directory => ArchiveEntryKind::Directory,
+        ManifestFileType::Symlink => ArchiveEntryKind::Symlink,
+        ManifestFileType::Other => ArchiveEntryKind::Special,
     }
 }
 
@@ -1820,6 +2275,142 @@ fn ensure_destination_root_path(value: String) -> Result<String, ZmanagerMobileE
     }
 }
 
+fn ensure_existing_source_paths(values: Vec<String>) -> Result<Vec<String>, ZmanagerMobileError> {
+    if values.is_empty() {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "sourcePaths cannot be empty",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    values
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| ensure_existing_source_path(value, &format!("sourcePaths[{index}]")))
+        .collect()
+}
+
+fn ensure_existing_source_path(value: String, field: &str) -> Result<String, ZmanagerMobileError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            format!("{field} cannot be empty"),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    if value.contains("://") {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            format!("{field} must be an app-controlled filesystem path"),
+            hint("Copy provider-backed files into app cache before calling the Rust bridge."),
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let path = Path::new(&value);
+    fs::metadata(path).map_err(|source| {
+        if source.kind() == io::ErrorKind::NotFound {
+            bridge_error(
+                ERROR_NOT_FOUND,
+                format!("{field} does not exist"),
+                hint("Choose sources that have already been copied into app-controlled storage."),
+                BridgeSeverity::Warning,
+                false,
+            )
+        } else {
+            map_io_error(path.to_path_buf(), source)
+        }
+    })?;
+
+    Ok(value)
+}
+
+fn ensure_destination_archive_path(value: String) -> Result<String, ZmanagerMobileError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationArchivePath cannot be empty",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    if value.contains("://") {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationArchivePath must be an app-controlled filesystem path",
+            hint(
+                "Use an app-controlled staging path for archive creation, then let the native shell commit it.",
+            ),
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let path = Path::new(&value);
+    if path
+        .parent()
+        .is_none_or(|parent| parent.as_os_str().is_empty())
+    {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationArchivePath must include a parent directory",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    if let Some(parent) = path.parent() {
+        match fs::metadata(parent) {
+            Ok(metadata) if !metadata.is_dir() => {
+                return Err(bridge_error(
+                    ERROR_INVALID_REQUEST,
+                    "destinationArchivePath parent must be a directory",
+                    None,
+                    BridgeSeverity::Warning,
+                    false,
+                ));
+            }
+            Ok(_) => {}
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {
+                return Err(bridge_error(
+                    ERROR_NOT_FOUND,
+                    "destinationArchivePath parent does not exist",
+                    hint("Create the app-controlled staging directory before calling the bridge."),
+                    BridgeSeverity::Warning,
+                    false,
+                ));
+            }
+            Err(source) => return Err(map_io_error(parent.to_path_buf(), source)),
+        }
+    }
+
+    if let Ok(metadata) = fs::metadata(path)
+        && metadata.is_dir()
+    {
+        return Err(bridge_error(
+            ERROR_INVALID_REQUEST,
+            "destinationArchivePath must point to an archive file, not a directory",
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    Ok(value)
+}
+
 fn usize_from_u64(value: u64, field: &str) -> Result<usize, ZmanagerMobileError> {
     usize::try_from(value).map_err(|_| {
         bridge_error(
@@ -2048,6 +2639,21 @@ fn map_archive_browser_error(error: ArchiveBrowserError) -> ZmanagerMobileError 
             BridgeSeverity::Warning,
             false,
         ),
+    }
+}
+
+fn map_plan_error(error: PlanError) -> ZmanagerMobileError {
+    match error {
+        PlanError::MissingFileName { path } => bridge_error(
+            ERROR_INVALID_REQUEST,
+            format!("Source path has no archive name: {}", path.display()),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ),
+        PlanError::Metadata { path, source } | PlanError::ReadDir { path, source } => {
+            map_io_error(path, source)
+        }
     }
 }
 
@@ -2676,6 +3282,66 @@ mod tests {
     }
 
     #[test]
+    fn plan_create_returns_manifest_without_writing_archive() {
+        let temp = TestDir::new("plan-create-zip");
+        temp.create_dir("project");
+        temp.write_file("project/readme.txt", b"hello mobile bridge\n");
+        let destination = temp.path("archive.zip");
+
+        let result = plan_create(PlanCreateRequest {
+            source_paths: vec![temp.path("project").to_string_lossy().to_string()],
+            destination_archive_path: destination.to_string_lossy().to_string(),
+            format: CreateArchiveFormat::Zip,
+            password: None,
+            preserve_metadata: true,
+            replace_existing: false,
+            clean_source: false,
+        })
+        .expect("create planning should succeed");
+
+        assert!(!destination.exists());
+        assert_eq!(result.format, CreateArchiveFormat::Zip);
+        assert_eq!(result.format_label, "ZIP");
+        assert!(result.can_start);
+        assert!(!result.encrypted);
+        assert!(result.total_entries >= 1);
+        assert!(result.total_bytes > 0);
+        assert!(result.entries.iter().any(|entry| {
+            entry.archive_path.ends_with("readme.txt")
+                && matches!(entry.kind, ArchiveEntryKind::File)
+        }));
+    }
+
+    #[test]
+    fn plan_create_blocks_existing_output_without_replace() {
+        let temp = TestDir::new("plan-create-collision");
+        temp.create_dir("project");
+        temp.write_file("project/readme.txt", b"hello mobile bridge\n");
+        let destination = temp.path("archive.zip");
+        fs::write(&destination, b"existing").expect("existing destination should be written");
+
+        let result = plan_create(PlanCreateRequest {
+            source_paths: vec![temp.path("project").to_string_lossy().to_string()],
+            destination_archive_path: destination.to_string_lossy().to_string(),
+            format: CreateArchiveFormat::Zip,
+            password: None,
+            preserve_metadata: true,
+            replace_existing: false,
+            clean_source: false,
+        })
+        .expect("create planning should surface output collision");
+
+        assert!(result.output_exists);
+        assert!(!result.can_start);
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.message.contains("already exists"))
+        );
+    }
+
+    #[test]
     fn start_extract_job_extracts_zip_and_reports_terminal_summary() {
         let fixture = create_test_zip("start-extract-real-zip");
         let entry_path = readme_entry_path(&fixture.archive);
@@ -2717,6 +3383,137 @@ mod tests {
                 .expect("extracted file should be readable"),
             "hello mobile bridge\n"
         );
+    }
+
+    #[test]
+    fn start_create_job_creates_zip_and_reports_terminal_summary() {
+        let temp = TestDir::new("start-create-zip");
+        temp.create_dir("project");
+        temp.write_file("project/readme.txt", b"hello mobile bridge\n");
+        let destination = temp.path("archive.zip");
+
+        let started = start_create(StartCreateRequest {
+            source_paths: vec![temp.path("project").to_string_lossy().to_string()],
+            destination_archive_path: destination.to_string_lossy().to_string(),
+            format: CreateArchiveFormat::Zip,
+            password: None,
+            preserve_metadata: true,
+            replace_existing: false,
+            clean_source: false,
+        })
+        .expect("create job should start");
+
+        assert_eq!(started.kind, MobileJobKind::ZipCreate);
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert_eq!(terminal.status, MobileJobStatus::Completed);
+        assert!(destination.exists());
+        let summary = terminal
+            .terminal_summary
+            .expect("create job should include a terminal summary");
+        assert!(summary.written_entries >= 1);
+        assert!(summary.written_bytes > 0);
+        assert_eq!(summary.encrypted, Some(false));
+        assert_eq!(
+            summary.output_paths,
+            vec![destination.to_string_lossy().to_string()]
+        );
+
+        let listing = list_archive(ListArchiveRequest {
+            archive_path: destination.to_string_lossy().to_string(),
+            password: None,
+        })
+        .expect("created zip should list through the bridge");
+        assert!(
+            listing
+                .entries
+                .iter()
+                .any(|entry| entry.path.ends_with("readme.txt"))
+        );
+    }
+
+    #[test]
+    fn start_create_job_honors_clean_source_for_zip() {
+        let temp = TestDir::new("start-create-clean-source-zip");
+        temp.create_dir("project/src");
+        temp.create_dir("project/target");
+        temp.write_file("project/src/main.txt", b"keep me\n");
+        temp.write_file("project/target/build.bin", b"exclude me\n");
+        let destination = temp.path("archive.zip");
+
+        let started = start_create(StartCreateRequest {
+            source_paths: vec![temp.path("project").to_string_lossy().to_string()],
+            destination_archive_path: destination.to_string_lossy().to_string(),
+            format: CreateArchiveFormat::Zip,
+            password: None,
+            preserve_metadata: true,
+            replace_existing: false,
+            clean_source: true,
+        })
+        .expect("clean source create job should start");
+
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert_eq!(terminal.status, MobileJobStatus::Completed);
+
+        let listing = list_archive(ListArchiveRequest {
+            archive_path: destination.to_string_lossy().to_string(),
+            password: None,
+        })
+        .expect("created clean-source zip should list");
+        assert!(
+            listing
+                .entries
+                .iter()
+                .any(|entry| entry.path.ends_with("src/main.txt"))
+        );
+        assert!(
+            !listing
+                .entries
+                .iter()
+                .any(|entry| entry.path.contains("/target/"))
+        );
+    }
+
+    #[test]
+    fn start_create_job_preserves_encrypted_zip_password_whitespace() {
+        let temp = TestDir::new("start-create-encrypted-zip");
+        temp.create_dir("project");
+        temp.write_file("project/readme.txt", b"hello mobile bridge\n");
+        let destination = temp.path("archive.zip");
+        let password = " secret ";
+
+        let started = start_create(StartCreateRequest {
+            source_paths: vec![temp.path("project").to_string_lossy().to_string()],
+            destination_archive_path: destination.to_string_lossy().to_string(),
+            format: CreateArchiveFormat::Zip,
+            password: Some(password.to_string()),
+            preserve_metadata: true,
+            replace_existing: false,
+            clean_source: false,
+        })
+        .expect("encrypted create job should start");
+
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert_eq!(terminal.status, MobileJobStatus::Completed);
+        assert!(
+            !format!("{terminal:?}").contains(password),
+            "job events and summaries must not expose passwords"
+        );
+        assert_eq!(
+            terminal
+                .terminal_summary
+                .as_ref()
+                .and_then(|summary| summary.encrypted),
+            Some(true)
+        );
+
+        let verified = test_archive(TestArchiveRequest {
+            archive_path: destination.to_string_lossy().to_string(),
+            password: Some(password.to_string()),
+            selected_paths: Vec::new(),
+        })
+        .expect("created encrypted zip should verify with the exact password");
+        assert!(verified.verified);
+        assert!(verified.tested_entries >= 1);
     }
 
     #[test]

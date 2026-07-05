@@ -277,6 +277,11 @@ RustBuffer uniffi_zmanager_mobile_core_fn_func_listarchive(RustBuffer request, R
 RustBuffer uniffi_zmanager_mobile_core_fn_func_materializepreview(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANCREATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANCREATE
+RustBuffer uniffi_zmanager_mobile_core_fn_func_plancreate(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANEXTRACT
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANEXTRACT
 RustBuffer uniffi_zmanager_mobile_core_fn_func_planextract(RustBuffer request, RustCallStatus *_Nonnull out_status
@@ -285,6 +290,11 @@ RustBuffer uniffi_zmanager_mobile_core_fn_func_planextract(RustBuffer request, R
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_POLLJOBEVENTS
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_POLLJOBEVENTS
 RustBuffer uniffi_zmanager_mobile_core_fn_func_polljobevents(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_STARTCREATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_STARTCREATE
+RustBuffer uniffi_zmanager_mobile_core_fn_func_startcreate(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_STARTEXTRACT
@@ -607,6 +617,12 @@ uint16_t uniffi_zmanager_mobile_core_checksum_func_materializepreview(void
 
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANCREATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANCREATE
+uint16_t uniffi_zmanager_mobile_core_checksum_func_plancreate(void
+
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANEXTRACT
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANEXTRACT
 uint16_t uniffi_zmanager_mobile_core_checksum_func_planextract(void
@@ -616,6 +632,12 @@ uint16_t uniffi_zmanager_mobile_core_checksum_func_planextract(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_POLLJOBEVENTS
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_POLLJOBEVENTS
 uint16_t uniffi_zmanager_mobile_core_checksum_func_polljobevents(void
+
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_STARTCREATE
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_STARTCREATE
+uint16_t uniffi_zmanager_mobile_core_checksum_func_startcreate(void
 
 );
 #endif
