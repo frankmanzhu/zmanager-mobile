@@ -10,6 +10,12 @@ namespace zmanager {
     MaterializePreviewResult materializePreview(MaterializePreviewRequest request);
     [Throws=ZmanagerMobileError]
     PlanExtractResult planExtract(PlanExtractRequest request);
+    [Throws=ZmanagerMobileError]
+    StartJobResult startExtract(StartExtractRequest request);
+    [Throws=ZmanagerMobileError]
+    PollJobEventsResult pollJobEvents(PollJobEventsRequest request);
+    [Throws=ZmanagerMobileError]
+    CancelJobResult cancelJob(CancelJobRequest request);
 };
 
 enum BridgeSeverity {
@@ -185,6 +191,105 @@ dictionary PlanExtractResult {
     u64? estimated_bytes;
     boolean can_start;
     sequence<BridgeError> warnings;
+};
+
+enum MobileJobStatus {
+    "Queued",
+    "Running",
+    "Paused",
+    "Completed",
+    "Failed",
+    "Cancelled"
+};
+
+enum MobileJobKind {
+    "ZipCreate",
+    "ZipExtract",
+    "SevenZCreate",
+    "SevenZExtract",
+    "RarExtract",
+    "TarZstdCreate",
+    "TarZstdExtract",
+    "TzapCreate",
+    "TzapExtract",
+    "ArchiveExtract",
+    "RawStreamExtract",
+    "TestArchive"
+};
+
+enum MobileJobEventKind {
+    "Started",
+    "EntryStarted",
+    "BytesProcessed",
+    "EntryFinished",
+    "Paused",
+    "Resumed",
+    "Warning",
+    "Completed",
+    "Failed",
+    "Cancelled"
+};
+
+dictionary MobileJobEvent {
+    u64 sequence;
+    MobileJobEventKind event_type;
+    MobileJobKind? job_kind;
+    string? path;
+    u64? bytes;
+    u64? total_bytes;
+    u64? total_bytes_processed;
+    u64? entries;
+    u64? total_entries;
+    string? message;
+    BridgeError? error;
+};
+
+dictionary JobTerminalSummary {
+    u64 written_entries;
+    u64? skipped_entries;
+    u64 written_bytes;
+    sequence<BridgeError> warnings;
+};
+
+dictionary StartExtractRequest {
+    string archive_path;
+    string destination_root;
+    string? password;
+    sequence<string> selected_paths;
+    u64 strip_components;
+    ExtractionCollisionPolicy collision_policy;
+};
+
+dictionary StartJobResult {
+    string job_id;
+    MobileJobKind kind;
+    MobileJobStatus status;
+};
+
+dictionary PollJobEventsRequest {
+    string job_id;
+    u64 cursor;
+};
+
+dictionary PollJobEventsResult {
+    string job_id;
+    MobileJobKind kind;
+    MobileJobStatus status;
+    sequence<MobileJobEvent> events;
+    u64 next_cursor;
+    u64 min_retained_sequence;
+    boolean is_terminal;
+    JobTerminalSummary? terminal_summary;
+};
+
+dictionary CancelJobRequest {
+    string job_id;
+};
+
+dictionary CancelJobResult {
+    string job_id;
+    MobileJobStatus status;
+    boolean cancel_requested;
 };
 
 [Error]

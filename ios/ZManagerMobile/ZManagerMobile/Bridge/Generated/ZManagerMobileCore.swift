@@ -675,6 +675,146 @@ public func FfiConverterTypeBridgeError_lower(_ value: BridgeError) -> RustBuffe
 }
 
 
+public struct CancelJobRequest {
+    public var jobId: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(jobId: String) {
+        self.jobId = jobId
+    }
+}
+
+#if compiler(>=6)
+extension CancelJobRequest: Sendable {}
+#endif
+
+
+extension CancelJobRequest: Equatable, Hashable {
+    public static func ==(lhs: CancelJobRequest, rhs: CancelJobRequest) -> Bool {
+        if lhs.jobId != rhs.jobId {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(jobId)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCancelJobRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CancelJobRequest {
+        return
+            try CancelJobRequest(
+                jobId: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CancelJobRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.jobId, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelJobRequest_lift(_ buf: RustBuffer) throws -> CancelJobRequest {
+    return try FfiConverterTypeCancelJobRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelJobRequest_lower(_ value: CancelJobRequest) -> RustBuffer {
+    return FfiConverterTypeCancelJobRequest.lower(value)
+}
+
+
+public struct CancelJobResult {
+    public var jobId: String
+    public var status: MobileJobStatus
+    public var cancelRequested: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(jobId: String, status: MobileJobStatus, cancelRequested: Bool) {
+        self.jobId = jobId
+        self.status = status
+        self.cancelRequested = cancelRequested
+    }
+}
+
+#if compiler(>=6)
+extension CancelJobResult: Sendable {}
+#endif
+
+
+extension CancelJobResult: Equatable, Hashable {
+    public static func ==(lhs: CancelJobResult, rhs: CancelJobResult) -> Bool {
+        if lhs.jobId != rhs.jobId {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        if lhs.cancelRequested != rhs.cancelRequested {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(jobId)
+        hasher.combine(status)
+        hasher.combine(cancelRequested)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCancelJobResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CancelJobResult {
+        return
+            try CancelJobResult(
+                jobId: FfiConverterString.read(from: &buf),
+                status: FfiConverterTypeMobileJobStatus.read(from: &buf),
+                cancelRequested: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CancelJobResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.jobId, into: &buf)
+        FfiConverterTypeMobileJobStatus.write(value.status, into: &buf)
+        FfiConverterBool.write(value.cancelRequested, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelJobResult_lift(_ buf: RustBuffer) throws -> CancelJobResult {
+    return try FfiConverterTypeCancelJobResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCancelJobResult_lower(_ value: CancelJobResult) -> RustBuffer {
+    return FfiConverterTypeCancelJobResult.lower(value)
+}
+
+
 public struct DetectArchiveRequest {
     public var archivePath: String
 
@@ -1083,6 +1223,92 @@ public func FfiConverterTypeHealthcheckResult_lower(_ value: HealthcheckResult) 
 }
 
 
+public struct JobTerminalSummary {
+    public var writtenEntries: UInt64
+    public var skippedEntries: UInt64?
+    public var writtenBytes: UInt64
+    public var warnings: [BridgeError]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(writtenEntries: UInt64, skippedEntries: UInt64?, writtenBytes: UInt64, warnings: [BridgeError]) {
+        self.writtenEntries = writtenEntries
+        self.skippedEntries = skippedEntries
+        self.writtenBytes = writtenBytes
+        self.warnings = warnings
+    }
+}
+
+#if compiler(>=6)
+extension JobTerminalSummary: Sendable {}
+#endif
+
+
+extension JobTerminalSummary: Equatable, Hashable {
+    public static func ==(lhs: JobTerminalSummary, rhs: JobTerminalSummary) -> Bool {
+        if lhs.writtenEntries != rhs.writtenEntries {
+            return false
+        }
+        if lhs.skippedEntries != rhs.skippedEntries {
+            return false
+        }
+        if lhs.writtenBytes != rhs.writtenBytes {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(writtenEntries)
+        hasher.combine(skippedEntries)
+        hasher.combine(writtenBytes)
+        hasher.combine(warnings)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JobTerminalSummary {
+        return
+            try JobTerminalSummary(
+                writtenEntries: FfiConverterUInt64.read(from: &buf),
+                skippedEntries: FfiConverterOptionUInt64.read(from: &buf),
+                writtenBytes: FfiConverterUInt64.read(from: &buf),
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: JobTerminalSummary, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.writtenEntries, into: &buf)
+        FfiConverterOptionUInt64.write(value.skippedEntries, into: &buf)
+        FfiConverterUInt64.write(value.writtenBytes, into: &buf)
+        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJobTerminalSummary_lift(_ buf: RustBuffer) throws -> JobTerminalSummary {
+    return try FfiConverterTypeJobTerminalSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJobTerminalSummary_lower(_ value: JobTerminalSummary) -> RustBuffer {
+    return FfiConverterTypeJobTerminalSummary.lower(value)
+}
+
+
 public struct ListArchiveRequest {
     public var archivePath: String
     public var password: String?
@@ -1451,6 +1677,148 @@ public func FfiConverterTypeMaterializePreviewResult_lower(_ value: MaterializeP
 }
 
 
+public struct MobileJobEvent {
+    public var sequence: UInt64
+    public var eventType: MobileJobEventKind
+    public var jobKind: MobileJobKind?
+    public var path: String?
+    public var bytes: UInt64?
+    public var totalBytes: UInt64?
+    public var totalBytesProcessed: UInt64?
+    public var entries: UInt64?
+    public var totalEntries: UInt64?
+    public var message: String?
+    public var error: BridgeError?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sequence: UInt64, eventType: MobileJobEventKind, jobKind: MobileJobKind?, path: String?, bytes: UInt64?, totalBytes: UInt64?, totalBytesProcessed: UInt64?, entries: UInt64?, totalEntries: UInt64?, message: String?, error: BridgeError?) {
+        self.sequence = sequence
+        self.eventType = eventType
+        self.jobKind = jobKind
+        self.path = path
+        self.bytes = bytes
+        self.totalBytes = totalBytes
+        self.totalBytesProcessed = totalBytesProcessed
+        self.entries = entries
+        self.totalEntries = totalEntries
+        self.message = message
+        self.error = error
+    }
+}
+
+#if compiler(>=6)
+extension MobileJobEvent: Sendable {}
+#endif
+
+
+extension MobileJobEvent: Equatable, Hashable {
+    public static func ==(lhs: MobileJobEvent, rhs: MobileJobEvent) -> Bool {
+        if lhs.sequence != rhs.sequence {
+            return false
+        }
+        if lhs.eventType != rhs.eventType {
+            return false
+        }
+        if lhs.jobKind != rhs.jobKind {
+            return false
+        }
+        if lhs.path != rhs.path {
+            return false
+        }
+        if lhs.bytes != rhs.bytes {
+            return false
+        }
+        if lhs.totalBytes != rhs.totalBytes {
+            return false
+        }
+        if lhs.totalBytesProcessed != rhs.totalBytesProcessed {
+            return false
+        }
+        if lhs.entries != rhs.entries {
+            return false
+        }
+        if lhs.totalEntries != rhs.totalEntries {
+            return false
+        }
+        if lhs.message != rhs.message {
+            return false
+        }
+        if lhs.error != rhs.error {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(sequence)
+        hasher.combine(eventType)
+        hasher.combine(jobKind)
+        hasher.combine(path)
+        hasher.combine(bytes)
+        hasher.combine(totalBytes)
+        hasher.combine(totalBytesProcessed)
+        hasher.combine(entries)
+        hasher.combine(totalEntries)
+        hasher.combine(message)
+        hasher.combine(error)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMobileJobEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobEvent {
+        return
+            try MobileJobEvent(
+                sequence: FfiConverterUInt64.read(from: &buf),
+                eventType: FfiConverterTypeMobileJobEventKind.read(from: &buf),
+                jobKind: FfiConverterOptionTypeMobileJobKind.read(from: &buf),
+                path: FfiConverterOptionString.read(from: &buf),
+                bytes: FfiConverterOptionUInt64.read(from: &buf),
+                totalBytes: FfiConverterOptionUInt64.read(from: &buf),
+                totalBytesProcessed: FfiConverterOptionUInt64.read(from: &buf),
+                entries: FfiConverterOptionUInt64.read(from: &buf),
+                totalEntries: FfiConverterOptionUInt64.read(from: &buf),
+                message: FfiConverterOptionString.read(from: &buf),
+                error: FfiConverterOptionTypeBridgeError.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MobileJobEvent, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.sequence, into: &buf)
+        FfiConverterTypeMobileJobEventKind.write(value.eventType, into: &buf)
+        FfiConverterOptionTypeMobileJobKind.write(value.jobKind, into: &buf)
+        FfiConverterOptionString.write(value.path, into: &buf)
+        FfiConverterOptionUInt64.write(value.bytes, into: &buf)
+        FfiConverterOptionUInt64.write(value.totalBytes, into: &buf)
+        FfiConverterOptionUInt64.write(value.totalBytesProcessed, into: &buf)
+        FfiConverterOptionUInt64.write(value.entries, into: &buf)
+        FfiConverterOptionUInt64.write(value.totalEntries, into: &buf)
+        FfiConverterOptionString.write(value.message, into: &buf)
+        FfiConverterOptionTypeBridgeError.write(value.error, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobEvent_lift(_ buf: RustBuffer) throws -> MobileJobEvent {
+    return try FfiConverterTypeMobileJobEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobEvent_lower(_ value: MobileJobEvent) -> RustBuffer {
+    return FfiConverterTypeMobileJobEvent.lower(value)
+}
+
+
 public struct PlanExtractRequest {
     public var archivePath: String
     public var destinationRoot: String
@@ -1708,6 +2076,374 @@ public func FfiConverterTypePlanExtractResult_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypePlanExtractResult_lower(_ value: PlanExtractResult) -> RustBuffer {
     return FfiConverterTypePlanExtractResult.lower(value)
+}
+
+
+public struct PollJobEventsRequest {
+    public var jobId: String
+    public var cursor: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(jobId: String, cursor: UInt64) {
+        self.jobId = jobId
+        self.cursor = cursor
+    }
+}
+
+#if compiler(>=6)
+extension PollJobEventsRequest: Sendable {}
+#endif
+
+
+extension PollJobEventsRequest: Equatable, Hashable {
+    public static func ==(lhs: PollJobEventsRequest, rhs: PollJobEventsRequest) -> Bool {
+        if lhs.jobId != rhs.jobId {
+            return false
+        }
+        if lhs.cursor != rhs.cursor {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(jobId)
+        hasher.combine(cursor)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePollJobEventsRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PollJobEventsRequest {
+        return
+            try PollJobEventsRequest(
+                jobId: FfiConverterString.read(from: &buf),
+                cursor: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PollJobEventsRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.jobId, into: &buf)
+        FfiConverterUInt64.write(value.cursor, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePollJobEventsRequest_lift(_ buf: RustBuffer) throws -> PollJobEventsRequest {
+    return try FfiConverterTypePollJobEventsRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePollJobEventsRequest_lower(_ value: PollJobEventsRequest) -> RustBuffer {
+    return FfiConverterTypePollJobEventsRequest.lower(value)
+}
+
+
+public struct PollJobEventsResult {
+    public var jobId: String
+    public var kind: MobileJobKind
+    public var status: MobileJobStatus
+    public var events: [MobileJobEvent]
+    public var nextCursor: UInt64
+    public var minRetainedSequence: UInt64
+    public var isTerminal: Bool
+    public var terminalSummary: JobTerminalSummary?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(jobId: String, kind: MobileJobKind, status: MobileJobStatus, events: [MobileJobEvent], nextCursor: UInt64, minRetainedSequence: UInt64, isTerminal: Bool, terminalSummary: JobTerminalSummary?) {
+        self.jobId = jobId
+        self.kind = kind
+        self.status = status
+        self.events = events
+        self.nextCursor = nextCursor
+        self.minRetainedSequence = minRetainedSequence
+        self.isTerminal = isTerminal
+        self.terminalSummary = terminalSummary
+    }
+}
+
+#if compiler(>=6)
+extension PollJobEventsResult: Sendable {}
+#endif
+
+
+extension PollJobEventsResult: Equatable, Hashable {
+    public static func ==(lhs: PollJobEventsResult, rhs: PollJobEventsResult) -> Bool {
+        if lhs.jobId != rhs.jobId {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        if lhs.events != rhs.events {
+            return false
+        }
+        if lhs.nextCursor != rhs.nextCursor {
+            return false
+        }
+        if lhs.minRetainedSequence != rhs.minRetainedSequence {
+            return false
+        }
+        if lhs.isTerminal != rhs.isTerminal {
+            return false
+        }
+        if lhs.terminalSummary != rhs.terminalSummary {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(jobId)
+        hasher.combine(kind)
+        hasher.combine(status)
+        hasher.combine(events)
+        hasher.combine(nextCursor)
+        hasher.combine(minRetainedSequence)
+        hasher.combine(isTerminal)
+        hasher.combine(terminalSummary)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePollJobEventsResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PollJobEventsResult {
+        return
+            try PollJobEventsResult(
+                jobId: FfiConverterString.read(from: &buf),
+                kind: FfiConverterTypeMobileJobKind.read(from: &buf),
+                status: FfiConverterTypeMobileJobStatus.read(from: &buf),
+                events: FfiConverterSequenceTypeMobileJobEvent.read(from: &buf),
+                nextCursor: FfiConverterUInt64.read(from: &buf),
+                minRetainedSequence: FfiConverterUInt64.read(from: &buf),
+                isTerminal: FfiConverterBool.read(from: &buf),
+                terminalSummary: FfiConverterOptionTypeJobTerminalSummary.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PollJobEventsResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.jobId, into: &buf)
+        FfiConverterTypeMobileJobKind.write(value.kind, into: &buf)
+        FfiConverterTypeMobileJobStatus.write(value.status, into: &buf)
+        FfiConverterSequenceTypeMobileJobEvent.write(value.events, into: &buf)
+        FfiConverterUInt64.write(value.nextCursor, into: &buf)
+        FfiConverterUInt64.write(value.minRetainedSequence, into: &buf)
+        FfiConverterBool.write(value.isTerminal, into: &buf)
+        FfiConverterOptionTypeJobTerminalSummary.write(value.terminalSummary, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePollJobEventsResult_lift(_ buf: RustBuffer) throws -> PollJobEventsResult {
+    return try FfiConverterTypePollJobEventsResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePollJobEventsResult_lower(_ value: PollJobEventsResult) -> RustBuffer {
+    return FfiConverterTypePollJobEventsResult.lower(value)
+}
+
+
+public struct StartExtractRequest {
+    public var archivePath: String
+    public var destinationRoot: String
+    public var password: String?
+    public var selectedPaths: [String]
+    public var stripComponents: UInt64
+    public var collisionPolicy: ExtractionCollisionPolicy
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(archivePath: String, destinationRoot: String, password: String?, selectedPaths: [String], stripComponents: UInt64, collisionPolicy: ExtractionCollisionPolicy) {
+        self.archivePath = archivePath
+        self.destinationRoot = destinationRoot
+        self.password = password
+        self.selectedPaths = selectedPaths
+        self.stripComponents = stripComponents
+        self.collisionPolicy = collisionPolicy
+    }
+}
+
+#if compiler(>=6)
+extension StartExtractRequest: Sendable {}
+#endif
+
+
+extension StartExtractRequest: Equatable, Hashable {
+    public static func ==(lhs: StartExtractRequest, rhs: StartExtractRequest) -> Bool {
+        if lhs.archivePath != rhs.archivePath {
+            return false
+        }
+        if lhs.destinationRoot != rhs.destinationRoot {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        if lhs.selectedPaths != rhs.selectedPaths {
+            return false
+        }
+        if lhs.stripComponents != rhs.stripComponents {
+            return false
+        }
+        if lhs.collisionPolicy != rhs.collisionPolicy {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(archivePath)
+        hasher.combine(destinationRoot)
+        hasher.combine(password)
+        hasher.combine(selectedPaths)
+        hasher.combine(stripComponents)
+        hasher.combine(collisionPolicy)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartExtractRequest {
+        return
+            try StartExtractRequest(
+                archivePath: FfiConverterString.read(from: &buf),
+                destinationRoot: FfiConverterString.read(from: &buf),
+                password: FfiConverterOptionString.read(from: &buf),
+                selectedPaths: FfiConverterSequenceString.read(from: &buf),
+                stripComponents: FfiConverterUInt64.read(from: &buf),
+                collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StartExtractRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.archivePath, into: &buf)
+        FfiConverterString.write(value.destinationRoot, into: &buf)
+        FfiConverterOptionString.write(value.password, into: &buf)
+        FfiConverterSequenceString.write(value.selectedPaths, into: &buf)
+        FfiConverterUInt64.write(value.stripComponents, into: &buf)
+        FfiConverterTypeExtractionCollisionPolicy.write(value.collisionPolicy, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartExtractRequest_lift(_ buf: RustBuffer) throws -> StartExtractRequest {
+    return try FfiConverterTypeStartExtractRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartExtractRequest_lower(_ value: StartExtractRequest) -> RustBuffer {
+    return FfiConverterTypeStartExtractRequest.lower(value)
+}
+
+
+public struct StartJobResult {
+    public var jobId: String
+    public var kind: MobileJobKind
+    public var status: MobileJobStatus
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(jobId: String, kind: MobileJobKind, status: MobileJobStatus) {
+        self.jobId = jobId
+        self.kind = kind
+        self.status = status
+    }
+}
+
+#if compiler(>=6)
+extension StartJobResult: Sendable {}
+#endif
+
+
+extension StartJobResult: Equatable, Hashable {
+    public static func ==(lhs: StartJobResult, rhs: StartJobResult) -> Bool {
+        if lhs.jobId != rhs.jobId {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(jobId)
+        hasher.combine(kind)
+        hasher.combine(status)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStartJobResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartJobResult {
+        return
+            try StartJobResult(
+                jobId: FfiConverterString.read(from: &buf),
+                kind: FfiConverterTypeMobileJobKind.read(from: &buf),
+                status: FfiConverterTypeMobileJobStatus.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StartJobResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.jobId, into: &buf)
+        FfiConverterTypeMobileJobKind.write(value.kind, into: &buf)
+        FfiConverterTypeMobileJobStatus.write(value.status, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartJobResult_lift(_ buf: RustBuffer) throws -> StartJobResult {
+    return try FfiConverterTypeStartJobResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStartJobResult_lower(_ value: StartJobResult) -> RustBuffer {
+    return FfiConverterTypeStartJobResult.lower(value)
 }
 
 
@@ -2425,6 +3161,370 @@ extension ExtractionPlanEntryStatus: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum MobileJobEventKind {
+
+    case started
+    case entryStarted
+    case bytesProcessed
+    case entryFinished
+    case paused
+    case resumed
+    case warning
+    case completed
+    case failed
+    case cancelled
+}
+
+
+#if compiler(>=6)
+extension MobileJobEventKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMobileJobEventKind: FfiConverterRustBuffer {
+    typealias SwiftType = MobileJobEventKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobEventKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .started
+
+        case 2: return .entryStarted
+
+        case 3: return .bytesProcessed
+
+        case 4: return .entryFinished
+
+        case 5: return .paused
+
+        case 6: return .resumed
+
+        case 7: return .warning
+
+        case 8: return .completed
+
+        case 9: return .failed
+
+        case 10: return .cancelled
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MobileJobEventKind, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .started:
+            writeInt(&buf, Int32(1))
+
+
+        case .entryStarted:
+            writeInt(&buf, Int32(2))
+
+
+        case .bytesProcessed:
+            writeInt(&buf, Int32(3))
+
+
+        case .entryFinished:
+            writeInt(&buf, Int32(4))
+
+
+        case .paused:
+            writeInt(&buf, Int32(5))
+
+
+        case .resumed:
+            writeInt(&buf, Int32(6))
+
+
+        case .warning:
+            writeInt(&buf, Int32(7))
+
+
+        case .completed:
+            writeInt(&buf, Int32(8))
+
+
+        case .failed:
+            writeInt(&buf, Int32(9))
+
+
+        case .cancelled:
+            writeInt(&buf, Int32(10))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobEventKind_lift(_ buf: RustBuffer) throws -> MobileJobEventKind {
+    return try FfiConverterTypeMobileJobEventKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobEventKind_lower(_ value: MobileJobEventKind) -> RustBuffer {
+    return FfiConverterTypeMobileJobEventKind.lower(value)
+}
+
+
+extension MobileJobEventKind: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum MobileJobKind {
+
+    case zipCreate
+    case zipExtract
+    case sevenZCreate
+    case sevenZExtract
+    case rarExtract
+    case tarZstdCreate
+    case tarZstdExtract
+    case tzapCreate
+    case tzapExtract
+    case archiveExtract
+    case rawStreamExtract
+    case testArchive
+}
+
+
+#if compiler(>=6)
+extension MobileJobKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMobileJobKind: FfiConverterRustBuffer {
+    typealias SwiftType = MobileJobKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .zipCreate
+
+        case 2: return .zipExtract
+
+        case 3: return .sevenZCreate
+
+        case 4: return .sevenZExtract
+
+        case 5: return .rarExtract
+
+        case 6: return .tarZstdCreate
+
+        case 7: return .tarZstdExtract
+
+        case 8: return .tzapCreate
+
+        case 9: return .tzapExtract
+
+        case 10: return .archiveExtract
+
+        case 11: return .rawStreamExtract
+
+        case 12: return .testArchive
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MobileJobKind, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .zipCreate:
+            writeInt(&buf, Int32(1))
+
+
+        case .zipExtract:
+            writeInt(&buf, Int32(2))
+
+
+        case .sevenZCreate:
+            writeInt(&buf, Int32(3))
+
+
+        case .sevenZExtract:
+            writeInt(&buf, Int32(4))
+
+
+        case .rarExtract:
+            writeInt(&buf, Int32(5))
+
+
+        case .tarZstdCreate:
+            writeInt(&buf, Int32(6))
+
+
+        case .tarZstdExtract:
+            writeInt(&buf, Int32(7))
+
+
+        case .tzapCreate:
+            writeInt(&buf, Int32(8))
+
+
+        case .tzapExtract:
+            writeInt(&buf, Int32(9))
+
+
+        case .archiveExtract:
+            writeInt(&buf, Int32(10))
+
+
+        case .rawStreamExtract:
+            writeInt(&buf, Int32(11))
+
+
+        case .testArchive:
+            writeInt(&buf, Int32(12))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobKind_lift(_ buf: RustBuffer) throws -> MobileJobKind {
+    return try FfiConverterTypeMobileJobKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobKind_lower(_ value: MobileJobKind) -> RustBuffer {
+    return FfiConverterTypeMobileJobKind.lower(value)
+}
+
+
+extension MobileJobKind: Equatable, Hashable {}
+
+
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum MobileJobStatus {
+
+    case queued
+    case running
+    case paused
+    case completed
+    case failed
+    case cancelled
+}
+
+
+#if compiler(>=6)
+extension MobileJobStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMobileJobStatus: FfiConverterRustBuffer {
+    typealias SwiftType = MobileJobStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .queued
+
+        case 2: return .running
+
+        case 3: return .paused
+
+        case 4: return .completed
+
+        case 5: return .failed
+
+        case 6: return .cancelled
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MobileJobStatus, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .queued:
+            writeInt(&buf, Int32(1))
+
+
+        case .running:
+            writeInt(&buf, Int32(2))
+
+
+        case .paused:
+            writeInt(&buf, Int32(3))
+
+
+        case .completed:
+            writeInt(&buf, Int32(4))
+
+
+        case .failed:
+            writeInt(&buf, Int32(5))
+
+
+        case .cancelled:
+            writeInt(&buf, Int32(6))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobStatus_lift(_ buf: RustBuffer) throws -> MobileJobStatus {
+    return try FfiConverterTypeMobileJobStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMobileJobStatus_lower(_ value: MobileJobStatus) -> RustBuffer {
+    return FfiConverterTypeMobileJobStatus.lower(value)
+}
+
+
+extension MobileJobStatus: Equatable, Hashable {}
+
+
+
+
+
+
 
 public enum ZmanagerMobileError: Swift.Error {
 
@@ -2560,6 +3660,78 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeBridgeError: FfiConverterRustBuffer {
+    typealias SwiftType = BridgeError?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeBridgeError.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeBridgeError.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeJobTerminalSummary: FfiConverterRustBuffer {
+    typealias SwiftType = JobTerminalSummary?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeJobTerminalSummary.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeJobTerminalSummary.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeMobileJobKind: FfiConverterRustBuffer {
+    typealias SwiftType = MobileJobKind?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMobileJobKind.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMobileJobKind.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
@@ -2656,6 +3828,38 @@ fileprivate struct FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRust
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [MobileJobEvent]
+
+    public static func write(_ value: [MobileJobEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeMobileJobEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [MobileJobEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [MobileJobEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeMobileJobEvent.read(from: &buf))
+        }
+        return seq
+    }
+}
+public func cancelJob(request: CancelJobRequest)throws  -> CancelJobResult  {
+    return try  FfiConverterTypeCancelJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_canceljob(
+        FfiConverterTypeCancelJobRequest_lower(request),$0
+    )
+})
+}
 public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchiveResult  {
     return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_detectarchive(
@@ -2690,6 +3894,20 @@ public func planExtract(request: PlanExtractRequest)throws  -> PlanExtractResult
     )
 })
 }
+public func pollJobEvents(request: PollJobEventsRequest)throws  -> PollJobEventsResult  {
+    return try  FfiConverterTypePollJobEventsResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_polljobevents(
+        FfiConverterTypePollJobEventsRequest_lower(request),$0
+    )
+})
+}
+public func startExtract(request: StartExtractRequest)throws  -> StartJobResult  {
+    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
+    uniffi_zmanager_mobile_core_fn_func_startextract(
+        FfiConverterTypeStartExtractRequest_lower(request),$0
+    )
+})
+}
 public func testArchive(request: TestArchiveRequest)throws  -> TestArchiveResult  {
     return try  FfiConverterTypeTestArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
     uniffi_zmanager_mobile_core_fn_func_testarchive(
@@ -2713,6 +3931,9 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2726,6 +3947,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995) {

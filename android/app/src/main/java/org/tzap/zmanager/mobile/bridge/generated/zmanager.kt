@@ -723,6 +723,12 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -738,7 +744,9 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 // when the library is loaded.
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
-    fun uniffi_zmanager_mobile_core_checksum_func_detectarchive(
+    fun uniffi_zmanager_mobile_core_checksum_func_canceljob(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_detectarchive(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
 ): Short
@@ -747,6 +755,10 @@ fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
 fun uniffi_zmanager_mobile_core_checksum_func_materializepreview(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_planextract(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_polljobevents(
+): Short
+fun uniffi_zmanager_mobile_core_checksum_func_startextract(
 ): Short
 fun uniffi_zmanager_mobile_core_checksum_func_testarchive(
 ): Short
@@ -795,7 +807,9 @@ internal interface UniffiLib : Library {
     }
 
     // FFI functions
-    fun uniffi_zmanager_mobile_core_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    fun uniffi_zmanager_mobile_core_fn_func_canceljob(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -804,6 +818,10 @@ fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValu
 fun uniffi_zmanager_mobile_core_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_planextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_polljobevents(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+fun uniffi_zmanager_mobile_core_fn_func_startextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 fun uniffi_zmanager_mobile_core_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
@@ -933,6 +951,9 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -946,6 +967,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995.toShort()) {
@@ -1227,6 +1254,70 @@ public object FfiConverterTypeBridgeError: FfiConverterRustBuffer<BridgeError> {
 
 
 
+data class CancelJobRequest (
+    var `jobId`: kotlin.String
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCancelJobRequest: FfiConverterRustBuffer<CancelJobRequest> {
+    override fun read(buf: ByteBuffer): CancelJobRequest {
+        return CancelJobRequest(
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CancelJobRequest) = (
+            FfiConverterString.allocationSize(value.`jobId`)
+    )
+
+    override fun write(value: CancelJobRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`jobId`, buf)
+    }
+}
+
+
+
+data class CancelJobResult (
+    var `jobId`: kotlin.String,
+    var `status`: MobileJobStatus,
+    var `cancelRequested`: kotlin.Boolean
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCancelJobResult: FfiConverterRustBuffer<CancelJobResult> {
+    override fun read(buf: ByteBuffer): CancelJobResult {
+        return CancelJobResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeMobileJobStatus.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CancelJobResult) = (
+            FfiConverterString.allocationSize(value.`jobId`) +
+            FfiConverterTypeMobileJobStatus.allocationSize(value.`status`) +
+            FfiConverterBoolean.allocationSize(value.`cancelRequested`)
+    )
+
+    override fun write(value: CancelJobResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`jobId`, buf)
+            FfiConverterTypeMobileJobStatus.write(value.`status`, buf)
+            FfiConverterBoolean.write(value.`cancelRequested`, buf)
+    }
+}
+
+
+
 data class DetectArchiveRequest (
     var `archivePath`: kotlin.String
 ) {
@@ -1419,6 +1510,46 @@ public object FfiConverterTypeHealthcheckResult: FfiConverterRustBuffer<Healthch
 
 
 
+data class JobTerminalSummary (
+    var `writtenEntries`: kotlin.ULong,
+    var `skippedEntries`: kotlin.ULong?,
+    var `writtenBytes`: kotlin.ULong,
+    var `warnings`: List<BridgeError>
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerminalSummary> {
+    override fun read(buf: ByteBuffer): JobTerminalSummary {
+        return JobTerminalSummary(
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterSequenceTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: JobTerminalSummary) = (
+            FfiConverterULong.allocationSize(value.`writtenEntries`) +
+            FfiConverterOptionalULong.allocationSize(value.`skippedEntries`) +
+            FfiConverterULong.allocationSize(value.`writtenBytes`) +
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+    )
+
+    override fun write(value: JobTerminalSummary, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`writtenEntries`, buf)
+            FfiConverterOptionalULong.write(value.`skippedEntries`, buf)
+            FfiConverterULong.write(value.`writtenBytes`, buf)
+            FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
 data class ListArchiveRequest (
     var `archivePath`: kotlin.String,
     var `password`: kotlin.String?
@@ -1591,6 +1722,74 @@ public object FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer<M
 
 
 
+data class MobileJobEvent (
+    var `sequence`: kotlin.ULong,
+    var `eventType`: MobileJobEventKind,
+    var `jobKind`: MobileJobKind?,
+    var `path`: kotlin.String?,
+    var `bytes`: kotlin.ULong?,
+    var `totalBytes`: kotlin.ULong?,
+    var `totalBytesProcessed`: kotlin.ULong?,
+    var `entries`: kotlin.ULong?,
+    var `totalEntries`: kotlin.ULong?,
+    var `message`: kotlin.String?,
+    var `error`: BridgeError?
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMobileJobEvent: FfiConverterRustBuffer<MobileJobEvent> {
+    override fun read(buf: ByteBuffer): MobileJobEvent {
+        return MobileJobEvent(
+            FfiConverterULong.read(buf),
+            FfiConverterTypeMobileJobEventKind.read(buf),
+            FfiConverterOptionalTypeMobileJobKind.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeBridgeError.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MobileJobEvent) = (
+            FfiConverterULong.allocationSize(value.`sequence`) +
+            FfiConverterTypeMobileJobEventKind.allocationSize(value.`eventType`) +
+            FfiConverterOptionalTypeMobileJobKind.allocationSize(value.`jobKind`) +
+            FfiConverterOptionalString.allocationSize(value.`path`) +
+            FfiConverterOptionalULong.allocationSize(value.`bytes`) +
+            FfiConverterOptionalULong.allocationSize(value.`totalBytes`) +
+            FfiConverterOptionalULong.allocationSize(value.`totalBytesProcessed`) +
+            FfiConverterOptionalULong.allocationSize(value.`entries`) +
+            FfiConverterOptionalULong.allocationSize(value.`totalEntries`) +
+            FfiConverterOptionalString.allocationSize(value.`message`) +
+            FfiConverterOptionalTypeBridgeError.allocationSize(value.`error`)
+    )
+
+    override fun write(value: MobileJobEvent, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`sequence`, buf)
+            FfiConverterTypeMobileJobEventKind.write(value.`eventType`, buf)
+            FfiConverterOptionalTypeMobileJobKind.write(value.`jobKind`, buf)
+            FfiConverterOptionalString.write(value.`path`, buf)
+            FfiConverterOptionalULong.write(value.`bytes`, buf)
+            FfiConverterOptionalULong.write(value.`totalBytes`, buf)
+            FfiConverterOptionalULong.write(value.`totalBytesProcessed`, buf)
+            FfiConverterOptionalULong.write(value.`entries`, buf)
+            FfiConverterOptionalULong.write(value.`totalEntries`, buf)
+            FfiConverterOptionalString.write(value.`message`, buf)
+            FfiConverterOptionalTypeBridgeError.write(value.`error`, buf)
+    }
+}
+
+
+
 data class PlanExtractRequest (
     var `archivePath`: kotlin.String,
     var `destinationRoot`: kotlin.String,
@@ -1710,6 +1909,178 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
             FfiConverterOptionalULong.write(value.`estimatedBytes`, buf)
             FfiConverterBoolean.write(value.`canStart`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
+data class PollJobEventsRequest (
+    var `jobId`: kotlin.String,
+    var `cursor`: kotlin.ULong
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePollJobEventsRequest: FfiConverterRustBuffer<PollJobEventsRequest> {
+    override fun read(buf: ByteBuffer): PollJobEventsRequest {
+        return PollJobEventsRequest(
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PollJobEventsRequest) = (
+            FfiConverterString.allocationSize(value.`jobId`) +
+            FfiConverterULong.allocationSize(value.`cursor`)
+    )
+
+    override fun write(value: PollJobEventsRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`jobId`, buf)
+            FfiConverterULong.write(value.`cursor`, buf)
+    }
+}
+
+
+
+data class PollJobEventsResult (
+    var `jobId`: kotlin.String,
+    var `kind`: MobileJobKind,
+    var `status`: MobileJobStatus,
+    var `events`: List<MobileJobEvent>,
+    var `nextCursor`: kotlin.ULong,
+    var `minRetainedSequence`: kotlin.ULong,
+    var `isTerminal`: kotlin.Boolean,
+    var `terminalSummary`: JobTerminalSummary?
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePollJobEventsResult: FfiConverterRustBuffer<PollJobEventsResult> {
+    override fun read(buf: ByteBuffer): PollJobEventsResult {
+        return PollJobEventsResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeMobileJobKind.read(buf),
+            FfiConverterTypeMobileJobStatus.read(buf),
+            FfiConverterSequenceTypeMobileJobEvent.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeJobTerminalSummary.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PollJobEventsResult) = (
+            FfiConverterString.allocationSize(value.`jobId`) +
+            FfiConverterTypeMobileJobKind.allocationSize(value.`kind`) +
+            FfiConverterTypeMobileJobStatus.allocationSize(value.`status`) +
+            FfiConverterSequenceTypeMobileJobEvent.allocationSize(value.`events`) +
+            FfiConverterULong.allocationSize(value.`nextCursor`) +
+            FfiConverterULong.allocationSize(value.`minRetainedSequence`) +
+            FfiConverterBoolean.allocationSize(value.`isTerminal`) +
+            FfiConverterOptionalTypeJobTerminalSummary.allocationSize(value.`terminalSummary`)
+    )
+
+    override fun write(value: PollJobEventsResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`jobId`, buf)
+            FfiConverterTypeMobileJobKind.write(value.`kind`, buf)
+            FfiConverterTypeMobileJobStatus.write(value.`status`, buf)
+            FfiConverterSequenceTypeMobileJobEvent.write(value.`events`, buf)
+            FfiConverterULong.write(value.`nextCursor`, buf)
+            FfiConverterULong.write(value.`minRetainedSequence`, buf)
+            FfiConverterBoolean.write(value.`isTerminal`, buf)
+            FfiConverterOptionalTypeJobTerminalSummary.write(value.`terminalSummary`, buf)
+    }
+}
+
+
+
+data class StartExtractRequest (
+    var `archivePath`: kotlin.String,
+    var `destinationRoot`: kotlin.String,
+    var `password`: kotlin.String?,
+    var `selectedPaths`: List<kotlin.String>,
+    var `stripComponents`: kotlin.ULong,
+    var `collisionPolicy`: ExtractionCollisionPolicy
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer<StartExtractRequest> {
+    override fun read(buf: ByteBuffer): StartExtractRequest {
+        return StartExtractRequest(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterTypeExtractionCollisionPolicy.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StartExtractRequest) = (
+            FfiConverterString.allocationSize(value.`archivePath`) +
+            FfiConverterString.allocationSize(value.`destinationRoot`) +
+            FfiConverterOptionalString.allocationSize(value.`password`) +
+            FfiConverterSequenceString.allocationSize(value.`selectedPaths`) +
+            FfiConverterULong.allocationSize(value.`stripComponents`) +
+            FfiConverterTypeExtractionCollisionPolicy.allocationSize(value.`collisionPolicy`)
+    )
+
+    override fun write(value: StartExtractRequest, buf: ByteBuffer) {
+            FfiConverterString.write(value.`archivePath`, buf)
+            FfiConverterString.write(value.`destinationRoot`, buf)
+            FfiConverterOptionalString.write(value.`password`, buf)
+            FfiConverterSequenceString.write(value.`selectedPaths`, buf)
+            FfiConverterULong.write(value.`stripComponents`, buf)
+            FfiConverterTypeExtractionCollisionPolicy.write(value.`collisionPolicy`, buf)
+    }
+}
+
+
+
+data class StartJobResult (
+    var `jobId`: kotlin.String,
+    var `kind`: MobileJobKind,
+    var `status`: MobileJobStatus
+) {
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStartJobResult: FfiConverterRustBuffer<StartJobResult> {
+    override fun read(buf: ByteBuffer): StartJobResult {
+        return StartJobResult(
+            FfiConverterString.read(buf),
+            FfiConverterTypeMobileJobKind.read(buf),
+            FfiConverterTypeMobileJobStatus.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StartJobResult) = (
+            FfiConverterString.allocationSize(value.`jobId`) +
+            FfiConverterTypeMobileJobKind.allocationSize(value.`kind`) +
+            FfiConverterTypeMobileJobStatus.allocationSize(value.`status`)
+    )
+
+    override fun write(value: StartJobResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`jobId`, buf)
+            FfiConverterTypeMobileJobKind.write(value.`kind`, buf)
+            FfiConverterTypeMobileJobStatus.write(value.`status`, buf)
     }
 }
 
@@ -1985,6 +2356,118 @@ public object FfiConverterTypeExtractionPlanEntryStatus: FfiConverterRustBuffer<
 
 
 
+enum class MobileJobEventKind {
+
+    STARTED,
+    ENTRY_STARTED,
+    BYTES_PROCESSED,
+    ENTRY_FINISHED,
+    PAUSED,
+    RESUMED,
+    WARNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMobileJobEventKind: FfiConverterRustBuffer<MobileJobEventKind> {
+    override fun read(buf: ByteBuffer) = try {
+        MobileJobEventKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MobileJobEventKind) = 4UL
+
+    override fun write(value: MobileJobEventKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class MobileJobKind {
+
+    ZIP_CREATE,
+    ZIP_EXTRACT,
+    SEVEN_Z_CREATE,
+    SEVEN_Z_EXTRACT,
+    RAR_EXTRACT,
+    TAR_ZSTD_CREATE,
+    TAR_ZSTD_EXTRACT,
+    TZAP_CREATE,
+    TZAP_EXTRACT,
+    ARCHIVE_EXTRACT,
+    RAW_STREAM_EXTRACT,
+    TEST_ARCHIVE;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMobileJobKind: FfiConverterRustBuffer<MobileJobKind> {
+    override fun read(buf: ByteBuffer) = try {
+        MobileJobKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MobileJobKind) = 4UL
+
+    override fun write(value: MobileJobKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class MobileJobStatus {
+
+    QUEUED,
+    RUNNING,
+    PAUSED,
+    COMPLETED,
+    FAILED,
+    CANCELLED;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMobileJobStatus: FfiConverterRustBuffer<MobileJobStatus> {
+    override fun read(buf: ByteBuffer) = try {
+        MobileJobStatus.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MobileJobStatus) = 4UL
+
+    override fun write(value: MobileJobStatus, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 
 sealed class ZmanagerMobileException: kotlin.Exception() {
 
@@ -2131,6 +2614,102 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeBridgeError: FfiConverterRustBuffer<BridgeError?> {
+    override fun read(buf: ByteBuffer): BridgeError? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeBridgeError.read(buf)
+    }
+
+    override fun allocationSize(value: BridgeError?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeBridgeError.allocationSize(value)
+        }
+    }
+
+    override fun write(value: BridgeError?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeBridgeError.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerminalSummary?> {
+    override fun read(buf: ByteBuffer): JobTerminalSummary? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeJobTerminalSummary.read(buf)
+    }
+
+    override fun allocationSize(value: JobTerminalSummary?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeJobTerminalSummary.allocationSize(value)
+        }
+    }
+
+    override fun write(value: JobTerminalSummary?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeJobTerminalSummary.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeMobileJobKind: FfiConverterRustBuffer<MobileJobKind?> {
+    override fun read(buf: ByteBuffer): MobileJobKind? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeMobileJobKind.read(buf)
+    }
+
+    override fun allocationSize(value: MobileJobKind?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeMobileJobKind.allocationSize(value)
+        }
+    }
+
+    override fun write(value: MobileJobKind?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeMobileJobKind.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -2236,6 +2815,44 @@ public object FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffe
         }
     }
 }
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<List<MobileJobEvent>> {
+    override fun read(buf: ByteBuffer): List<MobileJobEvent> {
+        val len = buf.getInt()
+        return List<MobileJobEvent>(len) {
+            FfiConverterTypeMobileJobEvent.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MobileJobEvent>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMobileJobEvent.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MobileJobEvent>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMobileJobEvent.write(it, buf)
+        }
+    }
+}
+    @Throws(ZmanagerMobileException::class) fun `cancelJob`(`request`: CancelJobRequest): CancelJobResult {
+            return FfiConverterTypeCancelJobResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_canceljob(
+        FfiConverterTypeCancelJobRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
     @Throws(ZmanagerMobileException::class) fun `detectArchive`(`request`: DetectArchiveRequest): DetectArchiveResult {
             return FfiConverterTypeDetectArchiveResult.lift(
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
@@ -2280,6 +2897,26 @@ public object FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffe
     uniffiRustCallWithError(ZmanagerMobileException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_planextract(
         FfiConverterTypePlanExtractRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `pollJobEvents`(`request`: PollJobEventsRequest): PollJobEventsResult {
+            return FfiConverterTypePollJobEventsResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_polljobevents(
+        FfiConverterTypePollJobEventsRequest.lower(`request`),_status)
+}
+    )
+    }
+
+
+    @Throws(ZmanagerMobileException::class) fun `startExtract`(`request`: StartExtractRequest): StartJobResult {
+            return FfiConverterTypeStartJobResult.lift(
+    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_startextract(
+        FfiConverterTypeStartExtractRequest.lower(`request`),_status)
 }
     )
     }

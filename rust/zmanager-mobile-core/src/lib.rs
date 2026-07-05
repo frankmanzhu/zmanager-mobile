@@ -1,13 +1,20 @@
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zmanager_core::archive_browser::{
     self, ArchiveBrowserError, BrowserEntryKind, BrowserExtractOptions, BrowserListOptions,
 };
+use zmanager_core::jobs::{
+    self, CancellationToken, JobEvent as CoreJobEvent, JobKind as CoreJobKind,
+};
 use zmanager_core::libarchive_backend::{self, LibarchiveError, LibarchiveTestReport};
+use zmanager_core::rar_backend::RarBackendError;
 use zmanager_core::raw_stream_backend::{self, RawStreamError};
 use zmanager_core::safety::{
     ExtractionDecision, ExtractionEntry, ExtractionEntryKind, ExtractionPolicy,
@@ -30,6 +37,9 @@ const ERROR_UNSUPPORTED_FORMAT: &str = "unsupported_format";
 const ERROR_DAMAGED_ARCHIVE: &str = "damaged_archive";
 const ERROR_CANCELLED: &str = "cancelled";
 const ERROR_OPERATION_FAILED: &str = "operation_failed";
+const MAX_EVENTS_PER_JOB: usize = 512;
+
+static JOB_REGISTRY: OnceLock<Arc<MobileJobRegistry>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum BridgeSeverity {
@@ -249,6 +259,122 @@ pub struct PlanExtractResult {
     pub warnings: Vec<BridgeError>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MobileJobStatus {
+    Queued,
+    Running,
+    Paused,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl MobileJobStatus {
+    const fn is_terminal(self) -> bool {
+        matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MobileJobKind {
+    ZipCreate,
+    ZipExtract,
+    SevenZCreate,
+    SevenZExtract,
+    RarExtract,
+    TarZstdCreate,
+    TarZstdExtract,
+    TzapCreate,
+    TzapExtract,
+    ArchiveExtract,
+    RawStreamExtract,
+    TestArchive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MobileJobEventKind {
+    Started,
+    EntryStarted,
+    BytesProcessed,
+    EntryFinished,
+    Paused,
+    Resumed,
+    Warning,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MobileJobEvent {
+    pub sequence: u64,
+    pub event_type: MobileJobEventKind,
+    pub job_kind: Option<MobileJobKind>,
+    pub path: Option<String>,
+    pub bytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+    pub total_bytes_processed: Option<u64>,
+    pub entries: Option<u64>,
+    pub total_entries: Option<u64>,
+    pub message: Option<String>,
+    pub error: Option<BridgeError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobTerminalSummary {
+    pub written_entries: u64,
+    pub skipped_entries: Option<u64>,
+    pub written_bytes: u64,
+    pub warnings: Vec<BridgeError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartExtractRequest {
+    pub archive_path: String,
+    pub destination_root: String,
+    pub password: Option<String>,
+    pub selected_paths: Vec<String>,
+    pub strip_components: u64,
+    pub collision_policy: ExtractionCollisionPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartJobResult {
+    pub job_id: String,
+    pub kind: MobileJobKind,
+    pub status: MobileJobStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PollJobEventsRequest {
+    pub job_id: String,
+    pub cursor: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PollJobEventsResult {
+    pub job_id: String,
+    pub kind: MobileJobKind,
+    pub status: MobileJobStatus,
+    pub events: Vec<MobileJobEvent>,
+    pub next_cursor: u64,
+    pub min_retained_sequence: u64,
+    pub is_terminal: bool,
+    pub terminal_summary: Option<JobTerminalSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelJobRequest {
+    pub job_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelJobResult {
+    pub job_id: String,
+    pub status: MobileJobStatus,
+    pub cancel_requested: bool,
+}
+
 pub fn healthcheck() -> HealthcheckResult {
     let report = zmanager_core::healthcheck();
     HealthcheckResult {
@@ -297,11 +423,7 @@ pub fn detectArchive(
 
 pub fn list_archive(request: ListArchiveRequest) -> Result<ListArchiveResult, ZmanagerMobileError> {
     let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
-    let password = request
-        .password
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
+    let password = password_ref(&request.password);
     let path = Path::new(&archive_path);
     let (format, _warnings) = classify_archive_path(path);
 
@@ -347,11 +469,7 @@ pub fn listArchive(request: ListArchiveRequest) -> Result<ListArchiveResult, Zma
 
 pub fn test_archive(request: TestArchiveRequest) -> Result<TestArchiveResult, ZmanagerMobileError> {
     let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
-    let password = request
-        .password
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
+    let password = password_ref(&request.password);
     let selected_paths = sanitize_selected_paths(request.selected_paths);
     let path = Path::new(&archive_path);
     let (format, _warnings) = classify_archive_path(path);
@@ -411,11 +529,7 @@ pub fn materialize_preview(
     let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
     let entry_path = ensure_non_empty_entry_path(request.entry_path)?;
     let strip_components = usize_from_u64(request.strip_components, "stripComponents")?;
-    let password = request
-        .password
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
+    let password = password_ref(&request.password);
 
     let report = archive_browser::preview_entry_with_options(
         Path::new(&archive_path),
@@ -449,11 +563,7 @@ pub fn plan_extract(request: PlanExtractRequest) -> Result<PlanExtractResult, Zm
     let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
     let destination_root = ensure_destination_root_path(request.destination_root)?;
     let strip_components = usize_from_u64(request.strip_components, "stripComponents")?;
-    let password = request
-        .password
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
+    let password = password_ref(&request.password);
     let selected_paths = sanitize_selected_paths(request.selected_paths);
     let path = Path::new(&archive_path);
     let (format, _warnings) = classify_archive_path(path);
@@ -537,6 +647,638 @@ pub fn plan_extract(request: PlanExtractRequest) -> Result<PlanExtractResult, Zm
 #[allow(non_snake_case)]
 pub fn planExtract(request: PlanExtractRequest) -> Result<PlanExtractResult, ZmanagerMobileError> {
     plan_extract(request)
+}
+
+pub fn start_extract(request: StartExtractRequest) -> Result<StartJobResult, ZmanagerMobileError> {
+    let archive_path = ensure_existing_file_path(request.archive_path, "archivePath")?;
+    let destination_root = ensure_destination_root_path(request.destination_root)?;
+    let strip_components = usize_from_u64(request.strip_components, "stripComponents")?;
+    let selected_paths = sanitize_selected_paths(request.selected_paths);
+    let password = sanitize_password(request.password);
+    let path = Path::new(&archive_path);
+    let (format, _warnings) = classify_archive_path(path);
+    let (_, can_extract, _) = format_capabilities(format);
+
+    if !can_extract {
+        return Err(bridge_error(
+            ERROR_UNSUPPORTED_FORMAT,
+            format!(
+                "{} extraction is not exposed by zmanager-core for mobile yet.",
+                format_label(format)
+            ),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let token = CancellationToken::new();
+    let kind = mobile_extract_job_kind(path, format);
+    let registry = job_registry();
+    let result = registry.create_job(kind, token.clone());
+    let job_id = result.job_id.clone();
+    let input = ExtractJobInput {
+        archive_path,
+        destination_root,
+        password,
+        selected_paths,
+        strip_components,
+        collision_policy: request.collision_policy,
+        format,
+    };
+    let worker_registry = Arc::clone(&registry);
+
+    thread::spawn(move || {
+        let worker_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut sink = RegistryJobEventSink {
+                registry: Arc::clone(&worker_registry),
+                job_id: job_id.clone(),
+            };
+            run_extract_job(input, &token, &mut sink)
+        }));
+
+        match worker_result {
+            Ok(Ok(summary)) => worker_registry.set_terminal_summary(&job_id, summary),
+            Ok(Err(error)) => {
+                worker_registry.finish_with_error(&job_id, bridge_error_from_mobile(error));
+            }
+            Err(_) => {
+                worker_registry.finish_with_error(
+                    &job_id,
+                    BridgeError {
+                        code: ERROR_OPERATION_FAILED.to_string(),
+                        message: "Extraction worker failed unexpectedly.".to_string(),
+                        recovery_hint: hint("Retry the operation and report this if it repeats."),
+                        severity: BridgeSeverity::Error,
+                        retryable: true,
+                    },
+                );
+            }
+        }
+    });
+
+    Ok(result)
+}
+
+#[allow(non_snake_case)]
+pub fn startExtract(request: StartExtractRequest) -> Result<StartJobResult, ZmanagerMobileError> {
+    start_extract(request)
+}
+
+pub fn poll_job_events(
+    request: PollJobEventsRequest,
+) -> Result<PollJobEventsResult, ZmanagerMobileError> {
+    job_registry().poll_events(request)
+}
+
+#[allow(non_snake_case)]
+pub fn pollJobEvents(
+    request: PollJobEventsRequest,
+) -> Result<PollJobEventsResult, ZmanagerMobileError> {
+    poll_job_events(request)
+}
+
+pub fn cancel_job(request: CancelJobRequest) -> Result<CancelJobResult, ZmanagerMobileError> {
+    job_registry().cancel_job(request)
+}
+
+#[allow(non_snake_case)]
+pub fn cancelJob(request: CancelJobRequest) -> Result<CancelJobResult, ZmanagerMobileError> {
+    cancel_job(request)
+}
+
+#[derive(Default)]
+struct MobileJobRegistry {
+    inner: Mutex<MobileJobRegistryInner>,
+}
+
+#[derive(Default)]
+struct MobileJobRegistryInner {
+    next_job_index: u64,
+    jobs: HashMap<String, MobileJobRecord>,
+}
+
+struct MobileJobRecord {
+    kind: MobileJobKind,
+    status: MobileJobStatus,
+    events: VecDeque<MobileJobEvent>,
+    next_sequence: u64,
+    token: CancellationToken,
+    terminal_summary: Option<JobTerminalSummary>,
+}
+
+struct RegistryJobEventSink {
+    registry: Arc<MobileJobRegistry>,
+    job_id: String,
+}
+
+impl jobs::JobEventSink for RegistryJobEventSink {
+    fn emit(&mut self, event: CoreJobEvent) {
+        self.registry.emit_core_event(&self.job_id, event);
+    }
+}
+
+impl MobileJobRegistry {
+    fn create_job(&self, kind: MobileJobKind, token: CancellationToken) -> StartJobResult {
+        let mut inner = self.inner.lock().expect("job registry mutex poisoned");
+        inner.next_job_index = inner.next_job_index.saturating_add(1);
+        let job_id = format!("job-{}-{}", std::process::id(), inner.next_job_index);
+        inner.jobs.insert(
+            job_id.clone(),
+            MobileJobRecord {
+                kind,
+                status: MobileJobStatus::Queued,
+                events: VecDeque::new(),
+                next_sequence: 1,
+                token,
+                terminal_summary: None,
+            },
+        );
+
+        StartJobResult {
+            job_id,
+            kind,
+            status: MobileJobStatus::Queued,
+        }
+    }
+
+    fn poll_events(
+        &self,
+        request: PollJobEventsRequest,
+    ) -> Result<PollJobEventsResult, ZmanagerMobileError> {
+        let inner = self.inner.lock().expect("job registry mutex poisoned");
+        let record = inner.jobs.get(&request.job_id).ok_or_else(|| {
+            bridge_error(
+                ERROR_NOT_FOUND,
+                "Job not found.",
+                hint("The job may have been created in a previous app process."),
+                BridgeSeverity::Warning,
+                false,
+            )
+        })?;
+
+        let events: Vec<MobileJobEvent> = record
+            .events
+            .iter()
+            .filter(|event| event.sequence > request.cursor)
+            .cloned()
+            .collect();
+        let next_cursor = events
+            .last()
+            .map(|event| event.sequence)
+            .unwrap_or(request.cursor);
+        let min_retained_sequence = record
+            .events
+            .front()
+            .map(|event| event.sequence)
+            .unwrap_or(record.next_sequence);
+
+        Ok(PollJobEventsResult {
+            job_id: request.job_id,
+            kind: record.kind,
+            status: record.status,
+            events,
+            next_cursor,
+            min_retained_sequence,
+            is_terminal: record.status.is_terminal(),
+            terminal_summary: record.terminal_summary.clone(),
+        })
+    }
+
+    fn cancel_job(
+        &self,
+        request: CancelJobRequest,
+    ) -> Result<CancelJobResult, ZmanagerMobileError> {
+        let inner = self.inner.lock().expect("job registry mutex poisoned");
+        let record = inner.jobs.get(&request.job_id).ok_or_else(|| {
+            bridge_error(
+                ERROR_NOT_FOUND,
+                "Job not found.",
+                hint("The job may have been created in a previous app process."),
+                BridgeSeverity::Warning,
+                false,
+            )
+        })?;
+
+        let cancel_requested = !record.status.is_terminal();
+        if cancel_requested {
+            record.token.cancel();
+        }
+
+        Ok(CancelJobResult {
+            job_id: request.job_id,
+            status: record.status,
+            cancel_requested,
+        })
+    }
+
+    fn emit_core_event(&self, job_id: &str, event: CoreJobEvent) {
+        let mut inner = self.inner.lock().expect("job registry mutex poisoned");
+        let Some(record) = inner.jobs.get_mut(job_id) else {
+            return;
+        };
+        let event = mobile_event_from_core_event(event);
+        Self::append_event(record, event);
+    }
+
+    fn set_terminal_summary(&self, job_id: &str, summary: JobTerminalSummary) {
+        let mut inner = self.inner.lock().expect("job registry mutex poisoned");
+        let Some(record) = inner.jobs.get_mut(job_id) else {
+            return;
+        };
+        record.terminal_summary = Some(summary.clone());
+        if !record.status.is_terminal() {
+            Self::append_event(record, completed_event_from_summary(&summary));
+        }
+    }
+
+    fn finish_with_error(&self, job_id: &str, error: BridgeError) {
+        let mut inner = self.inner.lock().expect("job registry mutex poisoned");
+        let Some(record) = inner.jobs.get_mut(job_id) else {
+            return;
+        };
+
+        if matches!(record.status, MobileJobStatus::Cancelled) {
+            return;
+        }
+
+        if matches!(
+            record.events.back().map(|event| event.event_type),
+            Some(MobileJobEventKind::Failed)
+        ) {
+            if let Some(event) = record.events.back_mut() {
+                event.message = Some(error.message.clone());
+                event.error = Some(error);
+            }
+            return;
+        }
+
+        if error.code == ERROR_CANCELLED {
+            if !record.status.is_terminal() {
+                Self::append_event(record, cancelled_event(error.message));
+            }
+        } else if !record.status.is_terminal() {
+            Self::append_event(record, failed_event(error));
+        }
+    }
+
+    fn append_event(record: &mut MobileJobRecord, mut event: MobileJobEvent) {
+        if record.status.is_terminal()
+            && matches!(
+                event.event_type,
+                MobileJobEventKind::Completed
+                    | MobileJobEventKind::Failed
+                    | MobileJobEventKind::Cancelled
+            )
+        {
+            return;
+        }
+
+        match event.event_type {
+            MobileJobEventKind::Started => {
+                if !record.status.is_terminal() {
+                    record.status = MobileJobStatus::Running;
+                }
+            }
+            MobileJobEventKind::Completed => {
+                record.status = MobileJobStatus::Completed;
+                if record.terminal_summary.is_none() {
+                    record.terminal_summary = Some(JobTerminalSummary {
+                        written_entries: event.entries.unwrap_or(0),
+                        skipped_entries: None,
+                        written_bytes: event.bytes.unwrap_or(0),
+                        warnings: Vec::new(),
+                    });
+                }
+            }
+            MobileJobEventKind::Failed => record.status = MobileJobStatus::Failed,
+            MobileJobEventKind::Cancelled => record.status = MobileJobStatus::Cancelled,
+            MobileJobEventKind::Paused => record.status = MobileJobStatus::Paused,
+            MobileJobEventKind::Resumed
+            | MobileJobEventKind::EntryStarted
+            | MobileJobEventKind::BytesProcessed
+            | MobileJobEventKind::EntryFinished
+            | MobileJobEventKind::Warning => {}
+        }
+
+        event.sequence = record.next_sequence;
+        record.next_sequence = record.next_sequence.saturating_add(1);
+        record.events.push_back(event);
+        while record.events.len() > MAX_EVENTS_PER_JOB {
+            record.events.pop_front();
+        }
+    }
+}
+
+struct ExtractJobInput {
+    archive_path: String,
+    destination_root: String,
+    password: Option<String>,
+    selected_paths: Vec<String>,
+    strip_components: usize,
+    collision_policy: ExtractionCollisionPolicy,
+    format: ArchiveFormat,
+}
+
+fn job_registry() -> Arc<MobileJobRegistry> {
+    JOB_REGISTRY
+        .get_or_init(|| Arc::new(MobileJobRegistry::default()))
+        .clone()
+}
+
+fn run_extract_job(
+    input: ExtractJobInput,
+    token: &CancellationToken,
+    sink: &mut dyn jobs::JobEventSink,
+) -> Result<JobTerminalSummary, ZmanagerMobileError> {
+    if input.selected_paths.is_empty() {
+        run_full_extract_job(input, token, sink)
+    } else {
+        run_selected_extract_job(input, token, sink)
+    }
+}
+
+fn run_full_extract_job(
+    input: ExtractJobInput,
+    token: &CancellationToken,
+    sink: &mut dyn jobs::JobEventSink,
+) -> Result<JobTerminalSummary, ZmanagerMobileError> {
+    let archive_path = Path::new(&input.archive_path);
+    let destination_root = Path::new(&input.destination_root);
+    let password = input.password.as_deref();
+    let policy = extraction_policy_for_request(input.collision_policy, input.strip_components);
+
+    if matches!(input.format, ArchiveFormat::Zip) {
+        jobs::run_zip_extract_job_with_password_and_policy(
+            archive_path,
+            destination_root,
+            password,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_zip_error)
+        .map(JobTerminalSummary::from)
+    } else if matches!(input.format, ArchiveFormat::TarZst) {
+        jobs::run_tar_zst_extract_job_with_policy(
+            archive_path,
+            destination_root,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_tar_zst_error)
+        .map(JobTerminalSummary::from)
+    } else if matches!(input.format, ArchiveFormat::SevenZ) {
+        jobs::run_7z_extract_job_with_password_and_policy(
+            archive_path,
+            destination_root,
+            password,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_7z_error)
+        .map(JobTerminalSummary::from)
+    } else if matches!(
+        input.format,
+        ArchiveFormat::Rar | ArchiveFormat::MultipartRar
+    ) {
+        jobs::run_rar_extract_job_with_password_and_policy(
+            archive_path,
+            destination_root,
+            password,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_rar_error)
+        .map(JobTerminalSummary::from)
+    } else if matches!(input.format, ArchiveFormat::Tzap) {
+        jobs::run_tzap_extract_job_with_password_and_policy(
+            archive_path,
+            destination_root,
+            password,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_tzap_error)
+        .map(JobTerminalSummary::from)
+    } else if let Some(raw_format) = raw_stream_backend::detect_raw_stream_format(archive_path) {
+        jobs::run_raw_stream_extract_job_with_policy(
+            archive_path,
+            raw_format,
+            destination_root,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_raw_stream_error)
+        .map(JobTerminalSummary::from)
+    } else {
+        jobs::run_libarchive_extract_job_with_password_and_policy(
+            archive_path,
+            destination_root,
+            password,
+            policy,
+            token,
+            sink,
+        )
+        .map(ZipExtractJobReport::from)
+        .map_err(map_libarchive_error)
+        .map(JobTerminalSummary::from)
+    }
+}
+
+fn run_selected_extract_job(
+    input: ExtractJobInput,
+    token: &CancellationToken,
+    sink: &mut dyn jobs::JobEventSink,
+) -> Result<JobTerminalSummary, ZmanagerMobileError> {
+    let archive_path = Path::new(&input.archive_path);
+    let destination_root = Path::new(&input.destination_root);
+    let password = input.password.as_deref();
+    let listing =
+        archive_browser::list_entries_with_options(archive_path, BrowserListOptions { password })
+            .map_err(map_archive_browser_error)?;
+    let entries: Vec<_> = listing
+        .entries
+        .into_iter()
+        .filter(|entry| selected_path_matches(&input.selected_paths, &entry.path))
+        .collect();
+
+    if entries.is_empty() {
+        return Err(bridge_error(
+            ERROR_NOT_FOUND,
+            "No selected archive entries were found.",
+            hint("Refresh the archive listing and select entries that still exist."),
+            BridgeSeverity::Warning,
+            false,
+        ));
+    }
+
+    let total_bytes = entries
+        .iter()
+        .fold((false, 0_u64), |(has_size, total), entry| {
+            match entry.size {
+                Some(size) => (true, total.saturating_add(size)),
+                None => (has_size, total),
+            }
+        });
+    sink.emit(CoreJobEvent::Started {
+        kind: core_extract_job_kind(archive_path, input.format),
+        total_bytes: total_bytes.0.then_some(total_bytes.1),
+    });
+
+    let mut written_entries = 0usize;
+    let mut written_bytes = 0u64;
+    let options = BrowserExtractOptions {
+        password,
+        overwrite: map_collision_policy(input.collision_policy),
+        strip_components: input.strip_components,
+    };
+
+    for entry in entries {
+        if token.is_cancelled() {
+            sink.emit(CoreJobEvent::Cancelled {
+                message: "job cancelled".to_string(),
+            });
+            return Err(cancelled_bridge_error("Extraction job was cancelled."));
+        }
+
+        let entry_path = entry.path;
+        sink.emit(CoreJobEvent::EntryStarted {
+            path: entry_path.clone(),
+            bytes: entry.size,
+        });
+        let report = archive_browser::extract_entry_with_options(
+            archive_path,
+            &entry_path,
+            destination_root,
+            options,
+        )
+        .map_err(map_archive_browser_error)?;
+        written_entries = written_entries.saturating_add(1);
+        written_bytes = written_bytes.saturating_add(report.written_bytes);
+        sink.emit(CoreJobEvent::EntryFinished {
+            path: entry_path,
+            bytes: report.written_bytes,
+        });
+    }
+
+    sink.emit(CoreJobEvent::Completed {
+        entries: written_entries,
+        bytes: written_bytes,
+    });
+
+    Ok(JobTerminalSummary {
+        written_entries: usize_to_u64(written_entries),
+        skipped_entries: Some(0),
+        written_bytes,
+        warnings: Vec::new(),
+    })
+}
+
+struct ZipExtractJobReport {
+    written_entries: usize,
+    skipped_entries: usize,
+    written_bytes: u64,
+    warnings: Vec<String>,
+}
+
+impl From<zip_backend::ZipExtractReport> for ZipExtractJobReport {
+    fn from(report: zip_backend::ZipExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<zmanager_core::tar_zst_backend::TarZstdExtractReport> for ZipExtractJobReport {
+    fn from(report: zmanager_core::tar_zst_backend::TarZstdExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<zmanager_core::sevenz_backend::SevenZExtractReport> for ZipExtractJobReport {
+    fn from(report: zmanager_core::sevenz_backend::SevenZExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<zmanager_core::rar_backend::RarExtractReport> for ZipExtractJobReport {
+    fn from(report: zmanager_core::rar_backend::RarExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<tzap_backend::TzapExtractReport> for ZipExtractJobReport {
+    fn from(report: tzap_backend::TzapExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<raw_stream_backend::RawStreamExtractReport> for ZipExtractJobReport {
+    fn from(report: raw_stream_backend::RawStreamExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<libarchive_backend::LibarchiveExtractReport> for ZipExtractJobReport {
+    fn from(report: libarchive_backend::LibarchiveExtractReport) -> Self {
+        Self {
+            written_entries: report.written_entries,
+            skipped_entries: report.skipped_entries,
+            written_bytes: report.written_bytes,
+            warnings: report.warnings,
+        }
+    }
+}
+
+impl From<ZipExtractJobReport> for JobTerminalSummary {
+    fn from(report: ZipExtractJobReport) -> Self {
+        Self {
+            written_entries: usize_to_u64(report.written_entries),
+            skipped_entries: Some(usize_to_u64(report.skipped_entries)),
+            written_bytes: report.written_bytes,
+            warnings: report.warnings.into_iter().map(bridge_warning).collect(),
+        }
+    }
 }
 
 struct TestArchiveReport {
@@ -746,6 +1488,242 @@ fn map_collision_policy(policy: ExtractionCollisionPolicy) -> OverwritePolicy {
         ExtractionCollisionPolicy::Refuse => OverwritePolicy::Refuse,
         ExtractionCollisionPolicy::Replace => OverwritePolicy::Replace,
         ExtractionCollisionPolicy::Rename => OverwritePolicy::Rename,
+    }
+}
+
+fn extraction_policy_for_request(
+    collision_policy: ExtractionCollisionPolicy,
+    strip_components: usize,
+) -> ExtractionPolicy {
+    ExtractionPolicy {
+        overwrite: map_collision_policy(collision_policy),
+        strip_components,
+        ..ExtractionPolicy::default()
+    }
+}
+
+fn sanitize_password(password: Option<String>) -> Option<String> {
+    password.filter(|value| !value.is_empty())
+}
+
+fn password_ref(password: &Option<String>) -> Option<&str> {
+    password.as_deref().filter(|value| !value.is_empty())
+}
+
+fn mobile_extract_job_kind(path: &Path, format: ArchiveFormat) -> MobileJobKind {
+    match core_extract_job_kind(path, format) {
+        CoreJobKind::ZipCreate => MobileJobKind::ZipCreate,
+        CoreJobKind::ZipExtract => MobileJobKind::ZipExtract,
+        CoreJobKind::SevenZCreate => MobileJobKind::SevenZCreate,
+        CoreJobKind::SevenZExtract => MobileJobKind::SevenZExtract,
+        CoreJobKind::RarExtract => MobileJobKind::RarExtract,
+        CoreJobKind::TarZstdCreate => MobileJobKind::TarZstdCreate,
+        CoreJobKind::TarZstdExtract => MobileJobKind::TarZstdExtract,
+        CoreJobKind::TzapCreate => MobileJobKind::TzapCreate,
+        CoreJobKind::TzapExtract => MobileJobKind::TzapExtract,
+        CoreJobKind::ArchiveExtract => MobileJobKind::ArchiveExtract,
+        CoreJobKind::RawStreamExtract => MobileJobKind::RawStreamExtract,
+    }
+}
+
+fn core_extract_job_kind(path: &Path, format: ArchiveFormat) -> CoreJobKind {
+    if matches!(format, ArchiveFormat::Zip) {
+        CoreJobKind::ZipExtract
+    } else if matches!(format, ArchiveFormat::SevenZ) {
+        CoreJobKind::SevenZExtract
+    } else if matches!(format, ArchiveFormat::Rar | ArchiveFormat::MultipartRar) {
+        CoreJobKind::RarExtract
+    } else if matches!(format, ArchiveFormat::TarZst) {
+        CoreJobKind::TarZstdExtract
+    } else if matches!(format, ArchiveFormat::Tzap) {
+        CoreJobKind::TzapExtract
+    } else if raw_stream_backend::detect_raw_stream_format(path).is_some() {
+        CoreJobKind::RawStreamExtract
+    } else {
+        CoreJobKind::ArchiveExtract
+    }
+}
+
+fn mobile_job_kind_from_core(kind: CoreJobKind) -> MobileJobKind {
+    match kind {
+        CoreJobKind::ZipCreate => MobileJobKind::ZipCreate,
+        CoreJobKind::ZipExtract => MobileJobKind::ZipExtract,
+        CoreJobKind::SevenZCreate => MobileJobKind::SevenZCreate,
+        CoreJobKind::SevenZExtract => MobileJobKind::SevenZExtract,
+        CoreJobKind::RarExtract => MobileJobKind::RarExtract,
+        CoreJobKind::TarZstdCreate => MobileJobKind::TarZstdCreate,
+        CoreJobKind::TarZstdExtract => MobileJobKind::TarZstdExtract,
+        CoreJobKind::TzapCreate => MobileJobKind::TzapCreate,
+        CoreJobKind::TzapExtract => MobileJobKind::TzapExtract,
+        CoreJobKind::ArchiveExtract => MobileJobKind::ArchiveExtract,
+        CoreJobKind::RawStreamExtract => MobileJobKind::RawStreamExtract,
+    }
+}
+
+fn mobile_event_from_core_event(event: CoreJobEvent) -> MobileJobEvent {
+    match event {
+        CoreJobEvent::Started { kind, total_bytes } => MobileJobEvent {
+            sequence: 0,
+            event_type: MobileJobEventKind::Started,
+            job_kind: Some(mobile_job_kind_from_core(kind)),
+            path: None,
+            bytes: None,
+            total_bytes,
+            total_bytes_processed: None,
+            entries: None,
+            total_entries: None,
+            message: None,
+            error: None,
+        },
+        CoreJobEvent::EntryStarted { path, bytes } => MobileJobEvent {
+            sequence: 0,
+            event_type: MobileJobEventKind::EntryStarted,
+            job_kind: None,
+            path: Some(path),
+            bytes,
+            total_bytes: None,
+            total_bytes_processed: None,
+            entries: None,
+            total_entries: None,
+            message: None,
+            error: None,
+        },
+        CoreJobEvent::BytesProcessed {
+            path,
+            bytes,
+            total_bytes_processed,
+        } => MobileJobEvent {
+            sequence: 0,
+            event_type: MobileJobEventKind::BytesProcessed,
+            job_kind: None,
+            path,
+            bytes: Some(bytes),
+            total_bytes: None,
+            total_bytes_processed: Some(total_bytes_processed),
+            entries: None,
+            total_entries: None,
+            message: None,
+            error: None,
+        },
+        CoreJobEvent::EntryFinished { path, bytes } => MobileJobEvent {
+            sequence: 0,
+            event_type: MobileJobEventKind::EntryFinished,
+            job_kind: None,
+            path: Some(path),
+            bytes: Some(bytes),
+            total_bytes: None,
+            total_bytes_processed: None,
+            entries: None,
+            total_entries: None,
+            message: None,
+            error: None,
+        },
+        CoreJobEvent::Warning { message } => {
+            let error = bridge_warning(message.clone());
+            MobileJobEvent {
+                sequence: 0,
+                event_type: MobileJobEventKind::Warning,
+                job_kind: None,
+                path: None,
+                bytes: None,
+                total_bytes: None,
+                total_bytes_processed: None,
+                entries: None,
+                total_entries: None,
+                message: Some(message),
+                error: Some(error),
+            }
+        }
+        CoreJobEvent::Completed { entries, bytes } => MobileJobEvent {
+            sequence: 0,
+            event_type: MobileJobEventKind::Completed,
+            job_kind: None,
+            path: None,
+            bytes: Some(bytes),
+            total_bytes: None,
+            total_bytes_processed: None,
+            entries: Some(usize_to_u64(entries)),
+            total_entries: None,
+            message: None,
+            error: None,
+        },
+        CoreJobEvent::Failed { message } => {
+            let error = BridgeError {
+                code: ERROR_OPERATION_FAILED.to_string(),
+                message: message.clone(),
+                recovery_hint: None,
+                severity: BridgeSeverity::Error,
+                retryable: false,
+            };
+            MobileJobEvent {
+                sequence: 0,
+                event_type: MobileJobEventKind::Failed,
+                job_kind: None,
+                path: None,
+                bytes: None,
+                total_bytes: None,
+                total_bytes_processed: None,
+                entries: None,
+                total_entries: None,
+                message: Some(message),
+                error: Some(error),
+            }
+        }
+        CoreJobEvent::Cancelled { message } => cancelled_event(message),
+    }
+}
+
+fn completed_event_from_summary(summary: &JobTerminalSummary) -> MobileJobEvent {
+    MobileJobEvent {
+        sequence: 0,
+        event_type: MobileJobEventKind::Completed,
+        job_kind: None,
+        path: None,
+        bytes: Some(summary.written_bytes),
+        total_bytes: None,
+        total_bytes_processed: None,
+        entries: Some(summary.written_entries),
+        total_entries: None,
+        message: None,
+        error: None,
+    }
+}
+
+fn failed_event(error: BridgeError) -> MobileJobEvent {
+    MobileJobEvent {
+        sequence: 0,
+        event_type: MobileJobEventKind::Failed,
+        job_kind: None,
+        path: None,
+        bytes: None,
+        total_bytes: None,
+        total_bytes_processed: None,
+        entries: None,
+        total_entries: None,
+        message: Some(error.message.clone()),
+        error: Some(error),
+    }
+}
+
+fn cancelled_event(message: String) -> MobileJobEvent {
+    MobileJobEvent {
+        sequence: 0,
+        event_type: MobileJobEventKind::Cancelled,
+        job_kind: None,
+        path: None,
+        bytes: None,
+        total_bytes: None,
+        total_bytes_processed: None,
+        entries: None,
+        total_entries: None,
+        message: Some(message),
+        error: Some(BridgeError {
+            code: ERROR_CANCELLED.to_string(),
+            message: "Job was cancelled.".to_string(),
+            recovery_hint: None,
+            severity: BridgeSeverity::Info,
+            retryable: true,
+        }),
     }
 }
 
@@ -1214,6 +2192,35 @@ fn map_tzap_error(error: TzapError) -> ZmanagerMobileError {
     }
 }
 
+fn map_rar_error(error: RarBackendError) -> ZmanagerMobileError {
+    match error {
+        RarBackendError::Io { path, source } => map_io_error(path, source),
+        RarBackendError::Safety(source) => bridge_error(
+            ERROR_UNSAFE_ARCHIVE,
+            format!("Entry blocked by safety policy: {source}"),
+            None,
+            BridgeSeverity::Warning,
+            false,
+        ),
+        RarBackendError::Unrar(source) => {
+            let message = source.to_string();
+            let lower_message = message.to_ascii_lowercase();
+            if lower_message.contains("password") {
+                bridge_error(
+                    ERROR_INVALID_PASSWORD,
+                    "The RAR password was missing or incorrect.",
+                    hint("Enter the archive password and try again."),
+                    BridgeSeverity::Warning,
+                    true,
+                )
+            } else {
+                damaged_archive(format!("RAR archive could not be read: {message}"))
+            }
+        }
+        source => operation_failed(format!("RAR operation failed: {source}")),
+    }
+}
+
 fn map_libarchive_error(error: LibarchiveError) -> ZmanagerMobileError {
     match error {
         LibarchiveError::Archive(source) => {
@@ -1310,6 +2317,28 @@ fn damaged_archive(message: impl Into<String>) -> ZmanagerMobileError {
     )
 }
 
+fn cancelled_bridge_error(message: impl Into<String>) -> ZmanagerMobileError {
+    bridge_error(ERROR_CANCELLED, message, None, BridgeSeverity::Info, true)
+}
+
+fn bridge_error_from_mobile(error: ZmanagerMobileError) -> BridgeError {
+    match error {
+        ZmanagerMobileError::Bridge {
+            code,
+            user_message,
+            recovery_hint,
+            severity,
+            retryable,
+        } => BridgeError {
+            code,
+            message: user_message,
+            recovery_hint,
+            severity,
+            retryable,
+        },
+    }
+}
+
 fn bridge_warning(message: impl Into<String>) -> BridgeError {
     BridgeError {
         code: "warning".to_string(),
@@ -1330,7 +2359,7 @@ fn bridge_error(
     BridgeError {
         code: code.into(),
         message: message.into(),
-        recovery_hint: recovery_hint.map(Into::into),
+        recovery_hint,
         severity,
         retryable,
     }
@@ -1366,7 +2395,7 @@ fn is_retryable_io_error(kind: io::ErrorKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use zmanager_core::zip_backend::{ZipCreateOptions, create_zip_from_path};
 
     #[test]
@@ -1526,6 +2555,14 @@ mod tests {
     }
 
     #[test]
+    fn password_helpers_preserve_boundary_whitespace() {
+        let password = Some(" secret ".to_string());
+
+        assert_eq!(password_ref(&password), Some(" secret "));
+        assert_eq!(sanitize_password(password), Some(" secret ".to_string()));
+    }
+
+    #[test]
     fn materialize_preview_extracts_one_entry_to_cleanup_root() {
         let fixture = create_test_zip("materialize-preview-real-zip");
         let entry_path = readme_entry_path(&fixture.archive);
@@ -1638,10 +2675,139 @@ mod tests {
         );
     }
 
+    #[test]
+    fn start_extract_job_extracts_zip_and_reports_terminal_summary() {
+        let fixture = create_test_zip("start-extract-real-zip");
+        let entry_path = readme_entry_path(&fixture.archive);
+        let destination = fixture.temp.path("out");
+
+        let started = start_extract(StartExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: Vec::new(),
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("extract job should start");
+
+        assert_eq!(started.kind, MobileJobKind::ZipExtract);
+        assert_eq!(started.status, MobileJobStatus::Queued);
+
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert_eq!(terminal.status, MobileJobStatus::Completed);
+        assert!(terminal.is_terminal);
+        assert!(terminal.events.iter().any(|event| {
+            matches!(event.event_type, MobileJobEventKind::Started)
+                && event.job_kind == Some(MobileJobKind::ZipExtract)
+        }));
+        assert!(
+            terminal
+                .events
+                .iter()
+                .any(|event| matches!(event.event_type, MobileJobEventKind::Completed))
+        );
+        let summary = terminal
+            .terminal_summary
+            .expect("completed job should include a terminal summary");
+        assert!(summary.written_entries >= 1);
+        assert!(summary.written_bytes > 0);
+        assert_eq!(
+            fs::read_to_string(destination.join(entry_path))
+                .expect("extracted file should be readable"),
+            "hello mobile bridge\n"
+        );
+    }
+
+    #[test]
+    fn start_extract_job_honors_selected_paths() {
+        let fixture = create_test_zip("start-extract-selected-zip");
+        let entry_path = readme_entry_path(&fixture.archive);
+        let destination = fixture.temp.path("out");
+
+        let started = start_extract(StartExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: vec![entry_path.clone()],
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("selected extract job should start");
+
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert_eq!(terminal.status, MobileJobStatus::Completed);
+        assert!(terminal.events.iter().any(|event| {
+            matches!(event.event_type, MobileJobEventKind::EntryStarted)
+                && event.path.as_deref() == Some(entry_path.as_str())
+        }));
+        assert_eq!(
+            fs::read_to_string(destination.join(entry_path))
+                .expect("selected file should be extracted"),
+            "hello mobile bridge\n"
+        );
+    }
+
+    #[test]
+    fn poll_job_events_uses_sequence_cursor() {
+        let fixture = create_test_zip("poll-job-cursor");
+        let destination = fixture.temp.path("out");
+
+        let started = start_extract(StartExtractRequest {
+            archive_path: fixture.archive.to_string_lossy().to_string(),
+            destination_root: destination.to_string_lossy().to_string(),
+            password: None,
+            selected_paths: Vec::new(),
+            strip_components: 0,
+            collision_policy: ExtractionCollisionPolicy::Refuse,
+        })
+        .expect("extract job should start");
+
+        let terminal = wait_for_terminal_job(&started.job_id);
+        assert!(!terminal.events.is_empty());
+        let repeated = poll_job_events(PollJobEventsRequest {
+            job_id: started.job_id,
+            cursor: terminal.next_cursor,
+        })
+        .expect("polling from the latest cursor should succeed");
+
+        assert!(repeated.events.is_empty());
+        assert_eq!(repeated.next_cursor, terminal.next_cursor);
+        assert!(repeated.is_terminal);
+    }
+
+    #[test]
+    fn cancel_job_rejects_unknown_job_id() {
+        let error = cancel_job(CancelJobRequest {
+            job_id: "missing-job".to_string(),
+        })
+        .unwrap_err();
+
+        assert_bridge_error_code(error, ERROR_NOT_FOUND);
+    }
+
     fn assert_bridge_error_code(error: ZmanagerMobileError, expected: &str) {
         match error {
             ZmanagerMobileError::Bridge { code, .. } => assert_eq!(code, expected),
         }
+    }
+
+    fn wait_for_terminal_job(job_id: &str) -> PollJobEventsResult {
+        for _ in 0..100 {
+            let poll = poll_job_events(PollJobEventsRequest {
+                job_id: job_id.to_string(),
+                cursor: 0,
+            })
+            .expect("job should remain pollable");
+
+            if poll.is_terminal {
+                return poll;
+            }
+
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        panic!("job did not finish within the test timeout");
     }
 
     fn readme_entry_path(archive: &Path) -> String {

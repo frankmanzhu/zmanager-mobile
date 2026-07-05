@@ -251,6 +251,11 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_CANCELJOB
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_CANCELJOB
+RustBuffer uniffi_zmanager_mobile_core_fn_func_canceljob(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_DETECTARCHIVE
 RustBuffer uniffi_zmanager_mobile_core_fn_func_detectarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
@@ -275,6 +280,16 @@ RustBuffer uniffi_zmanager_mobile_core_fn_func_materializepreview(RustBuffer req
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANEXTRACT
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_PLANEXTRACT
 RustBuffer uniffi_zmanager_mobile_core_fn_func_planextract(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_POLLJOBEVENTS
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_POLLJOBEVENTS
+RustBuffer uniffi_zmanager_mobile_core_fn_func_polljobevents(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_STARTEXTRACT
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_STARTEXTRACT
+RustBuffer uniffi_zmanager_mobile_core_fn_func_startextract(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_FN_FUNC_TESTARCHIVE
@@ -562,6 +577,12 @@ void ffi_zmanager_mobile_core_rust_future_free_void(uint64_t handle
 void ffi_zmanager_mobile_core_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CANCELJOB
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_CANCELJOB
+uint16_t uniffi_zmanager_mobile_core_checksum_func_canceljob(void
+
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_DETECTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_DETECTARCHIVE
 uint16_t uniffi_zmanager_mobile_core_checksum_func_detectarchive(void
@@ -589,6 +610,18 @@ uint16_t uniffi_zmanager_mobile_core_checksum_func_materializepreview(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANEXTRACT
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_PLANEXTRACT
 uint16_t uniffi_zmanager_mobile_core_checksum_func_planextract(void
+
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_POLLJOBEVENTS
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_POLLJOBEVENTS
+uint16_t uniffi_zmanager_mobile_core_checksum_func_polljobevents(void
+
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_STARTEXTRACT
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_MOBILE_CORE_CHECKSUM_FUNC_STARTEXTRACT
+uint16_t uniffi_zmanager_mobile_core_checksum_func_startextract(void
 
 );
 #endif
