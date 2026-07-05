@@ -22,7 +22,7 @@ The product goal is not "a file manager that also does archives." It is "the arc
 
 ## Product Assumption
 
-ZManager Mobile depends on ZManager-Core for archive compression and decompression. The design assumes ZManager-Core already covers the supported archive types and that archive parsing, extraction safety, creation, testing, and format-specific behavior stay in Rust.
+ZManager Mobile depends on ZManager-Core for archive compression and decompression. The design assumes ZManager-Core already covers the supported archive types and that archive parsing, extraction safety, creation, testing, and format-specific behavior stay in Rust. Platform shells must not call AppleArchive, XIP, `aa`, `xip`, libarchive, or other archive engines directly.
 
 Implementation requirements are tracked in [mobile-launch-spec.md](mobile-launch-spec.md).
 
@@ -62,6 +62,7 @@ This section uses public app store and support pages reviewed on 2026-07-05.
 | --- | --- | --- | --- | --- |
 | [ZArchiver](https://play.google.com/store/apps/details?id=ru.zdevs.zarchiver) | Android | Huge install base, broad create/extract/view support, split archives, password support, no declared data collection | Dense utility UX, Android storage access friction in reviews, hard to out-format quickly | Emphasize safety-first planning, clearer progress, modern SAF behavior, and a quieter UI |
 | [RAR by RARLAB](https://play.google.com/store/apps/details?id=com.rarlab.rar) | Android | Official RAR pedigree, creates RAR/ZIP, repair command, recovery records, multipart support | Ad/analytics stack disclosed in privacy policy, technical UI, strongest around RAR specifically | Support RAR extraction for compatibility, but make tzap the preferred path for new recovery-aware archives |
+| [Keka](https://ios.keka.io/) | iOS/iPadOS | Broad create/extract support, archive browsing, selected preview/extract/share, passwords, AppleArchive, Photos input, split volumes, Shortcuts, and polished native workflows | Paid iOS app and less safety-forward positioning; strongest on broad utility parity | Treat as the v2 iOS capability benchmark while differentiating through safer extraction planning, redaction, and clearer completion states |
 | [iZip](https://apps.apple.com/us/app/izip-zip-unzip-unrar/id413971331) | iOS/iPadOS | High rating, many formats, cloud integrations, simple ZIP/RAR management | Some security and advanced features are Pro; UX is utility/file-manager oriented | Offer transparent free core, safer extraction planning, and native document-picker flows |
 | [WinZip](https://apps.apple.com/us/app/winzip-1-zip-unzip-tool/id500637987) | iOS/iPadOS | Recognized brand, cloud integrations, ZIPX, AES encryption, broad document preview | Lower iOS rating than iZip/Documents in observed listing, broad app surface | Keep the experience focused on archives with fewer non-archive distractions |
 | [Documents by Readdle](https://apps.apple.com/us/app/documents-file-manager-docs/id364901807) | iOS/iPadOS | Excellent distribution, polished file manager, cloud, PDF, media, archive support | Archive work is one feature among many; large app surface and subscription ecosystem | Be the specialist tool for risky archives, verification, and extraction control |
@@ -77,6 +78,8 @@ Compared with built-in tools, ZManager adds capability. Apple Files and Files by
 Compared with ad-supported utilities, ZManager leads with trust. RAR's own privacy policy says the Android app integrates AdMob, Firebase Analytics, and Crashlytics. ZManager should make "no ads, no trackers, no password persistence" a product promise and an implementation constraint.
 
 Compared with broad file managers, ZManager stays focused. Documents by Readdle is a polished all-in-one file hub. ZManager should not copy that. It should do archive work with fewer steps, clearer risk labels, and better completion confidence.
+
+Compared with Keka on iOS, ZManager should adopt the same practical workflow breadth by v2: open/import, browse, preview, selected extract, create, password, verify, split-volume handling, Photos input, drag/drop, and automation hooks. The differentiation is not "more buttons." It is making risky archive work safer, more explainable, and more privacy-preserving.
 
 ZManager should not expect to match ZArchiver's Android distribution immediately. If ZManager-Core already supports the needed archive formats, the mobile response is not to rebuild format logic; it is to make every supported format feel safer, calmer, and easier to operate than established apps.
 
@@ -133,7 +136,7 @@ Anti-goals:
 - Do not add ads or analytics that weaken the trust story.
 - Do not reimplement archive parsing in Kotlin or Swift.
 - Do not make RAR creation, RAR repair, or generic repair a promise; position tzap as the recovery-first archive option.
-- Do not expose a format or action in the GUI before the mobile-shell quality gates pass.
+- Do not expose a format or action in the GUI before the mobile-shell quality gates pass; launch-scope formats must pass those gates and be exposed rather than hidden as launch gaps.
 
 ## Target Users
 
@@ -246,20 +249,28 @@ Launch should prefer staging plus native commit over long-lived direct writes in
 4. Rust creates archive with progress and cancellation.
 5. UI offers share/export/open location.
 
-Launch should target polished create flows for the same practical families as `zm`: ZIP, 7z, modern tar+zstd / `.tzst`, and `.tzap` where ZManager-Core exposes the workflow through the bridge. RAR creation and RAR repair are intentionally out of scope.
+V2 should target polished create flows for the same practical families as `zm` plus Keka-parity iOS formats where ZManager-Core exposes the workflow through the bridge: ZIP, encrypted ZIP, 7z, TAR, GZIP, BZIP2, Zstd, modern tar+zstd / `.tzst`, `.tzap`, and AppleArchive / AAR where supported. RAR creation and RAR repair are intentionally out of scope.
 
 ## Feature Requirements
 
-### Launch Must Have
+ZManager Mobile v2 adopts the full Keka-parity workflow set below. "Must Adopt", "Should Adopt", and "Nice Later" describe implementation sequencing inside v2, not scope exclusion. Launch-scope formats are not hidden or marked experimental as a release workaround: they must pass ZManager-Core, bridge, Android, and iOS gates and then be exposed in the UI.
 
-- Open archive from app launcher.
+### V2 Must Adopt
+
+- Open archive from app launcher and in-app picker.
 - Open archive from Android share/open intents.
-- Open archive from iOS document picker.
-- List archive entries through Rust.
-- Password-required flow for listing and extraction.
-- Extraction plan before writing.
-- Extract all entries.
-- Extract selected entries.
+- Open archive from iOS document picker and share/import flow.
+- Browse archive contents before extraction through Rust-backed listing.
+- Search, sort, and switch between folder tree and flat/grouped list views.
+- Extract all entries or selected entries.
+- Preview common text, image, and PDF files through safe temporary materialization and platform renderers.
+- Password-required, wrong-password, cancelled-password, and encrypted-create flows.
+- Create archives and then share/export/open the result.
+- Test or verify archive integrity where the bridge supports it.
+- Verify after compression where the bridge can test the created format.
+- Detect split and multipart archives with friendly "select the first part" guidance.
+- Choose native-feeling destinations, including iOS Files destinations where platform access permits.
+- Show progress, cancellation, known cleanup state, and a clear completion summary.
 - Collision handling: replace, skip, keep both, cancel.
 - Safety handling:
   - block parent traversal by default
@@ -267,25 +278,41 @@ Launch should target polished create flows for the same practical families as `z
   - detect duplicate output paths after normalization
   - detect invalid or hostile filenames
   - detect entries too large for available space when platform allows
-- Progress and cancellation.
 - Normalized errors with recovery hints.
+- Recent archives stored as display-only bookmarks without passwords.
+- Extract to app cache then native export/commit for platform-owned destinations.
+- Share extracted files/folders.
 - No archive parsing in platform code.
 - No password logging or persistence.
 - Visual design and state handling that meet the GUI quality gates below.
 
-### Launch Should Have
+### V2 Should Adopt
 
-- Search/filter entry list.
-- Folder tree and flat list toggle.
-- Recent archives stored as display-only bookmarks without passwords.
-- Test archive integrity.
-- Extract to app cache then native export/commit for platform-owned destinations.
-- Share extracted files/folders.
-- Basic file preview for common text/image/PDF files after extraction.
+- AppleArchive / AAR create, list, test where possible, and extract support when ZManager-Core exposes it and platform gates pass.
+- XIP extraction support when ZManager-Core exposes it safely and platform gates pass.
+- Old filename charset handling for real-world archives with legacy encodings.
+- Archive items separately during create.
+- Split-volume creation where the bridge supports it.
+- iPad drag/drop into the compression contents list.
+- Photos picker input for compressing photos and videos.
+- VoiceOver and Dynamic Type polish from the start, not after release.
+- Default destination settings for extraction and creation.
 
-### Launch Quality Gates
+### V2 Nice Later
 
-Every launch-supported format should pass mobile smoke tests before the app claims support for it in the UI. ZManager-Core can support a format before the mobile shell exposes it.
+These are still adopted in v2, but can land after the core open/list/extract/create flows are stable.
+
+- Shortcuts and X-Callback-URL automation.
+- Pause and resume for compression and extraction, beyond basic cancellation.
+- Background task support once interruption, partial output, and cleanup behavior are fully specified.
+- Batch extract multiple archives.
+- Save extraction reports.
+- iPad multi-window support.
+- Android tablet two-pane layout.
+
+### V2 Quality Gates
+
+Every v2-supported format must pass mobile smoke tests before launch. A listed launch-scope format that fails gates blocks launch until fixed, or until the launch spec is explicitly changed.
 
 Required gates:
 
@@ -294,20 +321,14 @@ Required gates:
 - extraction plan returns before writing final output
 - progress does not block UI interaction
 - cancellation produces a known cleanup state
+- pause/resume, if exposed for the operation, does not corrupt staging or destination state
+- launch pause/resume is in-process only; process death surfaces interruption recovery rather than a fake resume
 - completion summary matches actual output
+- verify-after-compression reports success, warnings, unsupported verification, or failure without hiding the created archive state
 - diagnostics never include passwords
 - visual states exist for loading, empty archive, damaged archive, unsupported archive, unsafe archive, wrong password, no storage, permission revoked, cancelled, partial success, and success
 
-### Launch Stretch Goals
-
-- Split archive detection with friendly "select first part" guidance.
-- Open single file from archive through temporary extraction.
-- Save extraction reports.
-- Batch extract multiple archives.
-- iPad multi-window support.
-- Android tablet two-pane layout.
-
-### Out Of Launch Scope
+### Out Of V2 Scope
 
 - Archive editing if core supports safe update operations.
 - Generic repair commands for non-tzap archives.
@@ -316,7 +337,7 @@ Required gates:
 
 ## Format Strategy
 
-ZManager-Core owns real format support. ZManager Mobile should expose formats according to mobile UX readiness, not according to whether the core can theoretically process them.
+ZManager-Core owns real format support. ZManager Mobile should expose every launch-scope format once mobile UX, bridge, Android, and iOS gates pass.
 
 Prioritize by user demand and mobile-shell confidence:
 
@@ -324,12 +345,13 @@ Prioritize by user demand and mobile-shell confidence:
 | --- | --- | --- |
 | Tier 1 | ZIP, RAR extraction, 7z, TAR, GZIP, BZIP2 | List, test where possible, extract |
 | Tier 2 | XZ, Zstd, TGZ, TBZ2, TXZ, split ZIP, multipart RAR extraction | List/extract with clear limitations |
-| Tier 3 | ISO, DMG, CAB, ARJ, LHA/LZH, CPIO, WIM | Consider for launch exposure only if ZManager-Core supports them and mobile-shell gates pass |
-| Create launch | ZIP, 7z, `.tzst` / tar+zstd, `.tzap` | Create only where bridge support, password/encryption UX, progress, cancellation, and destination commit are polished |
-| Create deferred | Other writable formats | Add only after UX and tests cover edge cases |
+| Tier 3 | ISO, DMG, CAB, ARJ, LHA/LZH, CPIO, WIM, XIP, executable/self-extracting archive containers | V2 exposure after ZManager-Core support and mobile-shell gates pass |
+| Apple parity | AppleArchive / AAR, IPA, APPX, APK, JAR, XPI, CPGZ, CPT | Prioritize list/extract where core support exists because these are common in Keka's iOS promise |
+| Create v2 | ZIP, encrypted ZIP, 7z, TAR, GZIP, BZIP2, Zstd, `.tzst` / tar+zstd, `.tzap`, AppleArchive / AAR where ZManager-Core exposes creation support | Create only where bridge support, password/encryption UX, progress, cancellation, verification, and destination commit are polished |
+| Post-v2 candidates | Other writable formats not listed above | Add only through a future scope update after UX and tests cover edge cases |
 | Out of scope | RAR creation, RAR repair | Use tzap for new recovery-aware archives |
 
-The app should never claim support for a format in mobile UI unless tests prove that format works across listing, extraction, password behavior where applicable, cancellation, destination commit, and error normalization on both platforms. If ZManager-Core supports a format but the mobile shell has not passed those gates, keep it hidden or label it experimental.
+The app should never claim support for a format in mobile UI unless tests prove that format works across listing, extraction, password behavior where applicable, cancellation, destination commit, and error normalization on both platforms. For launch-scope formats, missing proof blocks launch rather than becoming a hidden or experimental format gap.
 
 ## UX Design Principles
 
@@ -388,8 +410,11 @@ Primary screens:
 - Home: recent archives, open button, privacy/trust status.
 - Archive detail: metadata, warnings, tree/list, actions.
 - Plan review: destination, collisions, unsafe entries, size.
+- Preview: selected file materialization through native renderers.
 - Job progress: current work, cancel, background state.
+- Batch queue: per-archive progress and summary.
 - Completion: summary, open/share destination, report.
+- Settings/help: default destinations, supported formats, licenses, automation help.
 
 Required screen states:
 
@@ -401,12 +426,21 @@ Required screen states:
 - wrong password
 - unsupported archive
 - damaged archive
+- filename charset warning
 - unsafe entries found
 - destination permission revoked
 - iCloud/cloud provider file unavailable
 - not enough storage
+- preview materializing
+- preview unavailable
 - extraction in progress
+- creation in progress
+- verification in progress
+- paused
+- resumable
 - cancellation requested
+- background task active
+- background task unavailable
 - cancelled with cleanup complete
 - cancelled with partial output retained
 - partial success
@@ -500,10 +534,11 @@ Launch destination policy:
 Cleanup policy:
 
 - Planned extraction creates a job-specific staging directory.
-- Successful commit deletes staging unless the user explicitly saves a report.
-- Cancellation before commit deletes staging by default.
+- Successful commits delete staging immediately after completion summary and report data are captured.
+- Cancellation before commit deletes staging immediately.
+- Failed commits, permission failures, or provider failures retain staging for 24 hours, or until the user chooses retry, export elsewhere, or discard.
+- Partial commits where external output may exist retain a recovery record for 7 days; staging is still deleted after 24 hours unless the user retries or exports it elsewhere.
 - Cancellation during commit preserves a recovery record so the completion screen can explain partial output.
-- Failed commit keeps staging only long enough to retry, export elsewhere, or discard.
 
 ## Bridge Design
 
@@ -572,7 +607,10 @@ Output:
 
 Background:
 
-- Use foreground service or WorkManager only when the job duration and platform rules require it.
+- Use an Android foreground service for long user-started archive jobs that may continue after the app is backgrounded.
+- Keep archive detection, listing, planning, and small preview materialization foreground-only.
+- Do not use WorkManager at launch for archive jobs; revisit it only for password-free resumable jobs with persisted manifests.
+- Handle Android 15+ foreground-service timeout behavior in target SDK 35 tests.
 - Keep job state recoverable enough that app backgrounding does not leave the user confused.
 
 Android-specific tests:
@@ -663,9 +701,14 @@ Diagnostics:
 - Android and iOS open archive.
 - List entries.
 - Search entries.
+- Sort entries.
+- Toggle folder tree and flat/grouped list.
 - Password-required listing.
 - Safety warnings.
 - Test archive integrity.
+- Preview selected common files through safe temporary materialization.
+- Share/export selected entries where safe.
+- Surface legacy filename charset warnings or choices where the bridge supports them.
 - Modern archive detail UI with real loading, empty, warning, and error states.
 - Screenshot review for phone and tablet layouts on both platforms.
 
@@ -677,18 +720,27 @@ Success metric: user can inspect real ZIP/RAR/7z archives on both platforms with
 - Choose destination.
 - Collision handling.
 - Extract all and selected.
+- Batch extract multiple archives.
 - Progress events.
+- Pause/resume where bridge job semantics are safe.
 - Cancellation.
 - Completion summary.
+- Save extraction reports.
 - App-controlled staging and native destination commit.
+- Default destination settings with graceful fallback when permissions are revoked.
 - Recovery states for permission revocation, provider failure, low storage, partial commit, and cancellation.
 
 Success metric: extraction is boring, accurate, and explainable even when files are skipped or renamed.
 
 ### Track 3: Create And Share
 
-- ZIP, 7z, `.tzst`, and `.tzap` creation where bridge support is production-ready.
+- ZIP, encrypted ZIP, 7z, TAR, GZIP, BZIP2, Zstd, `.tzst`, `.tzap`, and AppleArchive / AAR creation where bridge support is production-ready.
 - Password/encryption only if implementation and UX are safe.
+- Verify-after-compression.
+- Archive items separately.
+- Split-volume creation where bridge and destination commit behavior are safe.
+- Photos picker input for compressing photos and videos.
+- iPad drag/drop into the compression contents list.
 - Share/export created archive.
 - Save recent output destinations.
 - Creation UI that makes format, encryption, destination, and output size understandable without desktop-style option overload.
@@ -697,13 +749,12 @@ Success metric: user can create a practical archive and send it without needing 
 
 ### Track 4: Power And Polish
 
-- split archives
-- batch extraction
-- tablet layouts
-- archive preview for single files
-- optional desktop/mobile handoff
-- broader format support
-- release-quality onboarding, help, and supported-format docs
+- AppleArchive / AAR, XIP, Keka-style app-container formats, and old filename charset handling after the relevant format gates pass.
+- Shortcuts and X-Callback-URL automation with redacted, safe request validation.
+- Background task support once interruption and partial-output behavior is proven.
+- iPad multi-window and Android tablet/foldable two-pane layouts.
+- VoiceOver, TalkBack, Dynamic Type, and font-scaling QA.
+- release-quality onboarding, help, supported-format docs, and automation docs
 - public UI strings, in-app claims, and docs agree
 
 ## Success Metrics
@@ -714,6 +765,7 @@ Product:
 - Less than 2 percent of completed jobs produce user reports of "I do not know where my files went."
 - Password-required archives have a successful retry path without app restart.
 - Users can complete open-list-extract in under 30 seconds for a normal small archive.
+- Keka-parity probes pass for selected preview/extract/share, verify-after-compression, split-volume guidance, batch extraction, default destinations, Photos input, drag/drop, and automation where exposed.
 
 Reliability:
 
@@ -721,9 +773,10 @@ Reliability:
 - Cancellation leaves no unknown job state.
 - Unsafe path test corpus passes on Android and iOS.
 - Bridge behavior is consistent across platforms for the same archive corpus.
-- Every advertised mobile format passes the mobile format quality gates.
+- Every launch-scope mobile format passes the mobile format quality gates and is exposed.
 - Large archive listing stays responsive through virtualization or incremental loading.
 - Extraction progress and cancellation never block the main UI thread.
+- Pause/resume, where exposed, never leaves staging or destination state ambiguous.
 - Platform provider failures produce recoverable, user-readable states.
 - Staging cleanup is deterministic after success, cancellation, and failure.
 
@@ -733,6 +786,7 @@ GUI:
 - Light mode, dark mode, small phone, large phone, and tablet/iPad layouts are checked before release.
 - Accessibility labels exist for icon-only actions.
 - Dynamic Type / font scaling does not break primary flows.
+- VoiceOver and TalkBack can complete the main open, inspect, extract, create, password, and completion flows.
 - Long names and paths remain readable without overlapping actions.
 
 Market Position:
@@ -746,12 +800,13 @@ Market Position:
 
 ZManager Mobile can be called launch-ready when:
 
-- every Launch Must Have item is implemented or intentionally deferred with a documented reason
+- every V2 adoption item is implemented, or any non-format scope change is intentionally documented with a bridge/platform reason
 - supported-format claims, in-app labels, README/docs, and bridge behavior agree
-- Android and iOS both pass the launch quality gates for every advertised format
+- Android and iOS both pass the launch quality gates for every launch-scope format
 - the create/extract/list/test flows cover the practical `zm` families exposed on mobile
+- Keka-parity workflows pass probes for selected preview/extract/share, verify-after-compression, split-volume guidance, batch extraction, saved reports, default destinations, Photos input, drag/drop, and automation entry points where exposed
 - `.tzap` recovery-oriented flows are clearly positioned and do not blur into generic repair claims
-- no-prior-knowledge usability probes pass open, inspect, extract, create, password, and cancellation tasks
+- no-prior-knowledge usability probes pass open, inspect, selected preview, extract, create, password, verification, batch extraction, and cancellation tasks
 - screenshot QA passes for the required phone/tablet, light/dark, and state matrix
 - app interruption, provider failure, cancellation, and staging cleanup have tested outcomes
 - password and diagnostic redaction tests pass
@@ -763,15 +818,17 @@ ZManager Mobile can be called launch-ready when:
 - Encrypted ZIP creation is launch scope and should match the behavior already available in `zmanager-cli`.
 - Feedback should go through GitHub issues. Do not add telemetry or third-party analytics.
 - Distribution should be open source, free, and Apache-2.0 licensed.
-- iOS destinations should be comparable to leading archive/file apps: support true user-selected destinations where the platform allows it, with app sandbox plus share/export as fallback paths.
+- iOS destinations should be comparable to leading archive/file apps: support app sandbox destinations first; support `On My iPhone` and iCloud Drive folder destinations after security-scope and staged-commit tests pass; use share/export fallback for third-party Files providers until that provider class passes the same tests.
 - Archive preview should be comparable to leading archive/file apps: list archive contents, search/filter entries, preview common files through safe temporary materialization, and avoid becoming a full document/media suite.
+- Keka is the iOS workflow benchmark for v2 breadth: browse, selected preview/extract/share, create, password, verify, split volumes, Photos input, drag/drop, automation, and native destination polish.
 - Visual direction should be native and polished: Apple HIG plus Documents by Readdle on iOS/iPadOS; Material 3 plus clean Files-style surfaces on Android.
 
 ## Recommended Immediate Next Steps
 
-1. Create high-fidelity native GUI direction for home, archive detail, plan review, progress, completion, password, warning, and error states.
-2. Build a fixture corpus: normal ZIP, encrypted ZIP, RAR, 7z, TAR.GZ, split archive, unsafe paths, duplicate normalized paths, huge entry count.
-3. Expand the UniFFI API to include normalized errors, warnings, planning, jobs, progress, and cancellation.
-4. Implement read-only listing on Android and iOS through native pickers and cached local paths.
+1. Create high-fidelity native GUI direction for home, archive detail, preview, plan review, progress, batch queue, completion, password, warning, and error states.
+2. Build a fixture corpus: normal ZIP, encrypted ZIP, RAR, 7z, TAR.GZ, AppleArchive / AAR, XIP, split archive, unsafe paths, legacy charset paths, duplicate normalized paths, and huge entry count.
+3. Expand the UniFFI API to include normalized errors, warnings, preview materialization, planning, jobs, progress, pause/resume capability, cancellation, and reports.
+4. Implement read-only listing on Android and iOS through native pickers, share/import flows, and cached local paths.
 5. Implement the staging plus native commit model before broad external-destination extraction.
-6. Decide and document the launch mobile exposure matrix from ZManager-Core support plus platform-shell tests.
+6. Add v2 parity tracks for verify-after-compression, archive-items-separately, split-volume creation, Photos input, drag/drop, batch extraction, reports, default destinations, and automation.
+7. Decide and document the launch mobile exposure matrix from ZManager-Core support plus platform-shell tests.
