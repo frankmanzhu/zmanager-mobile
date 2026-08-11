@@ -20,6 +20,8 @@ scripts/check-android.sh
 
 The script uses `./gradlew` when present, then an installed `gradle`, then the locally cached Gradle 8.9 distribution. It honors an existing `JAVA_HOME`; when `JAVA_HOME` is unset, it falls back to Android Studio's bundled JBR. Android Gradle Plugin 8.7 requires JDK 17, and this project is validated with Liberica JDK 17.0.20.
 
+Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. That script builds `zmanager-ffi` from the sibling `zmanager` repository and copies the generated arm64 libraries into the ignored `android/app/src/main/jniLibs/arm64-v8a/` directory. Set `ZMANAGER_DIR`, `ANDROID_NDK_HOME`, `ANDROID_NDK_VERSION`, or `ANDROID_API_LEVEL` when the defaults do not match the local machine.
+
 ## Maestro UI tests
 
 Maestro provides the device-level smoke tests in `maestro/android/` and `maestro/ios/`. Install the CLI with:

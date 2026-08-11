@@ -1,7 +1,30 @@
+import org.gradle.api.tasks.Exec
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val mobileRoot = rootProject.projectDir.parentFile
+val zmanagerRoot = mobileRoot.resolve("../zmanager").canonicalFile
+val generatedJniDir = project.file("src/main/jniLibs/arm64-v8a")
+
+val buildZmanagerFfi by tasks.registering(Exec::class) {
+    description = "Build the zmanager-ffi Android library from the sibling zmanager repository."
+    group = "build"
+    workingDir(mobileRoot)
+    inputs.dir(zmanagerRoot.resolve("crates"))
+    inputs.files(zmanagerRoot.resolve("Cargo.toml"), zmanagerRoot.resolve("Cargo.lock"))
+    outputs.files(
+        generatedJniDir.resolve("libzmanager_ffi.so"),
+        generatedJniDir.resolve("libc++_shared.so")
+    )
+    commandLine("bash", mobileRoot.resolve("scripts/build-android-rust.sh").absolutePath)
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(buildZmanagerFfi)
 }
 
 android {

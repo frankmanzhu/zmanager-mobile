@@ -9,4 +9,4 @@ local.properties
 *.iml
 *.xcuserstate
 xcuserdata/
-
+/android/app/src/main/jniLibs/**/*.so
