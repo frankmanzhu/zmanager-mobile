@@ -24,7 +24,7 @@ Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. Tha
 
 ## Maestro UI tests
 
-Maestro provides the device-level smoke tests in `maestro/android/` and `maestro/ios/`. Install the CLI with:
+Maestro provides device-level smoke tests in `maestro/android/` and `maestro/ios/`. Install the CLI with:
 
 ```sh
 brew install mobile-dev-inc/tap/maestro
@@ -37,7 +37,19 @@ MAESTRO_PLATFORM=android ./scripts/check-maestro.sh
 MAESTRO_PLATFORM=ios ./scripts/check-maestro.sh
 ```
 
-The initial flows verify the landing screen and exercise the `Open Archive` action. Archive-import flows should add a committed fixture and cover platform-specific file-picker behavior separately.
+`scripts/check-maestro.sh` regenerates the deterministic fixture archive before it
+runs. Build and install the debug app after changing fixture source files so the
+debug-only **Load Maestro fixture** action is present. The workflow suite imports
+that archive through the same app-cache import path as normal files, browses text,
+JSON, SVG, Markdown, and PDF entries, and verifies the archive through the Rust
+bridge. The landing-screen smoke flow continues to exercise the native
+`Open Archive` picker entry point.
+
+The current app does not yet expose extraction-plan approval or destination
+commit UI, so the Maestro suite deliberately does not claim end-to-end coverage
+of full extraction. It covers the implemented safe single-file materialization
+path and archive verification; add plan, progress, cancel, and destination
+assertions alongside that UI when it lands.
 
 ## iOS
 

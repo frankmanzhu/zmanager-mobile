@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android"
 JBR_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
+"$ROOT_DIR/scripts/generate-maestro-fixtures.sh"
+
 if [[ -z "${JAVA_HOME:-}" && -x "$JBR_HOME/bin/java" ]]; then
   export JAVA_HOME="$JBR_HOME"
 fi

@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -211,6 +213,38 @@ private fun ZManagerApp(
         }
     }
 
+    fun startMaestroFixtureImport() {
+        importRequestId += 1
+        val currentImportRequestId = importRequestId
+        listingRequestId += 1
+        clearPreviewState()
+        clearTestState()
+        isImporting = true
+        importError = null
+        importedArchive = null
+        listingState = ArchiveListingState.Idle
+        passwordInput = ""
+        entrySearchQuery = ""
+        selectedEntryIds = emptySet()
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { importer.importAsset("maestro-files.zip") }
+            }
+            if (currentImportRequestId != importRequestId) {
+                return@launch
+            }
+            result
+                .onSuccess { archive ->
+                    importedArchive = archive
+                    loadArchiveListing(archive, null)
+                }
+                .onFailure {
+                    importError = "Unable to import the Maestro fixture."
+                }
+            isImporting = false
+        }
+    }
+
     val documentPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -333,6 +367,14 @@ private fun ZManagerApp(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
+                    if (BuildConfig.DEBUG) {
+                        OutlinedButton(
+                            enabled = !isImporting,
+                            onClick = { startMaestroFixtureImport() }
+                        ) {
+                            Text("Load Maestro fixture")
+                        }
+                    }
                     Button(
                         enabled = !isImporting,
                         onClick = { documentPicker.launch(arrayOf("*/*")) }
@@ -585,7 +627,10 @@ private fun ArchiveListingReadyPanel(
                 ) {
                     Checkbox(
                         checked = selectedEntryIds.contains(entry.id),
-                        onCheckedChange = { onToggleEntrySelected(entry) }
+                        onCheckedChange = { onToggleEntrySelected(entry) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Select ${entry.displayName}"
+                        }
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

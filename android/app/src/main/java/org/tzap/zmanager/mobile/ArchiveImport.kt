@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.UUID
 
 data class ImportedArchive(
@@ -26,20 +27,44 @@ class ArchiveImporter(context: Context) {
     fun importUri(uri: Uri): ImportedArchive {
         val resolver = appContext.contentResolver
         val metadata = ArchiveImportMetadata.fromUri(appContext, uri)
-        val displayName = ArchiveImportNames.sanitizedDisplayName(metadata.displayName ?: uri.lastPathSegment)
+        return importStream(
+            displayName = metadata.displayName ?: uri.lastPathSegment,
+            sourceMimeType = metadata.mimeType
+        ) {
+            resolver.openInputStream(uri) ?: throw IOException("Unable to open selected archive.")
+        }
+    }
+
+    @Throws(IOException::class)
+    fun importAsset(assetName: String): ImportedArchive {
+        return importStream(
+            displayName = assetName,
+            sourceMimeType = "application/zip"
+        ) {
+            appContext.assets.open(assetName)
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun importStream(
+        displayName: String?,
+        sourceMimeType: String?,
+        openInputStream: () -> InputStream
+    ): ImportedArchive {
+        val sanitizedDisplayName = ArchiveImportNames.sanitizedDisplayName(displayName)
         val importRoot = File(appContext.cacheDir, "imported-archives").also { root ->
             if (!root.exists() && !root.mkdirs()) {
                 throw IOException("Unable to create archive import cache.")
             }
         }
-        val destination = File(importRoot, "${UUID.randomUUID()}-$displayName")
+        val destination = File(importRoot, "${UUID.randomUUID()}-$sanitizedDisplayName")
 
         try {
-            resolver.openInputStream(uri)?.use { input ->
+            openInputStream().use { input ->
                 FileOutputStream(destination).use { output ->
                     input.copyTo(output)
                 }
-            } ?: throw IOException("Unable to open selected archive.")
+            }
         } catch (error: IOException) {
             destination.delete()
             throw error
@@ -47,10 +72,10 @@ class ArchiveImporter(context: Context) {
 
         return ImportedArchive(
             id = UUID.randomUUID().toString(),
-            displayName = displayName,
+            displayName = sanitizedDisplayName,
             localPath = destination.absolutePath,
             byteSize = destination.length().takeIf { it >= 0 },
-            sourceMimeType = metadata.mimeType,
+            sourceMimeType = sourceMimeType,
             importedAtEpochMillis = System.currentTimeMillis()
         )
     }

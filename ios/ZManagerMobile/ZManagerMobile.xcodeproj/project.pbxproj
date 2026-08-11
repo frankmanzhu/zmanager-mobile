@@ -12,6 +12,7 @@
 		01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000103 /* ZManagerMobileTests.swift */; };
 		01A000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000107 /* Assets.xcassets */; };
 		01A000000000000000000005 /* zmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000108 /* zmanager.swift */; };
+		01A000000000000000000006 /* maestro-files.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010B /* maestro-files.zip */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,6 +36,7 @@
 		01A000000000000000000108 /* zmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = zmanager.swift; sourceTree = "<group>"; };
 		01A000000000000000000109 /* zmanagerFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = zmanagerFFI.h; sourceTree = "<group>"; };
 		01A00000000000000000010A /* zmanagerFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = zmanagerFFI.modulemap; sourceTree = "<group>"; };
+		01A00000000000000000010B /* maestro-files.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-files.zip; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				01A000000000000000000102 /* ContentView.swift */,
 				01A000000000000000000104 /* Info.plist */,
 				01A000000000000000000107 /* Assets.xcassets */,
+				01A00000000000000000010B /* maestro-files.zip */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -194,6 +197,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				01A000000000000000000004 /* Assets.xcassets in Resources */,
+				01A000000000000000000006 /* maestro-files.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,6 +336,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_INCLUDE_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",

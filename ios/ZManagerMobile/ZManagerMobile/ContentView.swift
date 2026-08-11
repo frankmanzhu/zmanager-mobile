@@ -57,6 +57,12 @@ struct ContentView: View {
 
             HStack {
                 Spacer()
+#if DEBUG
+                Button("Load Maestro fixture") {
+                    importModel.importMaestroFixture()
+                }
+                .disabled(importModel.isImporting)
+#endif
                 Button(importModel.isImporting ? "Importing" : "Open Archive") {
                     isFileImporterPresented = true
                 }
@@ -1125,6 +1131,17 @@ final class ArchiveImportModel: ObservableObject {
                 isImporting = false
             }
         }
+    }
+
+    func importMaestroFixture() {
+        guard let fixtureURL = Bundle.main.url(
+            forResource: "maestro-files",
+            withExtension: "zip"
+        ) else {
+            errorMessage = "The Maestro fixture is not available in this build."
+            return
+        }
+        importExternalURL(fixtureURL)
     }
 
     func retryListingWithPassword() {

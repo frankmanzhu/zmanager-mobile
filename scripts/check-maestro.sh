@@ -8,16 +8,19 @@ fi
 
 platform="${MAESTRO_PLATFORM:-android}"
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+"$ROOT_DIR/scripts/generate-maestro-fixtures.sh"
+
 case "$platform" in
   android)
-    maestro test maestro/android/smoke.yaml
+    maestro --platform android test maestro/android
     ;;
   ios)
-    maestro test maestro/ios/smoke.yaml
+    maestro --platform ios test maestro/ios
     ;;
   all)
-    maestro test maestro/android/smoke.yaml
-    maestro test maestro/ios/smoke.yaml
+    maestro --platform android test maestro/android
+    maestro --platform ios test maestro/ios
     ;;
   *)
     echo "Usage: MAESTRO_PLATFORM=android|ios|all $0" >&2

@@ -1,0 +1,16 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- tapOn: "Load Maestro fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 5 entries"
+    timeout: 15000
+- tapOn: "readme.txt"
+- assertVisible: "1 selected"
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "ZManager Maestro fixture"
+    timeout: 15000

@@ -1,0 +1,23 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Load Maestro fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 5 entries"
+    timeout: 15000
+- assertVisible: "Imported maestro-files.zip"
+- assertVisible: "readme.txt"
+- assertVisible: "manifest.json"
+- assertVisible: "cover.svg"
+- assertVisible: "release-notes.md"
+- assertVisible: "summary.pdf"
+- tapOn: "Select Visible"
+- assertVisible: "5 selected"
+- tapOn: "Test"
+- extendedWaitUntil:
+    visible: "Archive verified"
+    timeout: 15000
