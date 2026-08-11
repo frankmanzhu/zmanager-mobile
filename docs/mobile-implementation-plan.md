@@ -10,6 +10,10 @@ The launch goal is a polished native archive workbench backed by shared Rust arc
 
 This plan is intentionally implementation-facing. If a behavior is user-facing or product-positioning oriented, keep the source of truth in [mobile-product-design.md](mobile-product-design.md). If a requirement changes, update [mobile-launch-spec.md](mobile-launch-spec.md) first and then reflect the implementation impact here.
 
+The follow-up plan for nested archive browsing, archive-folder repackaging, and
+LocalSend-compatible local-network sharing is in
+[mobile-follow-up-implementation-plan.md](mobile-follow-up-implementation-plan.md).
+
 ## V2 Adoption Scope
 
 ZManager Mobile v2 adopts the full Keka-parity workflow set from the product design. "Must Adopt", "Should Adopt", and "Nice Later" are sequencing labels inside v2, not reasons to leave the behavior out of v2.

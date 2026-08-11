@@ -6,6 +6,10 @@ Last reviewed: 2026-07-05
 
 This specification turns the product direction in [mobile-product-design.md](mobile-product-design.md) into implementation requirements for the first serious ZManager Mobile release.
 
+The follow-up implementation plan for nested archive browsing, archive-folder
+repackaging, and LocalSend-compatible local-network sharing is in
+[mobile-follow-up-implementation-plan.md](mobile-follow-up-implementation-plan.md).
+
 ZManager Mobile targets a v2-level launch bar from the start. The app should feel like a complete native archive workbench, not a thin mobile wrapper around ZManager-Core.
 
 ## Product Contract
