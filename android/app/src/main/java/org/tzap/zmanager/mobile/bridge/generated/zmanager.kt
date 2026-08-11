@@ -58,7 +58,7 @@ open class RustBuffer : Structure() {
     companion object {
         internal fun alloc(size: ULong = 0UL) = uniffiRustCall() { status ->
             // Note: need to convert the size to a `Long` value to make this work with JVM.
-            UniffiLib.INSTANCE.ffi_zmanager_mobile_core_rustbuffer_alloc(size.toLong(), status)
+            UniffiLib.INSTANCE.ffi_zmanager_ffi_rustbuffer_alloc(size.toLong(), status)
         }.also {
             if(it.data == null) {
                throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
@@ -74,7 +74,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = uniffiRustCall() { status ->
-            UniffiLib.INSTANCE.ffi_zmanager_mobile_core_rustbuffer_free(buf, status)
+            UniffiLib.INSTANCE.ffi_zmanager_ffi_rustbuffer_free(buf, status)
         }
     }
 
@@ -374,7 +374,7 @@ private fun findLibraryName(componentName: String): String {
     if (libOverride != null) {
         return libOverride
     }
-    return "zmanager_mobile_core"
+    return "zmanager_ffi"
 }
 
 private inline fun <reified Lib : Library> loadIndirect(
@@ -735,46 +735,150 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
-// N.B. the name of the extension is very misleading, since it is
-// rather `InterfaceTooLargeException`, caused by too many methods
+// N.B. the name of the extension is very misleading, since it is 
+// rather `InterfaceTooLargeException`, caused by too many methods 
 // in the interface for large crates.
 //
 // By splitting the otherwise huge interface into two parts
-// * UniffiLib
+// * UniffiLib 
 // * IntegrityCheckingUniffiLib (this)
 // we allow for ~2x as many methods in the UniffiLib interface.
-//
-// The `ffi_uniffi_contract_version` method and all checksum methods are put
+// 
+// The `ffi_uniffi_contract_version` method and all checksum methods are put 
 // into `IntegrityCheckingUniffiLib` and these methods are called only once,
 // when the library is loaded.
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
-    fun uniffi_zmanager_mobile_core_checksum_func_canceljob(
+    fun uniffi_zmanager_ffi_checksum_func_canceljob(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate(
+fun uniffi_zmanager_ffi_checksum_func_clearsensitivestate(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_detectarchive(
+fun uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_healthcheck(
+fun uniffi_zmanager_ffi_checksum_func_detectarchive(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_listarchive(
+fun uniffi_zmanager_ffi_checksum_func_healthcheck(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_materializepreview(
+fun uniffi_zmanager_ffi_checksum_func_inspecttzapx509publicnokeysigner(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_plancreate(
+fun uniffi_zmanager_ffi_checksum_func_inspecttzapx509signer(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_planextract(
+fun uniffi_zmanager_ffi_checksum_func_listarchive(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_polljobevents(
+fun uniffi_zmanager_ffi_checksum_func_materializepreview(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_startcreate(
+fun uniffi_zmanager_ffi_checksum_func_plancreate(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_startextract(
+fun uniffi_zmanager_ffi_checksum_func_planextract(
 ): Short
-fun uniffi_zmanager_mobile_core_checksum_func_testarchive(
+fun uniffi_zmanager_ffi_checksum_func_polljobevents(
 ): Short
-fun ffi_zmanager_mobile_core_uniffi_contract_version(
+fun uniffi_zmanager_ffi_checksum_func_startcreate(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_startextract(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_testarchive(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzappublicmetadatadisplaysummary(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzappublicmetadatasummary(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_auth_account_url_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_auth_callback_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_auth_forget_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_auth_login_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_auth_status_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_cert_enroll_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_cert_renew_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_cert_revoke_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_certificate_inventory_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_contact_export_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_contact_import_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_contact_list_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_contact_remove_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_device_retire_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_document_sign_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_document_verify_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_generate_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_remove_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_tzap_share_create_json(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_verifytzapx509(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_verifytzapx509publicnokey(
+): Short
+fun ffi_zmanager_ffi_uniffi_contract_version(
 ): Int
 
 }
@@ -786,8 +890,8 @@ internal interface UniffiLib : Library {
         internal val INSTANCE: UniffiLib by lazy {
             val componentName = "zmanager"
             // For large crates we prevent `MethodTooLargeException` (see #2340)
-            // N.B. the name of the extension is very misleading, since it is
-            // rather `InterfaceTooLargeException`, caused by too many methods
+            // N.B. the name of the extension is very misleading, since it is 
+            // rather `InterfaceTooLargeException`, caused by too many methods 
             // in the interface for large crates.
             //
             // By splitting the otherwise huge interface into two parts
@@ -795,7 +899,7 @@ internal interface UniffiLib : Library {
             // * IntegrityCheckingUniffiLib
             // And all checksum methods are put into `IntegrityCheckingUniffiLib`
             // we allow for ~2x as many methods in the UniffiLib interface.
-            //
+            // 
             // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
             // so that we can (optionally!) call `uniffiCheckApiChecksums`...
             loadIndirect<IntegrityCheckingUniffiLib>(componentName)
@@ -810,150 +914,202 @@ internal interface UniffiLib : Library {
             // to trigger this issue, the performance impact is negligible, running on
             // a macOS M1 machine the `loadIndirect` call takes ~50ms.
             val lib = loadIndirect<UniffiLib>(componentName)
-            // No need to check the contract version and checksums, since
+            // No need to check the contract version and checksums, since 
             // we already did that with `IntegrityCheckingUniffiLib` above.
             // Loading of library with integrity check done.
             lib
         }
-
+        
     }
 
     // FFI functions
-    fun uniffi_zmanager_mobile_core_fn_func_canceljob(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    fun uniffi_zmanager_ffi_fn_func_canceljob(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_clearsensitivestate(uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_clearsensitivestate(uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(`identityPath`: RustBuffer.ByValue,`publicCertificatePath`: RustBuffer.ByValue,`commonName`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_detectarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_healthcheck(uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_inspecttzapx509publicnokeysigner(`archivePath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_plancreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(`archivePath`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_planextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_polljobevents(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_startcreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_plancreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_startextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_planextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_zmanager_mobile_core_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_polljobevents(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_startcreate(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_startextract(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+fun uniffi_zmanager_ffi_fn_func_testarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzappublicmetadatadisplaysummary(`archivePath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzappublicmetadatasummary(`archivePath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_auth_account_url_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_auth_callback_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_auth_forget_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_auth_login_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_auth_status_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_cert_enroll_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_cert_renew_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_cert_revoke_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_certificate_inventory_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_contact_export_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_contact_import_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_contact_list_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_contact_remove_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_device_retire_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_document_sign_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_document_verify_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_recipient_key_generate_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_recipient_key_remove_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_tzap_share_create_json(`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_verifytzapx509(`archivePath`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`trustedCaCerts`: RustBuffer.ByValue,`trustedSystemRoots`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_verifytzapx509publicnokey(`archivePath`: RustBuffer.ByValue,`trustedCaCerts`: RustBuffer.ByValue,`trustedSystemRoots`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_zmanager_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_zmanager_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_zmanager_ffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun ffi_zmanager_mobile_core_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_u8(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_u8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_u8(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_u8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun ffi_zmanager_mobile_core_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_i8(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_i8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_i8(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_i8(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun ffi_zmanager_mobile_core_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_u16(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_u16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_u16(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_u16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Short
-fun ffi_zmanager_mobile_core_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_i16(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_i16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_i16(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_i16(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Short
-fun ffi_zmanager_mobile_core_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_u32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_u32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_u32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_u32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Int
-fun ffi_zmanager_mobile_core_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_i32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_i32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_i32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_i32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Int
-fun ffi_zmanager_mobile_core_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_u64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_u64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_u64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_u64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Long
-fun ffi_zmanager_mobile_core_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_i64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_i64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_i64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_i64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Long
-fun ffi_zmanager_mobile_core_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_f32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_f32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_f32(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_f32(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Float
-fun ffi_zmanager_mobile_core_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_f64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_f64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_f64(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_f64(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Double
-fun ffi_zmanager_mobile_core_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_pointer(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_pointer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_pointer(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_pointer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Pointer
-fun ffi_zmanager_mobile_core_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_rust_buffer(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_rust_buffer(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_zmanager_mobile_core_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+fun ffi_zmanager_ffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_cancel_void(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_cancel_void(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_free_void(`handle`: Long,
+fun ffi_zmanager_ffi_rust_future_free_void(`handle`: Long,
 ): Unit
-fun ffi_zmanager_mobile_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+fun ffi_zmanager_ffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
 
 }
@@ -962,47 +1118,125 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
     val bindings_contract_version = 29
     // Get the scaffolding contract version by calling the into the dylib
-    val scaffolding_contract_version = lib.ffi_zmanager_mobile_core_uniffi_contract_version()
+    val scaffolding_contract_version = lib.ffi_zmanager_ffi_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
         throw RuntimeException("UniFFI contract version mismatch: try cleaning and rebuilding your project")
     }
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_canceljob() != 42499.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate() != 51151.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_clearsensitivestate() != 62689.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity() != 32200.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_healthcheck() != 32996.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_detectarchive() != 9520.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_healthcheck() != 6081.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_inspecttzapx509publicnokeysigner() != 56387.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_plancreate() != 54463.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_inspecttzapx509signer() != 17564.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_listarchive() != 51788.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_materializepreview() != 28909.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_startcreate() != 40262.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_plancreate() != 56403.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_planextract() != 50420.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995.toShort()) {
+    if (lib.uniffi_zmanager_ffi_checksum_func_polljobevents() != 20889.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_startcreate() != 43846.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_startextract() != 49772.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_testarchive() != 25757.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzappublicmetadatadisplaysummary() != 19687.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzappublicmetadatasummary() != 16201.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_auth_account_url_json() != 57360.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_auth_callback_json() != 65497.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_auth_forget_json() != 58927.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_auth_login_json() != 10840.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_auth_status_json() != 16972.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_cert_enroll_json() != 47168.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_cert_renew_json() != 57002.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_cert_revoke_json() != 40153.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_certificate_inventory_json() != 39989.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_contact_export_json() != 37408.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_contact_import_json() != 5092.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_contact_list_json() != 19618.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_contact_remove_json() != 36761.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_device_retire_json() != 19687.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_document_sign_json() != 27930.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_document_verify_json() != 11931.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_generate_json() != 1528.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_remove_json() != 13157.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_tzap_share_create_json() != 62473.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_verifytzapx509() != 39245.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_verifytzapx509publicnokey() != 37210.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1077,12 +1311,58 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
         }
     }
 
-/**
+/** 
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
  * */
 object NoPointer
+
+/**
+ * @suppress
+ */
+public object FfiConverterUByte: FfiConverter<UByte, Byte> {
+    override fun lift(value: Byte): UByte {
+        return value.toUByte()
+    }
+
+    override fun read(buf: ByteBuffer): UByte {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: UByte): Byte {
+        return value.toByte()
+    }
+
+    override fun allocationSize(value: UByte) = 1UL
+
+    override fun write(value: UByte, buf: ByteBuffer) {
+        buf.put(value.toByte())
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterUInt: FfiConverter<UInt, Int> {
+    override fun lift(value: Int): UInt {
+        return value.toUInt()
+    }
+
+    override fun read(buf: ByteBuffer): UInt {
+        return lift(buf.getInt())
+    }
+
+    override fun lower(value: UInt): Int {
+        return value.toInt()
+    }
+
+    override fun allocationSize(value: UInt) = 4UL
+
+    override fun write(value: UInt, buf: ByteBuffer) {
+        buf.putInt(value.toInt())
+    }
+}
 
 /**
  * @suppress
@@ -1190,14 +1470,14 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 
 data class ArchiveEntry (
-    var `path`: kotlin.String,
-    var `kind`: ArchiveEntryKind,
-    var `isDir`: kotlin.Boolean,
-    var `size`: kotlin.ULong?,
-    var `compressedSize`: kotlin.ULong?,
+    var `path`: kotlin.String, 
+    var `kind`: ArchiveEntryKind, 
+    var `isDir`: kotlin.Boolean, 
+    var `size`: kotlin.ULong?, 
+    var `compressedSize`: kotlin.ULong?, 
     var `modifiedAt`: kotlin.String?
 ) {
-
+    
     companion object
 }
 
@@ -1238,13 +1518,13 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
 
 
 data class BridgeError (
-    var `code`: kotlin.String,
-    var `message`: kotlin.String,
-    var `recoveryHint`: kotlin.String?,
-    var `severity`: BridgeSeverity,
+    var `code`: kotlin.String, 
+    var `message`: kotlin.String, 
+    var `recoveryHint`: kotlin.String?, 
+    var `severity`: BridgeSeverity, 
     var `retryable`: kotlin.Boolean
 ) {
-
+    
     companion object
 }
 
@@ -1284,7 +1564,7 @@ public object FfiConverterTypeBridgeError: FfiConverterRustBuffer<BridgeError> {
 data class CancelJobRequest (
     var `jobId`: kotlin.String
 ) {
-
+    
     companion object
 }
 
@@ -1310,11 +1590,11 @@ public object FfiConverterTypeCancelJobRequest: FfiConverterRustBuffer<CancelJob
 
 
 data class CancelJobResult (
-    var `jobId`: kotlin.String,
-    var `status`: MobileJobStatus,
+    var `jobId`: kotlin.String, 
+    var `status`: MobileJobStatus, 
     var `cancelRequested`: kotlin.Boolean
 ) {
-
+    
     companion object
 }
 
@@ -1346,11 +1626,11 @@ public object FfiConverterTypeCancelJobResult: FfiConverterRustBuffer<CancelJobR
 
 
 data class ClearSensitiveStateResult (
-    var `clearedTerminalJobs`: kotlin.ULong,
-    var `cancelRequestedJobs`: kotlin.ULong,
+    var `clearedTerminalJobs`: kotlin.ULong, 
+    var `cancelRequestedJobs`: kotlin.ULong, 
     var `retainedActiveJobs`: kotlin.ULong
 ) {
-
+    
     companion object
 }
 
@@ -1382,12 +1662,12 @@ public object FfiConverterTypeClearSensitiveStateResult: FfiConverterRustBuffer<
 
 
 data class CreatePlanEntry (
-    var `archivePath`: kotlin.String,
-    var `sourcePath`: kotlin.String,
-    var `kind`: ArchiveEntryKind,
+    var `archivePath`: kotlin.String, 
+    var `sourcePath`: kotlin.String, 
+    var `kind`: ArchiveEntryKind, 
     var `size`: kotlin.ULong
 ) {
-
+    
     companion object
 }
 
@@ -1424,7 +1704,7 @@ public object FfiConverterTypeCreatePlanEntry: FfiConverterRustBuffer<CreatePlan
 data class DetectArchiveRequest (
     var `archivePath`: kotlin.String
 ) {
-
+    
     companion object
 }
 
@@ -1450,17 +1730,17 @@ public object FfiConverterTypeDetectArchiveRequest: FfiConverterRustBuffer<Detec
 
 
 data class DetectArchiveResult (
-    var `archivePath`: kotlin.String,
-    var `format`: ArchiveFormat,
-    var `formatLabel`: kotlin.String,
-    var `exists`: kotlin.Boolean,
-    var `isFile`: kotlin.Boolean,
-    var `canList`: kotlin.Boolean,
-    var `canExtract`: kotlin.Boolean,
-    var `canCreate`: kotlin.Boolean,
+    var `archivePath`: kotlin.String, 
+    var `format`: ArchiveFormat, 
+    var `formatLabel`: kotlin.String, 
+    var `exists`: kotlin.Boolean, 
+    var `isFile`: kotlin.Boolean, 
+    var `canList`: kotlin.Boolean, 
+    var `canExtract`: kotlin.Boolean, 
+    var `canCreate`: kotlin.Boolean, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -1510,17 +1790,17 @@ public object FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer<Detect
 
 
 data class ExtractionPlanEntry (
-    var `archivePath`: kotlin.String,
-    var `normalizedPath`: kotlin.String?,
-    var `destinationPath`: kotlin.String?,
-    var `kind`: ArchiveEntryKind,
-    var `status`: ExtractionPlanEntryStatus,
-    var `reason`: kotlin.String?,
-    var `size`: kotlin.ULong?,
-    var `compressedSize`: kotlin.ULong?,
+    var `archivePath`: kotlin.String, 
+    var `normalizedPath`: kotlin.String?, 
+    var `destinationPath`: kotlin.String?, 
+    var `kind`: ArchiveEntryKind, 
+    var `status`: ExtractionPlanEntryStatus, 
+    var `reason`: kotlin.String?, 
+    var `size`: kotlin.ULong?, 
+    var `compressedSize`: kotlin.ULong?, 
     var `replaceExisting`: kotlin.Boolean
 ) {
-
+    
     companion object
 }
 
@@ -1570,13 +1850,13 @@ public object FfiConverterTypeExtractionPlanEntry: FfiConverterRustBuffer<Extrac
 
 
 data class HealthcheckResult (
-    var `status`: kotlin.String,
-    var `engine`: kotlin.String,
-    var `version`: kotlin.String,
-    var `ready`: kotlin.Boolean,
+    var `status`: kotlin.String, 
+    var `engine`: kotlin.String, 
+    var `version`: kotlin.String, 
+    var `ready`: kotlin.Boolean, 
     var `summary`: kotlin.String
 ) {
-
+    
     companion object
 }
 
@@ -1614,19 +1894,19 @@ public object FfiConverterTypeHealthcheckResult: FfiConverterRustBuffer<Healthch
 
 
 data class JobTerminalSummary (
-    var `writtenEntries`: kotlin.ULong,
-    var `skippedEntries`: kotlin.ULong?,
-    var `writtenBytes`: kotlin.ULong,
-    var `encrypted`: kotlin.Boolean?,
-    var `volumeSize`: kotlin.ULong?,
-    var `volumeCount`: kotlin.ULong?,
-    var `outputPaths`: List<kotlin.String>,
-    var `verified`: kotlin.Boolean?,
-    var `verifiedEntries`: kotlin.ULong?,
-    var `verifiedBytes`: kotlin.ULong?,
+    var `writtenEntries`: kotlin.ULong, 
+    var `skippedEntries`: kotlin.ULong?, 
+    var `writtenBytes`: kotlin.ULong, 
+    var `encrypted`: kotlin.Boolean?, 
+    var `volumeSize`: kotlin.ULong?, 
+    var `volumeCount`: kotlin.ULong?, 
+    var `outputPaths`: List<kotlin.String>, 
+    var `verified`: kotlin.Boolean?, 
+    var `verifiedEntries`: kotlin.ULong?, 
+    var `verifiedBytes`: kotlin.ULong?, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -1682,10 +1962,10 @@ public object FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer<JobTerm
 
 
 data class ListArchiveRequest (
-    var `archivePath`: kotlin.String,
+    var `archivePath`: kotlin.String, 
     var `password`: kotlin.String?
 ) {
-
+    
     companion object
 }
 
@@ -1714,15 +1994,15 @@ public object FfiConverterTypeListArchiveRequest: FfiConverterRustBuffer<ListArc
 
 
 data class ListArchiveResult (
-    var `archivePath`: kotlin.String,
-    var `format`: ArchiveFormat,
-    var `formatLabel`: kotlin.String,
-    var `entries`: List<ArchiveEntry>,
-    var `entryCount`: kotlin.ULong,
-    var `totalSize`: kotlin.ULong?,
+    var `archivePath`: kotlin.String, 
+    var `format`: ArchiveFormat, 
+    var `formatLabel`: kotlin.String, 
+    var `entries`: List<ArchiveEntry>, 
+    var `entryCount`: kotlin.ULong, 
+    var `totalSize`: kotlin.ULong?, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -1766,12 +2046,12 @@ public object FfiConverterTypeListArchiveResult: FfiConverterRustBuffer<ListArch
 
 
 data class MaterializePreviewRequest (
-    var `archivePath`: kotlin.String,
-    var `entryPath`: kotlin.String,
-    var `password`: kotlin.String?,
+    var `archivePath`: kotlin.String, 
+    var `entryPath`: kotlin.String, 
+    var `password`: kotlin.String?, 
     var `stripComponents`: kotlin.ULong
 ) {
-
+    
     companion object
 }
 
@@ -1806,14 +2086,14 @@ public object FfiConverterTypeMaterializePreviewRequest: FfiConverterRustBuffer<
 
 
 data class MaterializePreviewResult (
-    var `archivePath`: kotlin.String,
-    var `entryPath`: kotlin.String,
-    var `cleanupRoot`: kotlin.String,
-    var `previewPath`: kotlin.String,
-    var `writtenBytes`: kotlin.ULong,
+    var `archivePath`: kotlin.String, 
+    var `entryPath`: kotlin.String, 
+    var `cleanupRoot`: kotlin.String, 
+    var `previewPath`: kotlin.String, 
+    var `writtenBytes`: kotlin.ULong, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -1854,19 +2134,19 @@ public object FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer<M
 
 
 data class MobileJobEvent (
-    var `sequence`: kotlin.ULong,
-    var `eventType`: MobileJobEventKind,
-    var `jobKind`: MobileJobKind?,
-    var `path`: kotlin.String?,
-    var `bytes`: kotlin.ULong?,
-    var `totalBytes`: kotlin.ULong?,
-    var `totalBytesProcessed`: kotlin.ULong?,
-    var `entries`: kotlin.ULong?,
-    var `totalEntries`: kotlin.ULong?,
-    var `message`: kotlin.String?,
+    var `sequence`: kotlin.ULong, 
+    var `eventType`: MobileJobEventKind, 
+    var `jobKind`: MobileJobKind?, 
+    var `path`: kotlin.String?, 
+    var `bytes`: kotlin.ULong?, 
+    var `totalBytes`: kotlin.ULong?, 
+    var `totalBytesProcessed`: kotlin.ULong?, 
+    var `entries`: kotlin.ULong?, 
+    var `totalEntries`: kotlin.ULong?, 
+    var `message`: kotlin.String?, 
     var `error`: BridgeError?
 ) {
-
+    
     companion object
 }
 
@@ -1922,16 +2202,16 @@ public object FfiConverterTypeMobileJobEvent: FfiConverterRustBuffer<MobileJobEv
 
 
 data class PlanCreateRequest (
-    var `sourcePaths`: List<kotlin.String>,
-    var `destinationArchivePath`: kotlin.String,
-    var `format`: CreateArchiveFormat,
-    var `password`: kotlin.String?,
-    var `preserveMetadata`: kotlin.Boolean,
-    var `replaceExisting`: kotlin.Boolean,
-    var `cleanSource`: kotlin.Boolean,
+    var `sourcePaths`: List<kotlin.String>, 
+    var `destinationArchivePath`: kotlin.String, 
+    var `format`: CreateArchiveFormat, 
+    var `password`: kotlin.String?, 
+    var `preserveMetadata`: kotlin.Boolean, 
+    var `replaceExisting`: kotlin.Boolean, 
+    var `cleanSource`: kotlin.Boolean, 
     var `verifyAfterCreate`: kotlin.Boolean
 ) {
-
+    
     companion object
 }
 
@@ -1978,27 +2258,26 @@ public object FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer<PlanCrea
 
 
 data class PlanCreateResult (
-    var `planId`: kotlin.String,
-    var `sourcePaths`: List<kotlin.String>,
-    var `destinationArchivePath`: kotlin.String,
-    var `format`: CreateArchiveFormat,
-    var `formatLabel`: kotlin.String,
-    var `entries`: List<CreatePlanEntry>,
-    var `totalEntries`: kotlin.ULong,
-    var `totalBytes`: kotlin.ULong,
-    var `excludedEntries`: kotlin.ULong,
-    var `excludedBytes`: kotlin.ULong,
-    var `outputExists`: kotlin.Boolean,
-    var `replaceExisting`: kotlin.Boolean,
-    var `encrypted`: kotlin.Boolean,
-    var `preserveMetadata`: kotlin.Boolean,
-    var `cleanSource`: kotlin.Boolean,
-    var `verifyAfterCreate`: kotlin.Boolean,
-    var `verifySupported`: kotlin.Boolean,
-    var `canStart`: kotlin.Boolean,
+    var `sourcePaths`: List<kotlin.String>, 
+    var `destinationArchivePath`: kotlin.String, 
+    var `format`: CreateArchiveFormat, 
+    var `formatLabel`: kotlin.String, 
+    var `entries`: List<CreatePlanEntry>, 
+    var `totalEntries`: kotlin.ULong, 
+    var `totalBytes`: kotlin.ULong, 
+    var `excludedEntries`: kotlin.ULong, 
+    var `excludedBytes`: kotlin.ULong, 
+    var `outputExists`: kotlin.Boolean, 
+    var `replaceExisting`: kotlin.Boolean, 
+    var `encrypted`: kotlin.Boolean, 
+    var `preserveMetadata`: kotlin.Boolean, 
+    var `cleanSource`: kotlin.Boolean, 
+    var `verifyAfterCreate`: kotlin.Boolean, 
+    var `verifySupported`: kotlin.Boolean, 
+    var `canStart`: kotlin.Boolean, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -2008,7 +2287,6 @@ data class PlanCreateResult (
 public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreateResult> {
     override fun read(buf: ByteBuffer): PlanCreateResult {
         return PlanCreateResult(
-            FfiConverterString.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterTypeCreateArchiveFormat.read(buf),
@@ -2031,7 +2309,6 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
     }
 
     override fun allocationSize(value: PlanCreateResult) = (
-            FfiConverterString.allocationSize(value.`planId`) +
             FfiConverterSequenceString.allocationSize(value.`sourcePaths`) +
             FfiConverterString.allocationSize(value.`destinationArchivePath`) +
             FfiConverterTypeCreateArchiveFormat.allocationSize(value.`format`) +
@@ -2053,7 +2330,6 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
     )
 
     override fun write(value: PlanCreateResult, buf: ByteBuffer) {
-            FfiConverterString.write(value.`planId`, buf)
             FfiConverterSequenceString.write(value.`sourcePaths`, buf)
             FfiConverterString.write(value.`destinationArchivePath`, buf)
             FfiConverterTypeCreateArchiveFormat.write(value.`format`, buf)
@@ -2078,14 +2354,14 @@ public object FfiConverterTypePlanCreateResult: FfiConverterRustBuffer<PlanCreat
 
 
 data class PlanExtractRequest (
-    var `archivePath`: kotlin.String,
-    var `destinationRoot`: kotlin.String,
-    var `password`: kotlin.String?,
-    var `selectedPaths`: List<kotlin.String>,
-    var `stripComponents`: kotlin.ULong,
+    var `archivePath`: kotlin.String, 
+    var `destinationRoot`: kotlin.String, 
+    var `password`: kotlin.String?, 
+    var `selectedPaths`: List<kotlin.String>, 
+    var `stripComponents`: kotlin.ULong, 
     var `collisionPolicy`: ExtractionCollisionPolicy
 ) {
-
+    
     companion object
 }
 
@@ -2126,21 +2402,20 @@ public object FfiConverterTypePlanExtractRequest: FfiConverterRustBuffer<PlanExt
 
 
 data class PlanExtractResult (
-    var `planId`: kotlin.String,
-    var `archivePath`: kotlin.String,
-    var `destinationRoot`: kotlin.String,
-    var `format`: ArchiveFormat,
-    var `formatLabel`: kotlin.String,
-    var `entries`: List<ExtractionPlanEntry>,
-    var `totalEntries`: kotlin.ULong,
-    var `writableEntries`: kotlin.ULong,
-    var `skippedEntries`: kotlin.ULong,
-    var `blockedEntries`: kotlin.ULong,
-    var `estimatedBytes`: kotlin.ULong?,
-    var `canStart`: kotlin.Boolean,
+    var `archivePath`: kotlin.String, 
+    var `destinationRoot`: kotlin.String, 
+    var `format`: ArchiveFormat, 
+    var `formatLabel`: kotlin.String, 
+    var `entries`: List<ExtractionPlanEntry>, 
+    var `totalEntries`: kotlin.ULong, 
+    var `writableEntries`: kotlin.ULong, 
+    var `skippedEntries`: kotlin.ULong, 
+    var `blockedEntries`: kotlin.ULong, 
+    var `estimatedBytes`: kotlin.ULong?, 
+    var `canStart`: kotlin.Boolean, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -2150,7 +2425,6 @@ data class PlanExtractResult (
 public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtractResult> {
     override fun read(buf: ByteBuffer): PlanExtractResult {
         return PlanExtractResult(
-            FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterTypeArchiveFormat.read(buf),
@@ -2167,7 +2441,6 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
     }
 
     override fun allocationSize(value: PlanExtractResult) = (
-            FfiConverterString.allocationSize(value.`planId`) +
             FfiConverterString.allocationSize(value.`archivePath`) +
             FfiConverterString.allocationSize(value.`destinationRoot`) +
             FfiConverterTypeArchiveFormat.allocationSize(value.`format`) +
@@ -2183,7 +2456,6 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
     )
 
     override fun write(value: PlanExtractResult, buf: ByteBuffer) {
-            FfiConverterString.write(value.`planId`, buf)
             FfiConverterString.write(value.`archivePath`, buf)
             FfiConverterString.write(value.`destinationRoot`, buf)
             FfiConverterTypeArchiveFormat.write(value.`format`, buf)
@@ -2202,10 +2474,10 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
 
 
 data class PollJobEventsRequest (
-    var `jobId`: kotlin.String,
+    var `jobId`: kotlin.String, 
     var `cursor`: kotlin.ULong
 ) {
-
+    
     companion object
 }
 
@@ -2234,16 +2506,16 @@ public object FfiConverterTypePollJobEventsRequest: FfiConverterRustBuffer<PollJ
 
 
 data class PollJobEventsResult (
-    var `jobId`: kotlin.String,
-    var `kind`: MobileJobKind,
-    var `status`: MobileJobStatus,
-    var `events`: List<MobileJobEvent>,
-    var `nextCursor`: kotlin.ULong,
-    var `minRetainedSequence`: kotlin.ULong,
-    var `isTerminal`: kotlin.Boolean,
+    var `jobId`: kotlin.String, 
+    var `kind`: MobileJobKind, 
+    var `status`: MobileJobStatus, 
+    var `events`: List<MobileJobEvent>, 
+    var `nextCursor`: kotlin.ULong, 
+    var `minRetainedSequence`: kotlin.ULong, 
+    var `isTerminal`: kotlin.Boolean, 
     var `terminalSummary`: JobTerminalSummary?
 ) {
-
+    
     companion object
 }
 
@@ -2290,16 +2562,27 @@ public object FfiConverterTypePollJobEventsResult: FfiConverterRustBuffer<PollJo
 
 
 data class StartCreateRequest (
-    var `sourcePaths`: List<kotlin.String>,
-    var `destinationArchivePath`: kotlin.String,
-    var `format`: CreateArchiveFormat,
-    var `password`: kotlin.String?,
-    var `preserveMetadata`: kotlin.Boolean,
-    var `replaceExisting`: kotlin.Boolean,
-    var `cleanSource`: kotlin.Boolean,
-    var `verifyAfterCreate`: kotlin.Boolean
+    var `sourcePaths`: List<kotlin.String>, 
+    var `destinationArchivePath`: kotlin.String, 
+    var `format`: CreateArchiveFormat, 
+    var `password`: kotlin.String?, 
+    var `preserveMetadata`: kotlin.Boolean, 
+    var `replaceExisting`: kotlin.Boolean, 
+    var `cleanSource`: kotlin.Boolean, 
+    var `verifyAfterCreate`: kotlin.Boolean, 
+    var `excludedPaths`: List<kotlin.String>, 
+    var `level`: kotlin.UInt, 
+    var `encryptFileNames`: kotlin.Boolean, 
+    var `volumeSize`: kotlin.ULong?, 
+    var `recoveryPercentage`: kotlin.UByte, 
+    var `volumeLossTolerance`: kotlin.UByte, 
+    var `tzapSigningCertificate`: kotlin.String?, 
+    var `tzapSigningPrivateKey`: kotlin.String?, 
+    var `tzapSigningChain`: List<kotlin.String>, 
+    var `tzapIdentity`: kotlin.String?, 
+    var `tzapIdentityPassword`: kotlin.String?
 ) {
-
+    
     companion object
 }
 
@@ -2317,6 +2600,17 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalULong.read(buf),
+            FfiConverterUByte.read(buf),
+            FfiConverterUByte.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -2328,7 +2622,18 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterBoolean.allocationSize(value.`preserveMetadata`) +
             FfiConverterBoolean.allocationSize(value.`replaceExisting`) +
             FfiConverterBoolean.allocationSize(value.`cleanSource`) +
-            FfiConverterBoolean.allocationSize(value.`verifyAfterCreate`)
+            FfiConverterBoolean.allocationSize(value.`verifyAfterCreate`) +
+            FfiConverterSequenceString.allocationSize(value.`excludedPaths`) +
+            FfiConverterUInt.allocationSize(value.`level`) +
+            FfiConverterBoolean.allocationSize(value.`encryptFileNames`) +
+            FfiConverterOptionalULong.allocationSize(value.`volumeSize`) +
+            FfiConverterUByte.allocationSize(value.`recoveryPercentage`) +
+            FfiConverterUByte.allocationSize(value.`volumeLossTolerance`) +
+            FfiConverterOptionalString.allocationSize(value.`tzapSigningCertificate`) +
+            FfiConverterOptionalString.allocationSize(value.`tzapSigningPrivateKey`) +
+            FfiConverterSequenceString.allocationSize(value.`tzapSigningChain`) +
+            FfiConverterOptionalString.allocationSize(value.`tzapIdentity`) +
+            FfiConverterOptionalString.allocationSize(value.`tzapIdentityPassword`)
     )
 
     override fun write(value: StartCreateRequest, buf: ByteBuffer) {
@@ -2340,20 +2645,31 @@ public object FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer<StartCr
             FfiConverterBoolean.write(value.`replaceExisting`, buf)
             FfiConverterBoolean.write(value.`cleanSource`, buf)
             FfiConverterBoolean.write(value.`verifyAfterCreate`, buf)
+            FfiConverterSequenceString.write(value.`excludedPaths`, buf)
+            FfiConverterUInt.write(value.`level`, buf)
+            FfiConverterBoolean.write(value.`encryptFileNames`, buf)
+            FfiConverterOptionalULong.write(value.`volumeSize`, buf)
+            FfiConverterUByte.write(value.`recoveryPercentage`, buf)
+            FfiConverterUByte.write(value.`volumeLossTolerance`, buf)
+            FfiConverterOptionalString.write(value.`tzapSigningCertificate`, buf)
+            FfiConverterOptionalString.write(value.`tzapSigningPrivateKey`, buf)
+            FfiConverterSequenceString.write(value.`tzapSigningChain`, buf)
+            FfiConverterOptionalString.write(value.`tzapIdentity`, buf)
+            FfiConverterOptionalString.write(value.`tzapIdentityPassword`, buf)
     }
 }
 
 
 
 data class StartExtractRequest (
-    var `archivePath`: kotlin.String,
-    var `destinationRoot`: kotlin.String,
-    var `password`: kotlin.String?,
-    var `selectedPaths`: List<kotlin.String>,
-    var `stripComponents`: kotlin.ULong,
+    var `archivePath`: kotlin.String, 
+    var `destinationRoot`: kotlin.String, 
+    var `password`: kotlin.String?, 
+    var `selectedPaths`: List<kotlin.String>, 
+    var `stripComponents`: kotlin.ULong, 
     var `collisionPolicy`: ExtractionCollisionPolicy
 ) {
-
+    
     companion object
 }
 
@@ -2394,11 +2710,11 @@ public object FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer<StartE
 
 
 data class StartJobResult (
-    var `jobId`: kotlin.String,
-    var `kind`: MobileJobKind,
+    var `jobId`: kotlin.String, 
+    var `kind`: MobileJobKind, 
     var `status`: MobileJobStatus
 ) {
-
+    
     companion object
 }
 
@@ -2430,11 +2746,11 @@ public object FfiConverterTypeStartJobResult: FfiConverterRustBuffer<StartJobRes
 
 
 data class TestArchiveRequest (
-    var `archivePath`: kotlin.String,
-    var `password`: kotlin.String?,
+    var `archivePath`: kotlin.String, 
+    var `password`: kotlin.String?, 
     var `selectedPaths`: List<kotlin.String>
 ) {
-
+    
     companion object
 }
 
@@ -2466,17 +2782,17 @@ public object FfiConverterTypeTestArchiveRequest: FfiConverterRustBuffer<TestArc
 
 
 data class TestArchiveResult (
-    var `archivePath`: kotlin.String,
-    var `format`: ArchiveFormat,
-    var `formatLabel`: kotlin.String,
-    var `verified`: kotlin.Boolean,
-    var `testedEntries`: kotlin.ULong,
-    var `skippedEntries`: kotlin.ULong,
-    var `totalEntries`: kotlin.ULong,
-    var `testedBytes`: kotlin.ULong,
+    var `archivePath`: kotlin.String, 
+    var `format`: ArchiveFormat, 
+    var `formatLabel`: kotlin.String, 
+    var `verified`: kotlin.Boolean, 
+    var `testedEntries`: kotlin.ULong, 
+    var `skippedEntries`: kotlin.ULong, 
+    var `totalEntries`: kotlin.ULong, 
+    var `testedBytes`: kotlin.ULong, 
     var `warnings`: List<BridgeError>
 ) {
-
+    
     companion object
 }
 
@@ -2527,7 +2843,7 @@ public object FfiConverterTypeTestArchiveResult: FfiConverterRustBuffer<TestArch
 
 
 enum class ArchiveEntryKind {
-
+    
     FILE,
     DIRECTORY,
     SYMLINK,
@@ -2560,7 +2876,7 @@ public object FfiConverterTypeArchiveEntryKind: FfiConverterRustBuffer<ArchiveEn
 
 
 enum class ArchiveFormat {
-
+    
     ZIP,
     SPLIT_ZIP,
     RAR,
@@ -2607,7 +2923,7 @@ public object FfiConverterTypeArchiveFormat: FfiConverterRustBuffer<ArchiveForma
 
 
 enum class BridgeSeverity {
-
+    
     INFO,
     WARNING,
     ERROR;
@@ -2638,7 +2954,7 @@ public object FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer<BridgeSever
 
 
 enum class CreateArchiveFormat {
-
+    
     ZIP,
     SEVEN_Z,
     TAR_ZST,
@@ -2670,7 +2986,7 @@ public object FfiConverterTypeCreateArchiveFormat: FfiConverterRustBuffer<Create
 
 
 enum class ExtractionCollisionPolicy {
-
+    
     REFUSE,
     REPLACE,
     RENAME;
@@ -2701,7 +3017,7 @@ public object FfiConverterTypeExtractionCollisionPolicy: FfiConverterRustBuffer<
 
 
 enum class ExtractionPlanEntryStatus {
-
+    
     WRITE,
     SKIP,
     BLOCK;
@@ -2732,13 +3048,11 @@ public object FfiConverterTypeExtractionPlanEntryStatus: FfiConverterRustBuffer<
 
 
 enum class MobileJobEventKind {
-
+    
     STARTED,
     ENTRY_STARTED,
     BYTES_PROCESSED,
     ENTRY_FINISHED,
-    PAUSED,
-    RESUMED,
     WARNING,
     COMPLETED,
     FAILED,
@@ -2770,7 +3084,7 @@ public object FfiConverterTypeMobileJobEventKind: FfiConverterRustBuffer<MobileJ
 
 
 enum class MobileJobKind {
-
+    
     ZIP_CREATE,
     ZIP_EXTRACT,
     SEVEN_Z_CREATE,
@@ -2784,7 +3098,8 @@ enum class MobileJobKind {
     APPLE_ARCHIVE_EXTRACT,
     ARCHIVE_EXTRACT,
     RAW_STREAM_EXTRACT,
-    TEST_ARCHIVE;
+    TEST_ARCHIVE,
+    TAR_GZ_CREATE;
     companion object
 }
 
@@ -2812,10 +3127,9 @@ public object FfiConverterTypeMobileJobKind: FfiConverterRustBuffer<MobileJobKin
 
 
 enum class MobileJobStatus {
-
+    
     QUEUED,
     RUNNING,
-    PAUSED,
     COMPLETED,
     FAILED,
     CANCELLED;
@@ -2846,41 +3160,41 @@ public object FfiConverterTypeMobileJobStatus: FfiConverterRustBuffer<MobileJobS
 
 
 
-sealed class ZmanagerMobileException: kotlin.Exception() {
-
+sealed class ZmanagerGuiException: kotlin.Exception() {
+    
     class Bridge(
-
-        val `code`: kotlin.String,
-
-        val `userMessage`: kotlin.String,
-
-        val `recoveryHint`: kotlin.String?,
-
-        val `severity`: BridgeSeverity,
-
+        
+        val `code`: kotlin.String, 
+        
+        val `userMessage`: kotlin.String, 
+        
+        val `recoveryHint`: kotlin.String?, 
+        
+        val `severity`: BridgeSeverity, 
+        
         val `retryable`: kotlin.Boolean
-        ) : ZmanagerMobileException() {
+        ) : ZmanagerGuiException() {
         override val message
             get() = "code=${ `code` }, userMessage=${ `userMessage` }, recoveryHint=${ `recoveryHint` }, severity=${ `severity` }, retryable=${ `retryable` }"
     }
+    
 
-
-    companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ZmanagerMobileException> {
-        override fun lift(error_buf: RustBuffer.ByValue): ZmanagerMobileException = FfiConverterTypeZmanagerMobileError.lift(error_buf)
+    companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ZmanagerGuiException> {
+        override fun lift(error_buf: RustBuffer.ByValue): ZmanagerGuiException = FfiConverterTypeZmanagerGuiError.lift(error_buf)
     }
 
-
+    
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeZmanagerMobileError : FfiConverterRustBuffer<ZmanagerMobileException> {
-    override fun read(buf: ByteBuffer): ZmanagerMobileException {
-
+public object FfiConverterTypeZmanagerGuiError : FfiConverterRustBuffer<ZmanagerGuiException> {
+    override fun read(buf: ByteBuffer): ZmanagerGuiException {
+        
 
         return when(buf.getInt()) {
-            1 -> ZmanagerMobileException.Bridge(
+            1 -> ZmanagerGuiException.Bridge(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
                 FfiConverterOptionalString.read(buf),
@@ -2891,9 +3205,9 @@ public object FfiConverterTypeZmanagerMobileError : FfiConverterRustBuffer<Zmana
         }
     }
 
-    override fun allocationSize(value: ZmanagerMobileException): ULong {
+    override fun allocationSize(value: ZmanagerGuiException): ULong {
         return when(value) {
-            is ZmanagerMobileException.Bridge -> (
+            is ZmanagerGuiException.Bridge -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`code`)
@@ -2905,9 +3219,9 @@ public object FfiConverterTypeZmanagerMobileError : FfiConverterRustBuffer<Zmana
         }
     }
 
-    override fun write(value: ZmanagerMobileException, buf: ByteBuffer) {
+    override fun write(value: ZmanagerGuiException, buf: ByteBuffer) {
         when(value) {
-            is ZmanagerMobileException.Bridge -> {
+            is ZmanagerGuiException.Bridge -> {
                 buf.putInt(1)
                 FfiConverterString.write(value.`code`, buf)
                 FfiConverterString.write(value.`userMessage`, buf)
@@ -3280,122 +3594,356 @@ public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<Lis
         }
     }
 }
-    @Throws(ZmanagerMobileException::class) fun `cancelJob`(`request`: CancelJobRequest): CancelJobResult {
+    @Throws(ZmanagerGuiException::class) fun `cancelJob`(`request`: CancelJobRequest): CancelJobResult {
             return FfiConverterTypeCancelJobResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_canceljob(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_canceljob(
         FfiConverterTypeCancelJobRequest.lower(`request`),_status)
 }
     )
     }
-
+    
  fun `clearSensitiveState`(): ClearSensitiveStateResult {
             return FfiConverterTypeClearSensitiveStateResult.lift(
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_clearsensitivestate(
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_clearsensitivestate(
         _status)
 }
     )
     }
+    
+ fun `createTzapSelfSignedIdentity`(`identityPath`: kotlin.String, `publicCertificatePath`: kotlin.String, `commonName`: kotlin.String, `password`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(
+        FfiConverterString.lower(`identityPath`),FfiConverterString.lower(`publicCertificatePath`),FfiConverterString.lower(`commonName`),FfiConverterString.lower(`password`),_status)
+}
+    )
+    }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `detectArchive`(`request`: DetectArchiveRequest): DetectArchiveResult {
+    @Throws(ZmanagerGuiException::class) fun `detectArchive`(`request`: DetectArchiveRequest): DetectArchiveResult {
             return FfiConverterTypeDetectArchiveResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_detectarchive(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_detectarchive(
         FfiConverterTypeDetectArchiveRequest.lower(`request`),_status)
 }
     )
     }
-
+    
  fun `healthcheck`(): HealthcheckResult {
             return FfiConverterTypeHealthcheckResult.lift(
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_healthcheck(
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_healthcheck(
         _status)
 }
     )
     }
+    
+ fun `inspectTzapX509PublicNoKeySigner`(`archivePath`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_inspecttzapx509publicnokeysigner(
+        FfiConverterString.lower(`archivePath`),_status)
+}
+    )
+    }
+    
+ fun `inspectTzapX509Signer`(`archivePath`: kotlin.String, `password`: kotlin.String?): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(
+        FfiConverterString.lower(`archivePath`),FfiConverterOptionalString.lower(`password`),_status)
+}
+    )
+    }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `listArchive`(`request`: ListArchiveRequest): ListArchiveResult {
+    @Throws(ZmanagerGuiException::class) fun `listArchive`(`request`: ListArchiveRequest): ListArchiveResult {
             return FfiConverterTypeListArchiveResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_listarchive(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `materializePreview`(`request`: MaterializePreviewRequest): MaterializePreviewResult {
+    @Throws(ZmanagerGuiException::class) fun `materializePreview`(`request`: MaterializePreviewRequest): MaterializePreviewResult {
             return FfiConverterTypeMaterializePreviewResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_materializepreview(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_materializepreview(
         FfiConverterTypeMaterializePreviewRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `planCreate`(`request`: PlanCreateRequest): PlanCreateResult {
+    @Throws(ZmanagerGuiException::class) fun `planCreate`(`request`: PlanCreateRequest): PlanCreateResult {
             return FfiConverterTypePlanCreateResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_plancreate(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_plancreate(
         FfiConverterTypePlanCreateRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `planExtract`(`request`: PlanExtractRequest): PlanExtractResult {
+    @Throws(ZmanagerGuiException::class) fun `planExtract`(`request`: PlanExtractRequest): PlanExtractResult {
             return FfiConverterTypePlanExtractResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_planextract(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_planextract(
         FfiConverterTypePlanExtractRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `pollJobEvents`(`request`: PollJobEventsRequest): PollJobEventsResult {
+    @Throws(ZmanagerGuiException::class) fun `pollJobEvents`(`request`: PollJobEventsRequest): PollJobEventsResult {
             return FfiConverterTypePollJobEventsResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_polljobevents(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_polljobevents(
         FfiConverterTypePollJobEventsRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `startCreate`(`request`: StartCreateRequest): StartJobResult {
+    @Throws(ZmanagerGuiException::class) fun `startCreate`(`request`: StartCreateRequest): StartJobResult {
             return FfiConverterTypeStartJobResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_startcreate(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_startcreate(
         FfiConverterTypeStartCreateRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `startExtract`(`request`: StartExtractRequest): StartJobResult {
+    @Throws(ZmanagerGuiException::class) fun `startExtract`(`request`: StartExtractRequest): StartJobResult {
             return FfiConverterTypeStartJobResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_startextract(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_startextract(
         FfiConverterTypeStartExtractRequest.lower(`request`),_status)
 }
     )
     }
+    
 
-
-    @Throws(ZmanagerMobileException::class) fun `testArchive`(`request`: TestArchiveRequest): TestArchiveResult {
+    @Throws(ZmanagerGuiException::class) fun `testArchive`(`request`: TestArchiveRequest): TestArchiveResult {
             return FfiConverterTypeTestArchiveResult.lift(
-    uniffiRustCallWithError(ZmanagerMobileException) { _status ->
-    UniffiLib.INSTANCE.uniffi_zmanager_mobile_core_fn_func_testarchive(
+    uniffiRustCallWithError(ZmanagerGuiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_testarchive(
         FfiConverterTypeTestArchiveRequest.lower(`request`),_status)
 }
     )
     }
-
+    
+ fun `tzapPublicMetadataDisplaySummary`(`archivePath`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzappublicmetadatadisplaysummary(
+        FfiConverterString.lower(`archivePath`),_status)
+}
+    )
+    }
+    
+ fun `tzapPublicMetadataSummary`(`archivePath`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzappublicmetadatasummary(
+        FfiConverterString.lower(`archivePath`),_status)
+}
+    )
+    }
+    
+ fun `tzapAuthAccountUrlJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_auth_account_url_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapAuthCallbackJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_auth_callback_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapAuthForgetJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_auth_forget_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapAuthLoginJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_auth_login_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapAuthStatusJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_auth_status_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapCertEnrollJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_cert_enroll_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapCertRenewJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_cert_renew_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapCertRevokeJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_cert_revoke_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapCertificateInventoryJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_certificate_inventory_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapContactExportJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_contact_export_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapContactImportJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_contact_import_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapContactListJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_contact_list_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapContactRemoveJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_contact_remove_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapDeviceRetireJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_device_retire_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapDocumentSignJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_document_sign_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapDocumentVerifyJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_document_verify_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapRecipientKeyGenerateJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_recipient_key_generate_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapRecipientKeyRemoveJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_recipient_key_remove_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `tzapShareCreateJson`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_tzap_share_create_json(
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    )
+    }
+    
+ fun `verifyTzapX509`(`archivePath`: kotlin.String, `password`: kotlin.String?, `trustedCaCerts`: List<kotlin.String>, `trustedSystemRoots`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_verifytzapx509(
+        FfiConverterString.lower(`archivePath`),FfiConverterOptionalString.lower(`password`),FfiConverterSequenceString.lower(`trustedCaCerts`),FfiConverterBoolean.lower(`trustedSystemRoots`),_status)
+}
+    )
+    }
+    
+ fun `verifyTzapX509PublicNoKey`(`archivePath`: kotlin.String, `trustedCaCerts`: List<kotlin.String>, `trustedSystemRoots`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_verifytzapx509publicnokey(
+        FfiConverterString.lower(`archivePath`),FfiConverterSequenceString.lower(`trustedCaCerts`),FfiConverterBoolean.lower(`trustedSystemRoots`),_status)
+}
+    )
+    }
+    
 
 

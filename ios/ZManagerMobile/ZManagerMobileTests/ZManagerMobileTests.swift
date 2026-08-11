@@ -75,7 +75,7 @@ final class ZManagerMobileTests: XCTestCase {
     func testArchiveListingLoaderMapsPasswordRequired() {
         let loader = ArchiveListingLoader(
             bridge: FakeArchiveBridgeClient(
-                listError: ZmanagerMobileError.Bridge(
+                listError: ZmanagerGuiError.Bridge(
                     code: "password_required",
                     userMessage: "This archive requires a password.",
                     recoveryHint: "Enter the archive password.",
@@ -161,7 +161,7 @@ final class ZManagerMobileTests: XCTestCase {
         let entry = testEntry(id: "file", path: "readme.txt")
         let loader = ArchivePreviewLoader(
             bridge: FakeArchiveBridgeClient(
-                previewError: ZmanagerMobileError.Bridge(
+                previewError: ZmanagerGuiError.Bridge(
                     code: "password_required",
                     userMessage: "This archive requires a password.",
                     recoveryHint: "Enter the archive password.",
@@ -210,7 +210,7 @@ final class ZManagerMobileTests: XCTestCase {
     func testArchiveTestLoaderMapsPasswordRequired() {
         let loader = ArchiveTestLoader(
             bridge: FakeArchiveBridgeClient(
-                testError: ZmanagerMobileError.Bridge(
+                testError: ZmanagerGuiError.Bridge(
                     code: "password_required",
                     userMessage: "This archive requires a password.",
                     recoveryHint: "Enter the archive password.",

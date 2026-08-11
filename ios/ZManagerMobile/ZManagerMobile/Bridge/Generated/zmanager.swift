@@ -7,8 +7,8 @@ import Foundation
 // Depending on the consumer's build setup, the low-level FFI code
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
-#if canImport(ZManagerMobileCoreFFI)
-import ZManagerMobileCoreFFI
+#if canImport(zmanagerFFI)
+import zmanagerFFI
 #endif
 
 fileprivate extension RustBuffer {
@@ -25,13 +25,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_zmanager_mobile_core_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_zmanager_ffi_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_zmanager_mobile_core_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_zmanager_ffi_rustbuffer_free(self, $0) }
     }
 }
 
@@ -281,7 +281,7 @@ private func makeRustCall<T, E: Swift.Error>(
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
     errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
-    uniffiEnsureZmanagerMobileCoreInitialized()
+    uniffiEnsureZmanagerFfiInitialized()
     var callStatus = RustCallStatus.init()
     let returnedVal = callback(&callStatus)
     try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
@@ -396,6 +396,38 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
 
 // Public interface members begin here.
 
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterUInt8: FfiConverterPrimitive {
+    typealias FfiType = UInt8
+    typealias SwiftType = UInt8
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt8 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: UInt8, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
+    typealias FfiType = UInt32
+    typealias SwiftType = UInt32
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -546,11 +578,11 @@ public struct FfiConverterTypeArchiveEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveEntry {
         return
             try ArchiveEntry(
-                path: FfiConverterString.read(from: &buf),
-                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
-                isDir: FfiConverterBool.read(from: &buf),
-                size: FfiConverterOptionUInt64.read(from: &buf),
-                compressedSize: FfiConverterOptionUInt64.read(from: &buf),
+                path: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf), 
+                isDir: FfiConverterBool.read(from: &buf), 
+                size: FfiConverterOptionUInt64.read(from: &buf), 
+                compressedSize: FfiConverterOptionUInt64.read(from: &buf), 
                 modifiedAt: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -642,10 +674,10 @@ public struct FfiConverterTypeBridgeError: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BridgeError {
         return
             try BridgeError(
-                code: FfiConverterString.read(from: &buf),
-                message: FfiConverterString.read(from: &buf),
-                recoveryHint: FfiConverterOptionString.read(from: &buf),
-                severity: FfiConverterTypeBridgeSeverity.read(from: &buf),
+                code: FfiConverterString.read(from: &buf), 
+                message: FfiConverterString.read(from: &buf), 
+                recoveryHint: FfiConverterOptionString.read(from: &buf), 
+                severity: FfiConverterTypeBridgeSeverity.read(from: &buf), 
                 retryable: FfiConverterBool.read(from: &buf)
         )
     }
@@ -786,8 +818,8 @@ public struct FfiConverterTypeCancelJobResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CancelJobResult {
         return
             try CancelJobResult(
-                jobId: FfiConverterString.read(from: &buf),
-                status: FfiConverterTypeMobileJobStatus.read(from: &buf),
+                jobId: FfiConverterString.read(from: &buf), 
+                status: FfiConverterTypeMobileJobStatus.read(from: &buf), 
                 cancelRequested: FfiConverterBool.read(from: &buf)
         )
     }
@@ -864,8 +896,8 @@ public struct FfiConverterTypeClearSensitiveStateResult: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ClearSensitiveStateResult {
         return
             try ClearSensitiveStateResult(
-                clearedTerminalJobs: FfiConverterUInt64.read(from: &buf),
-                cancelRequestedJobs: FfiConverterUInt64.read(from: &buf),
+                clearedTerminalJobs: FfiConverterUInt64.read(from: &buf), 
+                cancelRequestedJobs: FfiConverterUInt64.read(from: &buf), 
                 retainedActiveJobs: FfiConverterUInt64.read(from: &buf)
         )
     }
@@ -948,9 +980,9 @@ public struct FfiConverterTypeCreatePlanEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreatePlanEntry {
         return
             try CreatePlanEntry(
-                archivePath: FfiConverterString.read(from: &buf),
-                sourcePath: FfiConverterString.read(from: &buf),
-                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                sourcePath: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf), 
                 size: FfiConverterUInt64.read(from: &buf)
         )
     }
@@ -1126,14 +1158,14 @@ public struct FfiConverterTypeDetectArchiveResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetectArchiveResult {
         return
             try DetectArchiveResult(
-                archivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeArchiveFormat.read(from: &buf),
-                formatLabel: FfiConverterString.read(from: &buf),
-                exists: FfiConverterBool.read(from: &buf),
-                isFile: FfiConverterBool.read(from: &buf),
-                canList: FfiConverterBool.read(from: &buf),
-                canExtract: FfiConverterBool.read(from: &buf),
-                canCreate: FfiConverterBool.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeArchiveFormat.read(from: &buf), 
+                formatLabel: FfiConverterString.read(from: &buf), 
+                exists: FfiConverterBool.read(from: &buf), 
+                isFile: FfiConverterBool.read(from: &buf), 
+                canList: FfiConverterBool.read(from: &buf), 
+                canExtract: FfiConverterBool.read(from: &buf), 
+                canCreate: FfiConverterBool.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1252,14 +1284,14 @@ public struct FfiConverterTypeExtractionPlanEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionPlanEntry {
         return
             try ExtractionPlanEntry(
-                archivePath: FfiConverterString.read(from: &buf),
-                normalizedPath: FfiConverterOptionString.read(from: &buf),
-                destinationPath: FfiConverterOptionString.read(from: &buf),
-                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf),
-                status: FfiConverterTypeExtractionPlanEntryStatus.read(from: &buf),
-                reason: FfiConverterOptionString.read(from: &buf),
-                size: FfiConverterOptionUInt64.read(from: &buf),
-                compressedSize: FfiConverterOptionUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                normalizedPath: FfiConverterOptionString.read(from: &buf), 
+                destinationPath: FfiConverterOptionString.read(from: &buf), 
+                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf), 
+                status: FfiConverterTypeExtractionPlanEntryStatus.read(from: &buf), 
+                reason: FfiConverterOptionString.read(from: &buf), 
+                size: FfiConverterOptionUInt64.read(from: &buf), 
+                compressedSize: FfiConverterOptionUInt64.read(from: &buf), 
                 replaceExisting: FfiConverterBool.read(from: &buf)
         )
     }
@@ -1354,10 +1386,10 @@ public struct FfiConverterTypeHealthcheckResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HealthcheckResult {
         return
             try HealthcheckResult(
-                status: FfiConverterString.read(from: &buf),
-                engine: FfiConverterString.read(from: &buf),
-                version: FfiConverterString.read(from: &buf),
-                ready: FfiConverterBool.read(from: &buf),
+                status: FfiConverterString.read(from: &buf), 
+                engine: FfiConverterString.read(from: &buf), 
+                version: FfiConverterString.read(from: &buf), 
+                ready: FfiConverterBool.read(from: &buf), 
                 summary: FfiConverterString.read(from: &buf)
         )
     }
@@ -1484,16 +1516,16 @@ public struct FfiConverterTypeJobTerminalSummary: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JobTerminalSummary {
         return
             try JobTerminalSummary(
-                writtenEntries: FfiConverterUInt64.read(from: &buf),
-                skippedEntries: FfiConverterOptionUInt64.read(from: &buf),
-                writtenBytes: FfiConverterUInt64.read(from: &buf),
-                encrypted: FfiConverterOptionBool.read(from: &buf),
-                volumeSize: FfiConverterOptionUInt64.read(from: &buf),
-                volumeCount: FfiConverterOptionUInt64.read(from: &buf),
-                outputPaths: FfiConverterSequenceString.read(from: &buf),
-                verified: FfiConverterOptionBool.read(from: &buf),
-                verifiedEntries: FfiConverterOptionUInt64.read(from: &buf),
-                verifiedBytes: FfiConverterOptionUInt64.read(from: &buf),
+                writtenEntries: FfiConverterUInt64.read(from: &buf), 
+                skippedEntries: FfiConverterOptionUInt64.read(from: &buf), 
+                writtenBytes: FfiConverterUInt64.read(from: &buf), 
+                encrypted: FfiConverterOptionBool.read(from: &buf), 
+                volumeSize: FfiConverterOptionUInt64.read(from: &buf), 
+                volumeCount: FfiConverterOptionUInt64.read(from: &buf), 
+                outputPaths: FfiConverterSequenceString.read(from: &buf), 
+                verified: FfiConverterOptionBool.read(from: &buf), 
+                verifiedEntries: FfiConverterOptionUInt64.read(from: &buf), 
+                verifiedBytes: FfiConverterOptionUInt64.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1572,7 +1604,7 @@ public struct FfiConverterTypeListArchiveRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListArchiveRequest {
         return
             try ListArchiveRequest(
-                archivePath: FfiConverterString.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
                 password: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -1672,12 +1704,12 @@ public struct FfiConverterTypeListArchiveResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListArchiveResult {
         return
             try ListArchiveResult(
-                archivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeArchiveFormat.read(from: &buf),
-                formatLabel: FfiConverterString.read(from: &buf),
-                entries: FfiConverterSequenceTypeArchiveEntry.read(from: &buf),
-                entryCount: FfiConverterUInt64.read(from: &buf),
-                totalSize: FfiConverterOptionUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeArchiveFormat.read(from: &buf), 
+                formatLabel: FfiConverterString.read(from: &buf), 
+                entries: FfiConverterSequenceTypeArchiveEntry.read(from: &buf), 
+                entryCount: FfiConverterUInt64.read(from: &buf), 
+                totalSize: FfiConverterOptionUInt64.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1764,9 +1796,9 @@ public struct FfiConverterTypeMaterializePreviewRequest: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MaterializePreviewRequest {
         return
             try MaterializePreviewRequest(
-                archivePath: FfiConverterString.read(from: &buf),
-                entryPath: FfiConverterString.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                entryPath: FfiConverterString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
                 stripComponents: FfiConverterUInt64.read(from: &buf)
         )
     }
@@ -1862,11 +1894,11 @@ public struct FfiConverterTypeMaterializePreviewResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MaterializePreviewResult {
         return
             try MaterializePreviewResult(
-                archivePath: FfiConverterString.read(from: &buf),
-                entryPath: FfiConverterString.read(from: &buf),
-                cleanupRoot: FfiConverterString.read(from: &buf),
-                previewPath: FfiConverterString.read(from: &buf),
-                writtenBytes: FfiConverterUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                entryPath: FfiConverterString.read(from: &buf), 
+                cleanupRoot: FfiConverterString.read(from: &buf), 
+                previewPath: FfiConverterString.read(from: &buf), 
+                writtenBytes: FfiConverterUInt64.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -1994,16 +2026,16 @@ public struct FfiConverterTypeMobileJobEvent: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobEvent {
         return
             try MobileJobEvent(
-                sequence: FfiConverterUInt64.read(from: &buf),
-                eventType: FfiConverterTypeMobileJobEventKind.read(from: &buf),
-                jobKind: FfiConverterOptionTypeMobileJobKind.read(from: &buf),
-                path: FfiConverterOptionString.read(from: &buf),
-                bytes: FfiConverterOptionUInt64.read(from: &buf),
-                totalBytes: FfiConverterOptionUInt64.read(from: &buf),
-                totalBytesProcessed: FfiConverterOptionUInt64.read(from: &buf),
-                entries: FfiConverterOptionUInt64.read(from: &buf),
-                totalEntries: FfiConverterOptionUInt64.read(from: &buf),
-                message: FfiConverterOptionString.read(from: &buf),
+                sequence: FfiConverterUInt64.read(from: &buf), 
+                eventType: FfiConverterTypeMobileJobEventKind.read(from: &buf), 
+                jobKind: FfiConverterOptionTypeMobileJobKind.read(from: &buf), 
+                path: FfiConverterOptionString.read(from: &buf), 
+                bytes: FfiConverterOptionUInt64.read(from: &buf), 
+                totalBytes: FfiConverterOptionUInt64.read(from: &buf), 
+                totalBytesProcessed: FfiConverterOptionUInt64.read(from: &buf), 
+                entries: FfiConverterOptionUInt64.read(from: &buf), 
+                totalEntries: FfiConverterOptionUInt64.read(from: &buf), 
+                message: FfiConverterOptionString.read(from: &buf), 
                 error: FfiConverterOptionTypeBridgeError.read(from: &buf)
         )
     }
@@ -2118,13 +2150,13 @@ public struct FfiConverterTypePlanCreateRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanCreateRequest {
         return
             try PlanCreateRequest(
-                sourcePaths: FfiConverterSequenceString.read(from: &buf),
-                destinationArchivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
-                preserveMetadata: FfiConverterBool.read(from: &buf),
-                replaceExisting: FfiConverterBool.read(from: &buf),
-                cleanSource: FfiConverterBool.read(from: &buf),
+                sourcePaths: FfiConverterSequenceString.read(from: &buf), 
+                destinationArchivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
+                preserveMetadata: FfiConverterBool.read(from: &buf), 
+                replaceExisting: FfiConverterBool.read(from: &buf), 
+                cleanSource: FfiConverterBool.read(from: &buf), 
                 verifyAfterCreate: FfiConverterBool.read(from: &buf)
         )
     }
@@ -2158,7 +2190,6 @@ public func FfiConverterTypePlanCreateRequest_lower(_ value: PlanCreateRequest) 
 
 
 public struct PlanCreateResult {
-    public var planId: String
     public var sourcePaths: [String]
     public var destinationArchivePath: String
     public var format: CreateArchiveFormat
@@ -2180,8 +2211,7 @@ public struct PlanCreateResult {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(planId: String, sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, formatLabel: String, entries: [CreatePlanEntry], totalEntries: UInt64, totalBytes: UInt64, excludedEntries: UInt64, excludedBytes: UInt64, outputExists: Bool, replaceExisting: Bool, encrypted: Bool, preserveMetadata: Bool, cleanSource: Bool, verifyAfterCreate: Bool, verifySupported: Bool, canStart: Bool, warnings: [BridgeError]) {
-        self.planId = planId
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, formatLabel: String, entries: [CreatePlanEntry], totalEntries: UInt64, totalBytes: UInt64, excludedEntries: UInt64, excludedBytes: UInt64, outputExists: Bool, replaceExisting: Bool, encrypted: Bool, preserveMetadata: Bool, cleanSource: Bool, verifyAfterCreate: Bool, verifySupported: Bool, canStart: Bool, warnings: [BridgeError]) {
         self.sourcePaths = sourcePaths
         self.destinationArchivePath = destinationArchivePath
         self.format = format
@@ -2210,9 +2240,6 @@ extension PlanCreateResult: Sendable {}
 
 extension PlanCreateResult: Equatable, Hashable {
     public static func ==(lhs: PlanCreateResult, rhs: PlanCreateResult) -> Bool {
-        if lhs.planId != rhs.planId {
-            return false
-        }
         if lhs.sourcePaths != rhs.sourcePaths {
             return false
         }
@@ -2271,7 +2298,6 @@ extension PlanCreateResult: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(planId)
         hasher.combine(sourcePaths)
         hasher.combine(destinationArchivePath)
         hasher.combine(format)
@@ -2302,30 +2328,28 @@ public struct FfiConverterTypePlanCreateResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanCreateResult {
         return
             try PlanCreateResult(
-                planId: FfiConverterString.read(from: &buf),
-                sourcePaths: FfiConverterSequenceString.read(from: &buf),
-                destinationArchivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
-                formatLabel: FfiConverterString.read(from: &buf),
-                entries: FfiConverterSequenceTypeCreatePlanEntry.read(from: &buf),
-                totalEntries: FfiConverterUInt64.read(from: &buf),
-                totalBytes: FfiConverterUInt64.read(from: &buf),
-                excludedEntries: FfiConverterUInt64.read(from: &buf),
-                excludedBytes: FfiConverterUInt64.read(from: &buf),
-                outputExists: FfiConverterBool.read(from: &buf),
-                replaceExisting: FfiConverterBool.read(from: &buf),
-                encrypted: FfiConverterBool.read(from: &buf),
-                preserveMetadata: FfiConverterBool.read(from: &buf),
-                cleanSource: FfiConverterBool.read(from: &buf),
-                verifyAfterCreate: FfiConverterBool.read(from: &buf),
-                verifySupported: FfiConverterBool.read(from: &buf),
-                canStart: FfiConverterBool.read(from: &buf),
+                sourcePaths: FfiConverterSequenceString.read(from: &buf), 
+                destinationArchivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf), 
+                formatLabel: FfiConverterString.read(from: &buf), 
+                entries: FfiConverterSequenceTypeCreatePlanEntry.read(from: &buf), 
+                totalEntries: FfiConverterUInt64.read(from: &buf), 
+                totalBytes: FfiConverterUInt64.read(from: &buf), 
+                excludedEntries: FfiConverterUInt64.read(from: &buf), 
+                excludedBytes: FfiConverterUInt64.read(from: &buf), 
+                outputExists: FfiConverterBool.read(from: &buf), 
+                replaceExisting: FfiConverterBool.read(from: &buf), 
+                encrypted: FfiConverterBool.read(from: &buf), 
+                preserveMetadata: FfiConverterBool.read(from: &buf), 
+                cleanSource: FfiConverterBool.read(from: &buf), 
+                verifyAfterCreate: FfiConverterBool.read(from: &buf), 
+                verifySupported: FfiConverterBool.read(from: &buf), 
+                canStart: FfiConverterBool.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
 
     public static func write(_ value: PlanCreateResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.planId, into: &buf)
         FfiConverterSequenceString.write(value.sourcePaths, into: &buf)
         FfiConverterString.write(value.destinationArchivePath, into: &buf)
         FfiConverterTypeCreateArchiveFormat.write(value.format, into: &buf)
@@ -2430,11 +2454,11 @@ public struct FfiConverterTypePlanExtractRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanExtractRequest {
         return
             try PlanExtractRequest(
-                archivePath: FfiConverterString.read(from: &buf),
-                destinationRoot: FfiConverterString.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
-                selectedPaths: FfiConverterSequenceString.read(from: &buf),
-                stripComponents: FfiConverterUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                destinationRoot: FfiConverterString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
+                selectedPaths: FfiConverterSequenceString.read(from: &buf), 
+                stripComponents: FfiConverterUInt64.read(from: &buf), 
                 collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
         )
     }
@@ -2466,7 +2490,6 @@ public func FfiConverterTypePlanExtractRequest_lower(_ value: PlanExtractRequest
 
 
 public struct PlanExtractResult {
-    public var planId: String
     public var archivePath: String
     public var destinationRoot: String
     public var format: ArchiveFormat
@@ -2482,8 +2505,7 @@ public struct PlanExtractResult {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(planId: String, archivePath: String, destinationRoot: String, format: ArchiveFormat, formatLabel: String, entries: [ExtractionPlanEntry], totalEntries: UInt64, writableEntries: UInt64, skippedEntries: UInt64, blockedEntries: UInt64, estimatedBytes: UInt64?, canStart: Bool, warnings: [BridgeError]) {
-        self.planId = planId
+    public init(archivePath: String, destinationRoot: String, format: ArchiveFormat, formatLabel: String, entries: [ExtractionPlanEntry], totalEntries: UInt64, writableEntries: UInt64, skippedEntries: UInt64, blockedEntries: UInt64, estimatedBytes: UInt64?, canStart: Bool, warnings: [BridgeError]) {
         self.archivePath = archivePath
         self.destinationRoot = destinationRoot
         self.format = format
@@ -2506,9 +2528,6 @@ extension PlanExtractResult: Sendable {}
 
 extension PlanExtractResult: Equatable, Hashable {
     public static func ==(lhs: PlanExtractResult, rhs: PlanExtractResult) -> Bool {
-        if lhs.planId != rhs.planId {
-            return false
-        }
         if lhs.archivePath != rhs.archivePath {
             return false
         }
@@ -2549,7 +2568,6 @@ extension PlanExtractResult: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(planId)
         hasher.combine(archivePath)
         hasher.combine(destinationRoot)
         hasher.combine(format)
@@ -2574,24 +2592,22 @@ public struct FfiConverterTypePlanExtractResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PlanExtractResult {
         return
             try PlanExtractResult(
-                planId: FfiConverterString.read(from: &buf),
-                archivePath: FfiConverterString.read(from: &buf),
-                destinationRoot: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeArchiveFormat.read(from: &buf),
-                formatLabel: FfiConverterString.read(from: &buf),
-                entries: FfiConverterSequenceTypeExtractionPlanEntry.read(from: &buf),
-                totalEntries: FfiConverterUInt64.read(from: &buf),
-                writableEntries: FfiConverterUInt64.read(from: &buf),
-                skippedEntries: FfiConverterUInt64.read(from: &buf),
-                blockedEntries: FfiConverterUInt64.read(from: &buf),
-                estimatedBytes: FfiConverterOptionUInt64.read(from: &buf),
-                canStart: FfiConverterBool.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                destinationRoot: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeArchiveFormat.read(from: &buf), 
+                formatLabel: FfiConverterString.read(from: &buf), 
+                entries: FfiConverterSequenceTypeExtractionPlanEntry.read(from: &buf), 
+                totalEntries: FfiConverterUInt64.read(from: &buf), 
+                writableEntries: FfiConverterUInt64.read(from: &buf), 
+                skippedEntries: FfiConverterUInt64.read(from: &buf), 
+                blockedEntries: FfiConverterUInt64.read(from: &buf), 
+                estimatedBytes: FfiConverterOptionUInt64.read(from: &buf), 
+                canStart: FfiConverterBool.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
 
     public static func write(_ value: PlanExtractResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.planId, into: &buf)
         FfiConverterString.write(value.archivePath, into: &buf)
         FfiConverterString.write(value.destinationRoot, into: &buf)
         FfiConverterTypeArchiveFormat.write(value.format, into: &buf)
@@ -2666,7 +2682,7 @@ public struct FfiConverterTypePollJobEventsRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PollJobEventsRequest {
         return
             try PollJobEventsRequest(
-                jobId: FfiConverterString.read(from: &buf),
+                jobId: FfiConverterString.read(from: &buf), 
                 cursor: FfiConverterUInt64.read(from: &buf)
         )
     }
@@ -2772,13 +2788,13 @@ public struct FfiConverterTypePollJobEventsResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PollJobEventsResult {
         return
             try PollJobEventsResult(
-                jobId: FfiConverterString.read(from: &buf),
-                kind: FfiConverterTypeMobileJobKind.read(from: &buf),
-                status: FfiConverterTypeMobileJobStatus.read(from: &buf),
-                events: FfiConverterSequenceTypeMobileJobEvent.read(from: &buf),
-                nextCursor: FfiConverterUInt64.read(from: &buf),
-                minRetainedSequence: FfiConverterUInt64.read(from: &buf),
-                isTerminal: FfiConverterBool.read(from: &buf),
+                jobId: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterTypeMobileJobKind.read(from: &buf), 
+                status: FfiConverterTypeMobileJobStatus.read(from: &buf), 
+                events: FfiConverterSequenceTypeMobileJobEvent.read(from: &buf), 
+                nextCursor: FfiConverterUInt64.read(from: &buf), 
+                minRetainedSequence: FfiConverterUInt64.read(from: &buf), 
+                isTerminal: FfiConverterBool.read(from: &buf), 
                 terminalSummary: FfiConverterOptionTypeJobTerminalSummary.read(from: &buf)
         )
     }
@@ -2820,10 +2836,21 @@ public struct StartCreateRequest {
     public var replaceExisting: Bool
     public var cleanSource: Bool
     public var verifyAfterCreate: Bool
+    public var excludedPaths: [String]
+    public var level: UInt32
+    public var encryptFileNames: Bool
+    public var volumeSize: UInt64?
+    public var recoveryPercentage: UInt8
+    public var volumeLossTolerance: UInt8
+    public var tzapSigningCertificate: String?
+    public var tzapSigningPrivateKey: String?
+    public var tzapSigningChain: [String]
+    public var tzapIdentity: String?
+    public var tzapIdentityPassword: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool, verifyAfterCreate: Bool) {
+    public init(sourcePaths: [String], destinationArchivePath: String, format: CreateArchiveFormat, password: String?, preserveMetadata: Bool, replaceExisting: Bool, cleanSource: Bool, verifyAfterCreate: Bool, excludedPaths: [String], level: UInt32, encryptFileNames: Bool, volumeSize: UInt64?, recoveryPercentage: UInt8, volumeLossTolerance: UInt8, tzapSigningCertificate: String?, tzapSigningPrivateKey: String?, tzapSigningChain: [String], tzapIdentity: String?, tzapIdentityPassword: String?) {
         self.sourcePaths = sourcePaths
         self.destinationArchivePath = destinationArchivePath
         self.format = format
@@ -2832,6 +2859,17 @@ public struct StartCreateRequest {
         self.replaceExisting = replaceExisting
         self.cleanSource = cleanSource
         self.verifyAfterCreate = verifyAfterCreate
+        self.excludedPaths = excludedPaths
+        self.level = level
+        self.encryptFileNames = encryptFileNames
+        self.volumeSize = volumeSize
+        self.recoveryPercentage = recoveryPercentage
+        self.volumeLossTolerance = volumeLossTolerance
+        self.tzapSigningCertificate = tzapSigningCertificate
+        self.tzapSigningPrivateKey = tzapSigningPrivateKey
+        self.tzapSigningChain = tzapSigningChain
+        self.tzapIdentity = tzapIdentity
+        self.tzapIdentityPassword = tzapIdentityPassword
     }
 }
 
@@ -2866,6 +2904,39 @@ extension StartCreateRequest: Equatable, Hashable {
         if lhs.verifyAfterCreate != rhs.verifyAfterCreate {
             return false
         }
+        if lhs.excludedPaths != rhs.excludedPaths {
+            return false
+        }
+        if lhs.level != rhs.level {
+            return false
+        }
+        if lhs.encryptFileNames != rhs.encryptFileNames {
+            return false
+        }
+        if lhs.volumeSize != rhs.volumeSize {
+            return false
+        }
+        if lhs.recoveryPercentage != rhs.recoveryPercentage {
+            return false
+        }
+        if lhs.volumeLossTolerance != rhs.volumeLossTolerance {
+            return false
+        }
+        if lhs.tzapSigningCertificate != rhs.tzapSigningCertificate {
+            return false
+        }
+        if lhs.tzapSigningPrivateKey != rhs.tzapSigningPrivateKey {
+            return false
+        }
+        if lhs.tzapSigningChain != rhs.tzapSigningChain {
+            return false
+        }
+        if lhs.tzapIdentity != rhs.tzapIdentity {
+            return false
+        }
+        if lhs.tzapIdentityPassword != rhs.tzapIdentityPassword {
+            return false
+        }
         return true
     }
 
@@ -2878,6 +2949,17 @@ extension StartCreateRequest: Equatable, Hashable {
         hasher.combine(replaceExisting)
         hasher.combine(cleanSource)
         hasher.combine(verifyAfterCreate)
+        hasher.combine(excludedPaths)
+        hasher.combine(level)
+        hasher.combine(encryptFileNames)
+        hasher.combine(volumeSize)
+        hasher.combine(recoveryPercentage)
+        hasher.combine(volumeLossTolerance)
+        hasher.combine(tzapSigningCertificate)
+        hasher.combine(tzapSigningPrivateKey)
+        hasher.combine(tzapSigningChain)
+        hasher.combine(tzapIdentity)
+        hasher.combine(tzapIdentityPassword)
     }
 }
 
@@ -2890,14 +2972,25 @@ public struct FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartCreateRequest {
         return
             try StartCreateRequest(
-                sourcePaths: FfiConverterSequenceString.read(from: &buf),
-                destinationArchivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
-                preserveMetadata: FfiConverterBool.read(from: &buf),
-                replaceExisting: FfiConverterBool.read(from: &buf),
-                cleanSource: FfiConverterBool.read(from: &buf),
-                verifyAfterCreate: FfiConverterBool.read(from: &buf)
+                sourcePaths: FfiConverterSequenceString.read(from: &buf), 
+                destinationArchivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeCreateArchiveFormat.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
+                preserveMetadata: FfiConverterBool.read(from: &buf), 
+                replaceExisting: FfiConverterBool.read(from: &buf), 
+                cleanSource: FfiConverterBool.read(from: &buf), 
+                verifyAfterCreate: FfiConverterBool.read(from: &buf), 
+                excludedPaths: FfiConverterSequenceString.read(from: &buf), 
+                level: FfiConverterUInt32.read(from: &buf), 
+                encryptFileNames: FfiConverterBool.read(from: &buf), 
+                volumeSize: FfiConverterOptionUInt64.read(from: &buf), 
+                recoveryPercentage: FfiConverterUInt8.read(from: &buf), 
+                volumeLossTolerance: FfiConverterUInt8.read(from: &buf), 
+                tzapSigningCertificate: FfiConverterOptionString.read(from: &buf), 
+                tzapSigningPrivateKey: FfiConverterOptionString.read(from: &buf), 
+                tzapSigningChain: FfiConverterSequenceString.read(from: &buf), 
+                tzapIdentity: FfiConverterOptionString.read(from: &buf), 
+                tzapIdentityPassword: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2910,6 +3003,17 @@ public struct FfiConverterTypeStartCreateRequest: FfiConverterRustBuffer {
         FfiConverterBool.write(value.replaceExisting, into: &buf)
         FfiConverterBool.write(value.cleanSource, into: &buf)
         FfiConverterBool.write(value.verifyAfterCreate, into: &buf)
+        FfiConverterSequenceString.write(value.excludedPaths, into: &buf)
+        FfiConverterUInt32.write(value.level, into: &buf)
+        FfiConverterBool.write(value.encryptFileNames, into: &buf)
+        FfiConverterOptionUInt64.write(value.volumeSize, into: &buf)
+        FfiConverterUInt8.write(value.recoveryPercentage, into: &buf)
+        FfiConverterUInt8.write(value.volumeLossTolerance, into: &buf)
+        FfiConverterOptionString.write(value.tzapSigningCertificate, into: &buf)
+        FfiConverterOptionString.write(value.tzapSigningPrivateKey, into: &buf)
+        FfiConverterSequenceString.write(value.tzapSigningChain, into: &buf)
+        FfiConverterOptionString.write(value.tzapIdentity, into: &buf)
+        FfiConverterOptionString.write(value.tzapIdentityPassword, into: &buf)
     }
 }
 
@@ -2996,11 +3100,11 @@ public struct FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartExtractRequest {
         return
             try StartExtractRequest(
-                archivePath: FfiConverterString.read(from: &buf),
-                destinationRoot: FfiConverterString.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
-                selectedPaths: FfiConverterSequenceString.read(from: &buf),
-                stripComponents: FfiConverterUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                destinationRoot: FfiConverterString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
+                selectedPaths: FfiConverterSequenceString.read(from: &buf), 
+                stripComponents: FfiConverterUInt64.read(from: &buf), 
                 collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
         )
     }
@@ -3080,8 +3184,8 @@ public struct FfiConverterTypeStartJobResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartJobResult {
         return
             try StartJobResult(
-                jobId: FfiConverterString.read(from: &buf),
-                kind: FfiConverterTypeMobileJobKind.read(from: &buf),
+                jobId: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterTypeMobileJobKind.read(from: &buf), 
                 status: FfiConverterTypeMobileJobStatus.read(from: &buf)
         )
     }
@@ -3158,8 +3262,8 @@ public struct FfiConverterTypeTestArchiveRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TestArchiveRequest {
         return
             try TestArchiveRequest(
-                archivePath: FfiConverterString.read(from: &buf),
-                password: FfiConverterOptionString.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                password: FfiConverterOptionString.read(from: &buf), 
                 selectedPaths: FfiConverterSequenceString.read(from: &buf)
         )
     }
@@ -3272,14 +3376,14 @@ public struct FfiConverterTypeTestArchiveResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TestArchiveResult {
         return
             try TestArchiveResult(
-                archivePath: FfiConverterString.read(from: &buf),
-                format: FfiConverterTypeArchiveFormat.read(from: &buf),
-                formatLabel: FfiConverterString.read(from: &buf),
-                verified: FfiConverterBool.read(from: &buf),
-                testedEntries: FfiConverterUInt64.read(from: &buf),
-                skippedEntries: FfiConverterUInt64.read(from: &buf),
-                totalEntries: FfiConverterUInt64.read(from: &buf),
-                testedBytes: FfiConverterUInt64.read(from: &buf),
+                archivePath: FfiConverterString.read(from: &buf), 
+                format: FfiConverterTypeArchiveFormat.read(from: &buf), 
+                formatLabel: FfiConverterString.read(from: &buf), 
+                verified: FfiConverterBool.read(from: &buf), 
+                testedEntries: FfiConverterUInt64.read(from: &buf), 
+                skippedEntries: FfiConverterUInt64.read(from: &buf), 
+                totalEntries: FfiConverterUInt64.read(from: &buf), 
+                testedBytes: FfiConverterUInt64.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
         )
     }
@@ -3316,7 +3420,7 @@ public func FfiConverterTypeTestArchiveResult_lower(_ value: TestArchiveResult) 
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ArchiveEntryKind {
-
+    
     case file
     case directory
     case symlink
@@ -3338,44 +3442,44 @@ public struct FfiConverterTypeArchiveEntryKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveEntryKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .file
-
+        
         case 2: return .directory
-
+        
         case 3: return .symlink
-
+        
         case 4: return .hardlink
-
+        
         case 5: return .special
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ArchiveEntryKind, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .file:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .directory:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .symlink:
             writeInt(&buf, Int32(3))
-
-
+        
+        
         case .hardlink:
             writeInt(&buf, Int32(4))
-
-
+        
+        
         case .special:
             writeInt(&buf, Int32(5))
-
+        
         }
     }
 }
@@ -3407,7 +3511,7 @@ extension ArchiveEntryKind: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ArchiveFormat {
-
+    
     case zip
     case splitZip
     case rar
@@ -3443,128 +3547,128 @@ public struct FfiConverterTypeArchiveFormat: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveFormat {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .zip
-
+        
         case 2: return .splitZip
-
+        
         case 3: return .rar
-
+        
         case 4: return .multipartRar
-
+        
         case 5: return .sevenZ
-
+        
         case 6: return .tar
-
+        
         case 7: return .tarGz
-
+        
         case 8: return .tarBz2
-
+        
         case 9: return .tarXz
-
+        
         case 10: return .tarZst
-
+        
         case 11: return .gzip
-
+        
         case 12: return .bzip2
-
+        
         case 13: return .xz
-
+        
         case 14: return .zstd
-
+        
         case 15: return .tzap
-
+        
         case 16: return .appleArchive
-
+        
         case 17: return .xip
-
+        
         case 18: return .rawStream
-
+        
         case 19: return .other
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ArchiveFormat, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .zip:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .splitZip:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .rar:
             writeInt(&buf, Int32(3))
-
-
+        
+        
         case .multipartRar:
             writeInt(&buf, Int32(4))
-
-
+        
+        
         case .sevenZ:
             writeInt(&buf, Int32(5))
-
-
+        
+        
         case .tar:
             writeInt(&buf, Int32(6))
-
-
+        
+        
         case .tarGz:
             writeInt(&buf, Int32(7))
-
-
+        
+        
         case .tarBz2:
             writeInt(&buf, Int32(8))
-
-
+        
+        
         case .tarXz:
             writeInt(&buf, Int32(9))
-
-
+        
+        
         case .tarZst:
             writeInt(&buf, Int32(10))
-
-
+        
+        
         case .gzip:
             writeInt(&buf, Int32(11))
-
-
+        
+        
         case .bzip2:
             writeInt(&buf, Int32(12))
-
-
+        
+        
         case .xz:
             writeInt(&buf, Int32(13))
-
-
+        
+        
         case .zstd:
             writeInt(&buf, Int32(14))
-
-
+        
+        
         case .tzap:
             writeInt(&buf, Int32(15))
-
-
+        
+        
         case .appleArchive:
             writeInt(&buf, Int32(16))
-
-
+        
+        
         case .xip:
             writeInt(&buf, Int32(17))
-
-
+        
+        
         case .rawStream:
             writeInt(&buf, Int32(18))
-
-
+        
+        
         case .other:
             writeInt(&buf, Int32(19))
-
+        
         }
     }
 }
@@ -3596,7 +3700,7 @@ extension ArchiveFormat: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum BridgeSeverity {
-
+    
     case info
     case warning
     case error
@@ -3616,32 +3720,32 @@ public struct FfiConverterTypeBridgeSeverity: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BridgeSeverity {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .info
-
+        
         case 2: return .warning
-
+        
         case 3: return .error
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: BridgeSeverity, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .info:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .warning:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .error:
             writeInt(&buf, Int32(3))
-
+        
         }
     }
 }
@@ -3673,7 +3777,7 @@ extension BridgeSeverity: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum CreateArchiveFormat {
-
+    
     case zip
     case sevenZ
     case tarZst
@@ -3694,38 +3798,38 @@ public struct FfiConverterTypeCreateArchiveFormat: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreateArchiveFormat {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .zip
-
+        
         case 2: return .sevenZ
-
+        
         case 3: return .tarZst
-
+        
         case 4: return .tzap
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CreateArchiveFormat, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .zip:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .sevenZ:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .tarZst:
             writeInt(&buf, Int32(3))
-
-
+        
+        
         case .tzap:
             writeInt(&buf, Int32(4))
-
+        
         }
     }
 }
@@ -3757,7 +3861,7 @@ extension CreateArchiveFormat: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ExtractionCollisionPolicy {
-
+    
     case refuse
     case replace
     case rename
@@ -3777,32 +3881,32 @@ public struct FfiConverterTypeExtractionCollisionPolicy: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionCollisionPolicy {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .refuse
-
+        
         case 2: return .replace
-
+        
         case 3: return .rename
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ExtractionCollisionPolicy, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .refuse:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .replace:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .rename:
             writeInt(&buf, Int32(3))
-
+        
         }
     }
 }
@@ -3834,7 +3938,7 @@ extension ExtractionCollisionPolicy: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ExtractionPlanEntryStatus {
-
+    
     case write
     case skip
     case block
@@ -3854,32 +3958,32 @@ public struct FfiConverterTypeExtractionPlanEntryStatus: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtractionPlanEntryStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .write
-
+        
         case 2: return .skip
-
+        
         case 3: return .block
-
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ExtractionPlanEntryStatus, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .write:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .skip:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .block:
             writeInt(&buf, Int32(3))
-
+        
         }
     }
 }
@@ -3911,13 +4015,11 @@ extension ExtractionPlanEntryStatus: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum MobileJobEventKind {
-
+    
     case started
     case entryStarted
     case bytesProcessed
     case entryFinished
-    case paused
-    case resumed
     case warning
     case completed
     case failed
@@ -3938,74 +4040,62 @@ public struct FfiConverterTypeMobileJobEventKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobEventKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .started
-
+        
         case 2: return .entryStarted
-
+        
         case 3: return .bytesProcessed
-
+        
         case 4: return .entryFinished
-
-        case 5: return .paused
-
-        case 6: return .resumed
-
-        case 7: return .warning
-
-        case 8: return .completed
-
-        case 9: return .failed
-
-        case 10: return .cancelled
-
+        
+        case 5: return .warning
+        
+        case 6: return .completed
+        
+        case 7: return .failed
+        
+        case 8: return .cancelled
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: MobileJobEventKind, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .started:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .entryStarted:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .bytesProcessed:
             writeInt(&buf, Int32(3))
-
-
+        
+        
         case .entryFinished:
             writeInt(&buf, Int32(4))
-
-
-        case .paused:
-            writeInt(&buf, Int32(5))
-
-
-        case .resumed:
-            writeInt(&buf, Int32(6))
-
-
+        
+        
         case .warning:
-            writeInt(&buf, Int32(7))
-
-
+            writeInt(&buf, Int32(5))
+        
+        
         case .completed:
-            writeInt(&buf, Int32(8))
-
-
+            writeInt(&buf, Int32(6))
+        
+        
         case .failed:
-            writeInt(&buf, Int32(9))
-
-
+            writeInt(&buf, Int32(7))
+        
+        
         case .cancelled:
-            writeInt(&buf, Int32(10))
-
+            writeInt(&buf, Int32(8))
+        
         }
     }
 }
@@ -4037,7 +4127,7 @@ extension MobileJobEventKind: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum MobileJobKind {
-
+    
     case zipCreate
     case zipExtract
     case sevenZCreate
@@ -4052,6 +4142,7 @@ public enum MobileJobKind {
     case archiveExtract
     case rawStreamExtract
     case testArchive
+    case tarGzCreate
 }
 
 
@@ -4068,98 +4159,104 @@ public struct FfiConverterTypeMobileJobKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .zipCreate
-
+        
         case 2: return .zipExtract
-
+        
         case 3: return .sevenZCreate
-
+        
         case 4: return .sevenZExtract
-
+        
         case 5: return .rarExtract
-
+        
         case 6: return .tarZstdCreate
-
+        
         case 7: return .tarZstdExtract
-
+        
         case 8: return .tzapCreate
-
+        
         case 9: return .tzapExtract
-
+        
         case 10: return .appleArchiveCreate
-
+        
         case 11: return .appleArchiveExtract
-
+        
         case 12: return .archiveExtract
-
+        
         case 13: return .rawStreamExtract
-
+        
         case 14: return .testArchive
-
+        
+        case 15: return .tarGzCreate
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: MobileJobKind, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .zipCreate:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .zipExtract:
             writeInt(&buf, Int32(2))
-
-
+        
+        
         case .sevenZCreate:
             writeInt(&buf, Int32(3))
-
-
+        
+        
         case .sevenZExtract:
             writeInt(&buf, Int32(4))
-
-
+        
+        
         case .rarExtract:
             writeInt(&buf, Int32(5))
-
-
+        
+        
         case .tarZstdCreate:
             writeInt(&buf, Int32(6))
-
-
+        
+        
         case .tarZstdExtract:
             writeInt(&buf, Int32(7))
-
-
+        
+        
         case .tzapCreate:
             writeInt(&buf, Int32(8))
-
-
+        
+        
         case .tzapExtract:
             writeInt(&buf, Int32(9))
-
-
+        
+        
         case .appleArchiveCreate:
             writeInt(&buf, Int32(10))
-
-
+        
+        
         case .appleArchiveExtract:
             writeInt(&buf, Int32(11))
-
-
+        
+        
         case .archiveExtract:
             writeInt(&buf, Int32(12))
-
-
+        
+        
         case .rawStreamExtract:
             writeInt(&buf, Int32(13))
-
-
+        
+        
         case .testArchive:
             writeInt(&buf, Int32(14))
-
+        
+        
+        case .tarGzCreate:
+            writeInt(&buf, Int32(15))
+        
         }
     }
 }
@@ -4191,10 +4288,9 @@ extension MobileJobKind: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum MobileJobStatus {
-
+    
     case queued
     case running
-    case paused
     case completed
     case failed
     case cancelled
@@ -4214,50 +4310,44 @@ public struct FfiConverterTypeMobileJobStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MobileJobStatus {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-
+        
         case 1: return .queued
-
+        
         case 2: return .running
-
-        case 3: return .paused
-
-        case 4: return .completed
-
-        case 5: return .failed
-
-        case 6: return .cancelled
-
+        
+        case 3: return .completed
+        
+        case 4: return .failed
+        
+        case 5: return .cancelled
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: MobileJobStatus, into buf: inout [UInt8]) {
         switch value {
-
-
+        
+        
         case .queued:
             writeInt(&buf, Int32(1))
-
-
+        
+        
         case .running:
             writeInt(&buf, Int32(2))
-
-
-        case .paused:
-            writeInt(&buf, Int32(3))
-
-
+        
+        
         case .completed:
-            writeInt(&buf, Int32(4))
-
-
+            writeInt(&buf, Int32(3))
+        
+        
         case .failed:
-            writeInt(&buf, Int32(5))
-
-
+            writeInt(&buf, Int32(4))
+        
+        
         case .cancelled:
-            writeInt(&buf, Int32(6))
-
+            writeInt(&buf, Int32(5))
+        
         }
     }
 }
@@ -4286,10 +4376,10 @@ extension MobileJobStatus: Equatable, Hashable {}
 
 
 
-public enum ZmanagerMobileError: Swift.Error {
+public enum ZmanagerGuiError: Swift.Error {
 
-
-
+    
+    
     case Bridge(code: String, userMessage: String, recoveryHint: String?, severity: BridgeSeverity, retryable: Bool
     )
 }
@@ -4298,21 +4388,21 @@ public enum ZmanagerMobileError: Swift.Error {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeZmanagerMobileError: FfiConverterRustBuffer {
-    typealias SwiftType = ZmanagerMobileError
+public struct FfiConverterTypeZmanagerGuiError: FfiConverterRustBuffer {
+    typealias SwiftType = ZmanagerGuiError
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ZmanagerMobileError {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ZmanagerGuiError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
 
+        
 
-
-
+        
         case 1: return .Bridge(
-            code: try FfiConverterString.read(from: &buf),
-            userMessage: try FfiConverterString.read(from: &buf),
-            recoveryHint: try FfiConverterOptionString.read(from: &buf),
-            severity: try FfiConverterTypeBridgeSeverity.read(from: &buf),
+            code: try FfiConverterString.read(from: &buf), 
+            userMessage: try FfiConverterString.read(from: &buf), 
+            recoveryHint: try FfiConverterOptionString.read(from: &buf), 
+            severity: try FfiConverterTypeBridgeSeverity.read(from: &buf), 
             retryable: try FfiConverterBool.read(from: &buf)
             )
 
@@ -4320,13 +4410,13 @@ public struct FfiConverterTypeZmanagerMobileError: FfiConverterRustBuffer {
         }
     }
 
-    public static func write(_ value: ZmanagerMobileError, into buf: inout [UInt8]) {
+    public static func write(_ value: ZmanagerGuiError, into buf: inout [UInt8]) {
         switch value {
 
+        
 
-
-
-
+        
+        
         case let .Bridge(code,userMessage,recoveryHint,severity,retryable):
             writeInt(&buf, Int32(1))
             FfiConverterString.write(code, into: &buf)
@@ -4334,7 +4424,7 @@ public struct FfiConverterTypeZmanagerMobileError: FfiConverterRustBuffer {
             FfiConverterOptionString.write(recoveryHint, into: &buf)
             FfiConverterTypeBridgeSeverity.write(severity, into: &buf)
             FfiConverterBool.write(retryable, into: &buf)
-
+            
         }
     }
 }
@@ -4343,24 +4433,24 @@ public struct FfiConverterTypeZmanagerMobileError: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeZmanagerMobileError_lift(_ buf: RustBuffer) throws -> ZmanagerMobileError {
-    return try FfiConverterTypeZmanagerMobileError.lift(buf)
+public func FfiConverterTypeZmanagerGuiError_lift(_ buf: RustBuffer) throws -> ZmanagerGuiError {
+    return try FfiConverterTypeZmanagerGuiError.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeZmanagerMobileError_lower(_ value: ZmanagerMobileError) -> RustBuffer {
-    return FfiConverterTypeZmanagerMobileError.lower(value)
+public func FfiConverterTypeZmanagerGuiError_lower(_ value: ZmanagerGuiError) -> RustBuffer {
+    return FfiConverterTypeZmanagerGuiError.lower(value)
 }
 
 
-extension ZmanagerMobileError: Equatable, Hashable {}
+extension ZmanagerGuiError: Equatable, Hashable {}
 
 
 
 
-extension ZmanagerMobileError: Foundation.LocalizedError {
+extension ZmanagerGuiError: Foundation.LocalizedError {
     public var errorDescription: String? {
         String(reflecting: self)
     }
@@ -4663,84 +4753,275 @@ fileprivate struct FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffe
     }
 }
 public func cancelJob(request: CancelJobRequest)throws  -> CancelJobResult  {
-    return try  FfiConverterTypeCancelJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_canceljob(
+    return try  FfiConverterTypeCancelJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_canceljob(
         FfiConverterTypeCancelJobRequest_lower(request),$0
     )
 })
 }
 public func clearSensitiveState() -> ClearSensitiveStateResult  {
     return try!  FfiConverterTypeClearSensitiveStateResult_lift(try! rustCall() {
-    uniffi_zmanager_mobile_core_fn_func_clearsensitivestate($0
+    uniffi_zmanager_ffi_fn_func_clearsensitivestate($0
+    )
+})
+}
+public func createTzapSelfSignedIdentity(identityPath: String, publicCertificatePath: String, commonName: String, password: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(
+        FfiConverterString.lower(identityPath),
+        FfiConverterString.lower(publicCertificatePath),
+        FfiConverterString.lower(commonName),
+        FfiConverterString.lower(password),$0
     )
 })
 }
 public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchiveResult  {
-    return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_detectarchive(
+    return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_detectarchive(
         FfiConverterTypeDetectArchiveRequest_lower(request),$0
     )
 })
 }
 public func healthcheck() -> HealthcheckResult  {
     return try!  FfiConverterTypeHealthcheckResult_lift(try! rustCall() {
-    uniffi_zmanager_mobile_core_fn_func_healthcheck($0
+    uniffi_zmanager_ffi_fn_func_healthcheck($0
+    )
+})
+}
+public func inspectTzapX509PublicNoKeySigner(archivePath: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_inspecttzapx509publicnokeysigner(
+        FfiConverterString.lower(archivePath),$0
+    )
+})
+}
+public func inspectTzapX509Signer(archivePath: String, password: String?) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(
+        FfiConverterString.lower(archivePath),
+        FfiConverterOptionString.lower(password),$0
     )
 })
 }
 public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult  {
-    return try  FfiConverterTypeListArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_listarchive(
+    return try  FfiConverterTypeListArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest_lower(request),$0
     )
 })
 }
 public func materializePreview(request: MaterializePreviewRequest)throws  -> MaterializePreviewResult  {
-    return try  FfiConverterTypeMaterializePreviewResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_materializepreview(
+    return try  FfiConverterTypeMaterializePreviewResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_materializepreview(
         FfiConverterTypeMaterializePreviewRequest_lower(request),$0
     )
 })
 }
 public func planCreate(request: PlanCreateRequest)throws  -> PlanCreateResult  {
-    return try  FfiConverterTypePlanCreateResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_plancreate(
+    return try  FfiConverterTypePlanCreateResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_plancreate(
         FfiConverterTypePlanCreateRequest_lower(request),$0
     )
 })
 }
 public func planExtract(request: PlanExtractRequest)throws  -> PlanExtractResult  {
-    return try  FfiConverterTypePlanExtractResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_planextract(
+    return try  FfiConverterTypePlanExtractResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_planextract(
         FfiConverterTypePlanExtractRequest_lower(request),$0
     )
 })
 }
 public func pollJobEvents(request: PollJobEventsRequest)throws  -> PollJobEventsResult  {
-    return try  FfiConverterTypePollJobEventsResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_polljobevents(
+    return try  FfiConverterTypePollJobEventsResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_polljobevents(
         FfiConverterTypePollJobEventsRequest_lower(request),$0
     )
 })
 }
 public func startCreate(request: StartCreateRequest)throws  -> StartJobResult  {
-    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_startcreate(
+    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_startcreate(
         FfiConverterTypeStartCreateRequest_lower(request),$0
     )
 })
 }
 public func startExtract(request: StartExtractRequest)throws  -> StartJobResult  {
-    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_startextract(
+    return try  FfiConverterTypeStartJobResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_startextract(
         FfiConverterTypeStartExtractRequest_lower(request),$0
     )
 })
 }
 public func testArchive(request: TestArchiveRequest)throws  -> TestArchiveResult  {
-    return try  FfiConverterTypeTestArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerMobileError_lift) {
-    uniffi_zmanager_mobile_core_fn_func_testarchive(
+    return try  FfiConverterTypeTestArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
+    uniffi_zmanager_ffi_fn_func_testarchive(
         FfiConverterTypeTestArchiveRequest_lower(request),$0
+    )
+})
+}
+public func tzapPublicMetadataDisplaySummary(archivePath: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzappublicmetadatadisplaysummary(
+        FfiConverterString.lower(archivePath),$0
+    )
+})
+}
+public func tzapPublicMetadataSummary(archivePath: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzappublicmetadatasummary(
+        FfiConverterString.lower(archivePath),$0
+    )
+})
+}
+public func tzapAuthAccountUrlJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_auth_account_url_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapAuthCallbackJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_auth_callback_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapAuthForgetJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_auth_forget_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapAuthLoginJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_auth_login_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapAuthStatusJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_auth_status_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapCertEnrollJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_cert_enroll_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapCertRenewJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_cert_renew_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapCertRevokeJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_cert_revoke_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapCertificateInventoryJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_certificate_inventory_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapContactExportJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_contact_export_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapContactImportJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_contact_import_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapContactListJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_contact_list_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapContactRemoveJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_contact_remove_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapDeviceRetireJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_device_retire_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapDocumentSignJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_document_sign_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapDocumentVerifyJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_document_verify_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapRecipientKeyGenerateJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_recipient_key_generate_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapRecipientKeyRemoveJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_recipient_key_remove_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func tzapShareCreateJson(requestJson: String) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_tzap_share_create_json(
+        FfiConverterString.lower(requestJson),$0
+    )
+})
+}
+public func verifyTzapX509(archivePath: String, password: String?, trustedCaCerts: [String], trustedSystemRoots: Bool) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_verifytzapx509(
+        FfiConverterString.lower(archivePath),
+        FfiConverterOptionString.lower(password),
+        FfiConverterSequenceString.lower(trustedCaCerts),
+        FfiConverterBool.lower(trustedSystemRoots),$0
+    )
+})
+}
+public func verifyTzapX509PublicNoKey(archivePath: String, trustedCaCerts: [String], trustedSystemRoots: Bool) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_verifytzapx509publicnokey(
+        FfiConverterString.lower(archivePath),
+        FfiConverterSequenceString.lower(trustedCaCerts),
+        FfiConverterBool.lower(trustedSystemRoots),$0
     )
 })
 }
@@ -4756,44 +5037,122 @@ private let initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 29
     // Get the scaffolding contract version by calling the into the dylib
-    let scaffolding_contract_version = ffi_zmanager_mobile_core_uniffi_contract_version()
+    let scaffolding_contract_version = ffi_zmanager_ffi_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_canceljob() != 27451) {
+    if (uniffi_zmanager_ffi_checksum_func_canceljob() != 42499) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_clearsensitivestate() != 51151) {
+    if (uniffi_zmanager_ffi_checksum_func_clearsensitivestate() != 62689) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_detectarchive() != 13112) {
+    if (uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity() != 32200) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_healthcheck() != 32996) {
+    if (uniffi_zmanager_ffi_checksum_func_detectarchive() != 9520) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_listarchive() != 41364) {
+    if (uniffi_zmanager_ffi_checksum_func_healthcheck() != 6081) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_materializepreview() != 61486) {
+    if (uniffi_zmanager_ffi_checksum_func_inspecttzapx509publicnokeysigner() != 56387) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_plancreate() != 54463) {
+    if (uniffi_zmanager_ffi_checksum_func_inspecttzapx509signer() != 17564) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_planextract() != 14150) {
+    if (uniffi_zmanager_ffi_checksum_func_listarchive() != 51788) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_polljobevents() != 58016) {
+    if (uniffi_zmanager_ffi_checksum_func_materializepreview() != 28909) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_startcreate() != 40262) {
+    if (uniffi_zmanager_ffi_checksum_func_plancreate() != 56403) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_startextract() != 3310) {
+    if (uniffi_zmanager_ffi_checksum_func_planextract() != 50420) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_mobile_core_checksum_func_testarchive() != 1995) {
+    if (uniffi_zmanager_ffi_checksum_func_polljobevents() != 20889) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_startcreate() != 43846) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_startextract() != 49772) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_testarchive() != 25757) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzappublicmetadatadisplaysummary() != 19687) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzappublicmetadatasummary() != 16201) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_auth_account_url_json() != 57360) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_auth_callback_json() != 65497) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_auth_forget_json() != 58927) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_auth_login_json() != 10840) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_auth_status_json() != 16972) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_cert_enroll_json() != 47168) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_cert_renew_json() != 57002) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_cert_revoke_json() != 40153) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_certificate_inventory_json() != 39989) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_contact_export_json() != 37408) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_contact_import_json() != 5092) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_contact_list_json() != 19618) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_contact_remove_json() != 36761) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_device_retire_json() != 19687) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_document_sign_json() != 27930) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_document_verify_json() != 11931) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_generate_json() != 1528) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_recipient_key_remove_json() != 13157) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_tzap_share_create_json() != 62473) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_verifytzapx509() != 39245) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_verifytzapx509publicnokey() != 37210) {
         return InitializationResult.apiChecksumMismatch
     }
 
@@ -4802,7 +5161,7 @@ private let initializationResult: InitializationResult = {
 
 // Make the ensure init function public so that other modules which have external type references to
 // our types can call it.
-public func uniffiEnsureZmanagerMobileCoreInitialized() {
+public func uniffiEnsureZmanagerFfiInitialized() {
     switch initializationResult {
     case .ok:
         break

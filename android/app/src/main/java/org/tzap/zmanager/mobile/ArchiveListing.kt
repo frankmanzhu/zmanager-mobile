@@ -10,7 +10,7 @@ import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewRequest
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
-import org.tzap.zmanager.mobile.bridge.generated.ZmanagerMobileException
+import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import org.tzap.zmanager.mobile.bridge.generated.detectArchive as bridgeDetectArchive
 import org.tzap.zmanager.mobile.bridge.generated.listArchive as bridgeListArchive
 import org.tzap.zmanager.mobile.bridge.generated.materializePreview as bridgeMaterializePreview
@@ -190,7 +190,7 @@ class ArchiveListingRepository(
 
             val listing = bridge.listArchive(archive.localPath, password)
             ArchiveListingState.Ready(listing.toSummary())
-        } catch (error: ZmanagerMobileException.Bridge) {
+        } catch (error: ZmanagerGuiException.Bridge) {
             error.toListingState()
         } catch (error: LinkageError) {
             ArchiveListingState.Failed(
@@ -221,7 +221,7 @@ class ArchiveListingRepository(
         return try {
             val preview = bridge.materializePreview(archive.localPath, entry.path, password)
             ArchivePreviewState.Ready(preview.toSummary(entry))
-        } catch (error: ZmanagerMobileException.Bridge) {
+        } catch (error: ZmanagerGuiException.Bridge) {
             val listingError = error.toListingError()
             if (listingError.code == ERROR_PASSWORD_REQUIRED || listingError.code == ERROR_INVALID_PASSWORD) {
                 ArchivePreviewState.PasswordRequired(entry, listingError)
@@ -263,7 +263,7 @@ class ArchiveListingRepository(
                 password = password
             )
             ArchiveTestState.Ready(result.toSummary(selectedEntries.size))
-        } catch (error: ZmanagerMobileException.Bridge) {
+        } catch (error: ZmanagerGuiException.Bridge) {
             val listingError = error.toListingError()
             if (listingError.code == ERROR_PASSWORD_REQUIRED || listingError.code == ERROR_INVALID_PASSWORD) {
                 ArchiveTestState.PasswordRequired(listingError)
@@ -338,7 +338,7 @@ class ArchiveListingRepository(
         )
     }
 
-    private fun ZmanagerMobileException.Bridge.toListingState(): ArchiveListingState {
+    private fun ZmanagerGuiException.Bridge.toListingState(): ArchiveListingState {
         val error = toListingError()
 
         return if (code == ERROR_PASSWORD_REQUIRED || code == ERROR_INVALID_PASSWORD) {
@@ -348,7 +348,7 @@ class ArchiveListingRepository(
         }
     }
 
-    private fun ZmanagerMobileException.Bridge.toListingError(): ArchiveListingError {
+    private fun ZmanagerGuiException.Bridge.toListingError(): ArchiveListingError {
         return ArchiveListingError(
             code = code,
             message = userMessage,

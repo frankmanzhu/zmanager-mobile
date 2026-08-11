@@ -1,0 +1,9 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- assertVisible: "Open an archive, inspect its contents, then extract safely."
+- tapOn: "Open Archive"

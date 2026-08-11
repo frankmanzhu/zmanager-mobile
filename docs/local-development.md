@@ -8,7 +8,7 @@ Run commands from the repository root unless a section says otherwise.
 scripts/check-rust.sh
 ```
 
-The Rust workspace includes `rust/zmanager-mobile-core` and the local UniFFI bindgen helper.
+The Rust bridge is owned by the sibling `zmanager` repository (`crates/zmanager-ffi`); this repo keeps no Rust workspace. `check-rust.sh` runs the `zmanager-ffi` tests there.
 
 ## Android
 
@@ -18,7 +18,24 @@ Open `android/` in Android Studio, or run the local check script:
 scripts/check-android.sh
 ```
 
-The script uses `./gradlew` when present, then an installed `gradle`, then the locally cached Gradle 8.9 distribution. When Android Studio is installed, it pins `JAVA_HOME` to Android Studio's bundled JBR so command-line builds do not accidentally use an unsupported host Java version.
+The script uses `./gradlew` when present, then an installed `gradle`, then the locally cached Gradle 8.9 distribution. It honors an existing `JAVA_HOME`; when `JAVA_HOME` is unset, it falls back to Android Studio's bundled JBR. Android Gradle Plugin 8.7 requires JDK 17, and this project is validated with Liberica JDK 17.0.20.
+
+## Maestro UI tests
+
+Maestro provides the device-level smoke tests in `maestro/android/` and `maestro/ios/`. Install the CLI with:
+
+```sh
+brew install mobile-dev-inc/tap/maestro
+```
+
+Start an Android emulator or iOS Simulator, install/build the app, and run the matching flow:
+
+```sh
+MAESTRO_PLATFORM=android ./scripts/check-maestro.sh
+MAESTRO_PLATFORM=ios ./scripts/check-maestro.sh
+```
+
+The initial flows verify the landing screen and exercise the `Open Archive` action. Archive-import flows should add a committed fixture and cover platform-specific file-picker behavior separately.
 
 ## iOS
 
@@ -36,15 +53,17 @@ scripts/check-ios.sh
 
 ## UniFFI Bindings
 
-Regenerate bindings after edits to `rust/zmanager-mobile-core/uniffi/zmanager_mobile_core.udl` or `rust/zmanager-mobile-core/uniffi/uniffi.toml`:
+The UDL and `uniffi.toml` live in the sibling `zmanager` repo (`crates/zmanager-ffi`). Regenerate bindings after edits there:
 
 ```sh
-scripts/generate-uniffi-bindings.sh
+../zmanager/scripts/regenerate-bindings.sh
 ```
 
 Generated Android Kotlin is written to `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`.
 
 Generated iOS Swift/modulemap/header files are written to `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
+
+The iOS Xcode "Build Rust Bridge" phase invokes `zmanager/scripts/build-ios-rust.sh` and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`.
 
 Do not check generated native binary artifacts into the repository by default. Platform build integration should build or copy those artifacts explicitly.
 

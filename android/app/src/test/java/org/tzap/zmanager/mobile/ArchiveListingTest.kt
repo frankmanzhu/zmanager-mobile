@@ -12,7 +12,7 @@ import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
-import org.tzap.zmanager.mobile.bridge.generated.ZmanagerMobileException
+import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 
 class ArchiveListingTest {
     @Test
@@ -54,7 +54,7 @@ class ArchiveListingTest {
     fun loadMapsPasswordErrorsToPasswordRequiredState() {
         val repository = ArchiveListingRepository(
             FakeArchiveBridgeGateway(
-                listError = ZmanagerMobileException.Bridge(
+                listError = ZmanagerGuiException.Bridge(
                     code = "password_required",
                     userMessage = "This archive requires a password.",
                     recoveryHint = "Enter the archive password.",
@@ -158,7 +158,7 @@ class ArchiveListingTest {
         val entry = testEntry(id = "file", path = "readme.txt")
         val repository = ArchiveListingRepository(
             FakeArchiveBridgeGateway(
-                previewError = ZmanagerMobileException.Bridge(
+                previewError = ZmanagerGuiException.Bridge(
                     code = "password_required",
                     userMessage = "This archive requires a password.",
                     recoveryHint = "Enter the archive password.",
@@ -207,7 +207,7 @@ class ArchiveListingTest {
     fun testArchiveMapsPasswordErrorsToPasswordRequiredState() {
         val repository = ArchiveListingRepository(
             FakeArchiveBridgeGateway(
-                testError = ZmanagerMobileException.Bridge(
+                testError = ZmanagerGuiException.Bridge(
                     code = "password_required",
                     userMessage = "This archive requires a password.",
                     recoveryHint = "Enter the archive password.",

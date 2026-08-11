@@ -824,7 +824,7 @@ struct ArchiveListingLoader {
 
             let listing = try bridge.listArchiveContents(path: archive.localPath, password: password)
             return .ready(listing.summary)
-        } catch ZmanagerMobileError.Bridge(
+        } catch ZmanagerGuiError.Bridge(
             let code,
             let userMessage,
             let recoveryHint,
@@ -877,7 +877,7 @@ struct ArchivePreviewLoader {
                 password: password
             )
             return .ready(preview.summary(entry: entry))
-        } catch ZmanagerMobileError.Bridge(
+        } catch ZmanagerGuiError.Bridge(
             let code,
             let userMessage,
             let recoveryHint,
@@ -931,7 +931,7 @@ struct ArchiveTestLoader {
                 password: password
             )
             return .ready(result.summary(selectedCount: selectedEntries.count))
-        } catch ZmanagerMobileError.Bridge(
+        } catch ZmanagerGuiError.Bridge(
             let code,
             let userMessage,
             let recoveryHint,

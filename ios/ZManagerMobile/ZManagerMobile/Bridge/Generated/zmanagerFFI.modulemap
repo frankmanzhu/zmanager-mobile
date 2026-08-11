@@ -1,5 +1,5 @@
-module ZManagerMobileCoreFFI {
-    header "ZManagerMobileCoreFFI.h"
+module zmanagerFFI {
+    header "zmanagerFFI.h"
     export *
     use "Darwin"
     use "_Builtin_stdbool"

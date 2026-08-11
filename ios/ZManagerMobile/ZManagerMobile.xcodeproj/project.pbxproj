@@ -11,7 +11,7 @@
 		01A000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000102 /* ContentView.swift */; };
 		01A000000000000000000003 /* ZManagerMobileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000103 /* ZManagerMobileTests.swift */; };
 		01A000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000107 /* Assets.xcassets */; };
-		01A000000000000000000005 /* ZManagerMobileCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000108 /* ZManagerMobileCore.swift */; };
+		01A000000000000000000005 /* zmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000108 /* zmanager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,9 +32,9 @@
 		01A000000000000000000105 /* ZManagerMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZManagerMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		01A000000000000000000106 /* ZManagerMobileTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		01A000000000000000000107 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		01A000000000000000000108 /* ZManagerMobileCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileCore.swift; sourceTree = "<group>"; };
-		01A000000000000000000109 /* ZManagerMobileCoreFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZManagerMobileCoreFFI.h; sourceTree = "<group>"; };
-		01A00000000000000000010A /* ZManagerMobileCoreFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = ZManagerMobileCoreFFI.modulemap; sourceTree = "<group>"; };
+		01A000000000000000000108 /* zmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = zmanager.swift; sourceTree = "<group>"; };
+		01A000000000000000000109 /* zmanagerFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = zmanagerFFI.h; sourceTree = "<group>"; };
+		01A00000000000000000010A /* zmanagerFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = zmanagerFFI.modulemap; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,9 +87,9 @@
 		01A000000000000000000606 /* Generated */ = {
 			isa = PBXGroup;
 			children = (
-				01A000000000000000000108 /* ZManagerMobileCore.swift */,
-				01A000000000000000000109 /* ZManagerMobileCoreFFI.h */,
-				01A00000000000000000010A /* ZManagerMobileCoreFFI.modulemap */,
+				01A000000000000000000108 /* zmanager.swift */,
+				01A000000000000000000109 /* zmanagerFFI.h */,
+				01A00000000000000000010A /* zmanagerFFI.modulemap */,
 			);
 			path = Generated;
 			sourceTree = "<group>";
@@ -221,11 +221,11 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(SRCROOT)/build/rust/libzmanager_mobile_core_sim.a",
+				"$(SRCROOT)/build/rust/libzmanager_ffi_sim.a",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/../..\" && ./scripts/build-ios-rust.sh\n";
+			shellScript = "cd \"$SRCROOT/../../../zmanager\" && ./scripts/build-ios-rust.sh && mkdir -p \"$SRCROOT/build/rust\" && cp dist/ios/libzmanager_ffi_sim.a \"$SRCROOT/build/rust/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -236,7 +236,7 @@
 			files = (
 				01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */,
 				01A000000000000000000002 /* ContentView.swift in Sources */,
-				01A000000000000000000005 /* ZManagerMobileCore.swift in Sources */,
+				01A000000000000000000005 /* zmanager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -316,7 +316,8 @@
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lzmanager_mobile_core_sim",
+					"-lzmanager_ffi_sim",
+					"-lAppleArchive",
 					"-lz",
 					"-lbz2",
 					"-lc++",
@@ -326,7 +327,7 @@
 				OTHER_SWIFT_FLAGS = (
 					"$(inherited)",
 					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -360,7 +361,8 @@
 				MARKETING_VERSION = 0.1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lzmanager_mobile_core_sim",
+					"-lzmanager_ffi_sim",
+					"-lAppleArchive",
 					"-lz",
 					"-lbz2",
 					"-lc++",
@@ -370,7 +372,7 @@
 				OTHER_SWIFT_FLAGS = (
 					"$(inherited)",
 					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -399,7 +401,7 @@
 				OTHER_SWIFT_FLAGS = (
 					"$(inherited)",
 					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -428,7 +430,7 @@
 				OTHER_SWIFT_FLAGS = (
 					"$(inherited)",
 					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/ZManagerMobileCoreFFI.modulemap",
+					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
