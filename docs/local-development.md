@@ -35,17 +35,25 @@ Start an Android emulator or iOS Simulator, install/build the app, and run the m
 ```sh
 MAESTRO_PLATFORM=android ./scripts/check-maestro.sh
 MAESTRO_PLATFORM=ios ./scripts/check-maestro.sh
+
+# Runs the archive matrix one flow at a time and verifies committed files.
+# This clears the debug app's deterministic Extracted test destination per flow.
+MAESTRO_PLATFORM=android ./scripts/check-extraction-e2e.sh
+MAESTRO_PLATFORM=ios ./scripts/check-extraction-e2e.sh
 ```
 
-`scripts/check-maestro.sh` regenerates deterministic ZIP, 7z, TGZ, TAR.ZST,
-TZAP, and Apple Archive fixtures before it runs. Build and install the debug app
-after changing fixture source files so the debug-only **Load test fixture** menu
-is present. The extraction matrix covers ZIP, 7z, TGZ, TAR.ZST, and TZAP on
-Android; iOS covers those five plus Apple Archive. Each format flow imports the
-archive through the normal app-cache path, confirms its five-entry listing,
-reviews the extraction plan, starts the job, and asserts that all five files were
-committed to app storage. The landing-screen smoke flow continues to exercise the
-native `Open Archive` picker entry point.
+Both Maestro scripts regenerate deterministic ZIP, 7z, TGZ, TAR.ZST, TZAP,
+Apple Archive, split ZIP, split 7z, split TZAP, multipart RAR, DEB, and CAB
+fixtures before they run. Build and install the debug app after changing fixture
+source files so the debug-only **Load test fixture** menu is present. The
+extraction matrix covers eleven formats on Android (the five single-file formats
+plus six broader-format/multipart cases) and twelve on iOS (the same eleven plus
+Apple Archive). Each flow imports the archive through the normal app-cache path,
+confirms its listing, reviews the extraction plan, starts the job, and asserts
+that every fixture file was committed to app storage. Multipart flows copy all
+selected volumes into one private import directory before calling the Rust bridge.
+The landing-screen smoke flow continues to exercise the native `Open Archive`
+picker entry point.
 
 The E2E destination is deterministic app storage. The UI also supports Android
 SAF tree destinations and iOS security-scoped folders; exercise those
