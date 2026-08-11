@@ -89,6 +89,47 @@ struct ContentView: View {
                     Button("Apple Archive fixture") {
                         importModel.importMaestroFixture(named: "maestro-files.aar")
                     }
+                    Button("Split ZIP fixture") {
+                        importModel.importMaestroFixture(
+                            named: "maestro-split.zip",
+                            companionNames: ["maestro-split.z01"]
+                        )
+                    }
+                    Button("Split 7z fixture") {
+                        importModel.importMaestroFixture(
+                            named: "maestro-split.7z.001",
+                            companionNames: ["maestro-split.7z.002"]
+                        )
+                    }
+                    Button("Split TZAP fixture") {
+                        importModel.importMaestroFixture(
+                            named: "maestro-split.vol000.tzap",
+                            companionNames: [
+                                "maestro-split.vol001.tzap",
+                                "maestro-split.vol002.tzap",
+                                "maestro-split.vol003.tzap",
+                                "maestro-split.vol004.tzap",
+                                "maestro-split.vol005.tzap"
+                            ]
+                        )
+                    }
+                    Button("Multipart RAR fixture") {
+                        importModel.importMaestroFixture(
+                            named: "maestro-split-rar.part1.rar",
+                            companionNames: [
+                                "maestro-split-rar.part2.rar",
+                                "maestro-split-rar.part3.rar",
+                                "maestro-split-rar.part4.rar",
+                                "maestro-split-rar.part5.rar"
+                            ]
+                        )
+                    }
+                    Button("DEB fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.deb")
+                    }
+                    Button("CAB fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.cab")
+                    }
                 }
                 .disabled(importModel.isImporting)
 #endif
@@ -103,7 +144,7 @@ struct ContentView: View {
         .fileImporter(
             isPresented: $isFileImporterPresented,
             allowedContentTypes: ArchiveImportStore.allowedContentTypes,
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
             importModel.handleFileImporterResult(result)
         }
@@ -183,6 +224,7 @@ enum ArchiveImportError: LocalizedError {
     case emptySelection
     case directoryUnsupported
     case cacheUnavailable
+    case conflictingVolumeNames
 
     var errorDescription: String? {
         switch self {
@@ -192,6 +234,8 @@ enum ArchiveImportError: LocalizedError {
             return "Choose an archive file instead of a folder."
         case .cacheUnavailable:
             return "Unable to prepare the app cache for that archive."
+        case .conflictingVolumeNames:
+            return "Selected archive volumes have conflicting names."
         }
     }
 }
@@ -554,35 +598,55 @@ struct ArchiveImportStore {
     }
 
     func importArchive(from url: URL) throws -> ImportedArchive {
-        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        try importArchives(from: [url])
+    }
+
+    func importArchives(from urls: [URL]) throws -> ImportedArchive {
+        guard !urls.isEmpty else {
+            throw ArchiveImportError.emptySelection
+        }
+        let scopedURLs = urls.map { url in
+            (url, url.startAccessingSecurityScopedResource())
+        }
         defer {
-            if didStartAccessing {
-                url.stopAccessingSecurityScopedResource()
+            scopedURLs.forEach { url, didStartAccessing in
+                if didStartAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+        }
+        for (url, _) in scopedURLs {
+            if try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
+                throw ArchiveImportError.directoryUnsupported
             }
         }
 
-        let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-        if values.isDirectory == true {
-            throw ArchiveImportError.directoryUnsupported
+        let displayNames = urls.map { Self.sanitizedDisplayName($0.lastPathComponent) }
+        guard Set(displayNames).count == displayNames.count else {
+            throw ArchiveImportError.conflictingVolumeNames
         }
-
-        let displayName = Self.sanitizedDisplayName(url.lastPathComponent)
+        let primaryName = Self.primaryArchiveName(displayNames) ?? displayNames[0]
+        guard let primaryIndex = displayNames.firstIndex(of: primaryName) else {
+            throw ArchiveImportError.emptySelection
+        }
         let importRoot = try archiveImportRoot()
-        let destination = importRoot.appendingPathComponent(
-            "\(UUID().uuidString)-\(displayName)",
-            isDirectory: false
-        )
+        let groupRoot = importRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: groupRoot, withIntermediateDirectories: false)
 
-        if fileManager.fileExists(atPath: destination.path) {
-            try fileManager.removeItem(at: destination)
+        do {
+            for (url, displayName) in zip(urls, displayNames) {
+                try fileManager.copyItem(at: url, to: groupRoot.appendingPathComponent(displayName))
+            }
+        } catch {
+            try? fileManager.removeItem(at: groupRoot)
+            throw error
         }
-
-        try fileManager.copyItem(at: url, to: destination)
+        let destination = groupRoot.appendingPathComponent(displayNames[primaryIndex])
         let importedValues = try? destination.resourceValues(forKeys: [.fileSizeKey])
 
         return ImportedArchive(
             id: UUID(),
-            displayName: displayName,
+            displayName: displayNames[primaryIndex],
             localPath: destination.path,
             byteSize: importedValues?.fileSize.map(Int64.init),
             importedAt: Date()
@@ -620,6 +684,13 @@ struct ArchiveImportStore {
             return "archive"
         }
         return limited
+    }
+
+    static func primaryArchiveName(_ names: [String]) -> String? {
+        names.first { $0.lowercased().hasSuffix(".vol000.tzap") }
+            ?? names.first { $0.range(of: #"(?i)^.+\.part1\.rar$"#, options: .regularExpression) != nil }
+            ?? names.first { $0.range(of: #"(?i)^.+\.7z\.001$"#, options: .regularExpression) != nil }
+            ?? names.first { $0.lowercased().hasSuffix(".zip") }
     }
 }
 
@@ -1257,17 +1328,21 @@ final class ArchiveImportModel: ObservableObject {
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            guard let url = urls.first else {
+            guard !urls.isEmpty else {
                 errorMessage = ArchiveImportError.emptySelection.localizedDescription
                 return
             }
-            importExternalURL(url)
+            importExternalURLs(urls)
         case .failure(let error):
             errorMessage = error.localizedDescription
         }
     }
 
     func importExternalURL(_ url: URL) {
+        importExternalURLs([url])
+    }
+
+    func importExternalURLs(_ urls: [URL]) {
         importGeneration += 1
         listingGeneration += 1
         clearPreviewState()
@@ -1285,7 +1360,7 @@ final class ArchiveImportModel: ObservableObject {
             do {
                 let importStore = importStore
                 let imported = try await Task.detached(priority: .userInitiated) {
-                    try importStore.importArchive(from: url)
+                    try importStore.importArchives(from: urls)
                 }.value
                 guard currentImportGeneration == importGeneration else {
                     return
@@ -1308,16 +1383,15 @@ final class ArchiveImportModel: ObservableObject {
         importMaestroFixture(named: "maestro-files.zip")
     }
 
-    func importMaestroFixture(named fixtureName: String) {
-        let fixtureURL = Bundle.main.url(
-            forResource: fixtureName,
-            withExtension: nil
-        )
-        guard let fixtureURL else {
+    func importMaestroFixture(named fixtureName: String, companionNames: [String] = []) {
+        let fixtureURLs = ([fixtureName] + companionNames).compactMap {
+            Bundle.main.url(forResource: $0, withExtension: nil)
+        }
+        guard fixtureURLs.count == companionNames.count + 1 else {
             errorMessage = "The Maestro fixture is not available in this build."
             return
         }
-        importExternalURL(fixtureURL)
+        importExternalURLs(fixtureURLs)
     }
 
     func retryListingWithPassword() {

@@ -35,4 +35,24 @@ class ArchiveImportTest {
     fun firstArchiveUriIgnoresLauncherIntent() {
         assertNull(ArchiveImportIntents.firstArchiveUri(Intent(Intent.ACTION_MAIN)))
     }
+
+    @Test
+    fun primaryArchiveNamePrefersTheFirstMultipartVolume() {
+        assertEquals(
+            "payload.vol000.tzap",
+            ArchiveImportNames.primaryArchiveName(listOf("payload.vol002.tzap", "payload.vol000.tzap"))
+        )
+        assertEquals(
+            "payload.part1.rar",
+            ArchiveImportNames.primaryArchiveName(listOf("payload.part2.rar", "payload.part1.rar"))
+        )
+        assertEquals(
+            "payload.7z.001",
+            ArchiveImportNames.primaryArchiveName(listOf("payload.7z.002", "payload.7z.001"))
+        )
+        assertEquals(
+            "payload.zip",
+            ArchiveImportNames.primaryArchiveName(listOf("payload.z01", "payload.zip"))
+        )
+    }
 }

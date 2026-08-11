@@ -269,7 +269,7 @@ private fun ZManagerApp(
         }
     }
 
-    fun startImport(uri: Uri) {
+    fun startImport(uris: List<Uri>) {
         importRequestId += 1
         val currentImportRequestId = importRequestId
         listingRequestId += 1
@@ -285,7 +285,7 @@ private fun ZManagerApp(
         selectedEntryIds = emptySet()
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { importer.importUri(uri) }
+                runCatching { importer.importUris(uris) }
             }
             if (currentImportRequestId != importRequestId) {
                 return@launch
@@ -302,7 +302,10 @@ private fun ZManagerApp(
         }
     }
 
-    fun startMaestroFixtureImport(assetName: String = "maestro-files.zip") {
+    fun startMaestroFixtureImport(
+        assetName: String = "maestro-files.zip",
+        companionAssetNames: List<String> = emptyList()
+    ) {
         importRequestId += 1
         val currentImportRequestId = importRequestId
         listingRequestId += 1
@@ -318,7 +321,7 @@ private fun ZManagerApp(
         selectedEntryIds = emptySet()
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { importer.importAsset(assetName) }
+                runCatching { importer.importAssets(assetName, listOf(assetName) + companionAssetNames) }
             }
             if (currentImportRequestId != importRequestId) {
                 return@launch
@@ -336,9 +339,9 @@ private fun ZManagerApp(
     }
 
     val documentPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let { startImport(it) }
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        uris.takeIf { it.isNotEmpty() }?.let(::startImport)
     }
     val destinationPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -360,7 +363,7 @@ private fun ZManagerApp(
     LaunchedEffect(incomingIntent) {
         incomingIntent?.let { intent ->
             ArchiveImportIntents.firstArchiveUri(intent)?.let { uri ->
-                startImport(uri)
+                startImport(listOf(uri))
             }
             onIncomingIntentHandled(intent)
         }
@@ -512,17 +515,50 @@ private fun ZManagerApp(
                                 onDismissRequest = { showFixtureMenu = false }
                             ) {
                                 listOf(
-                                    "ZIP fixture" to "maestro-files.zip",
-                                    "7z fixture" to "maestro-files.7z",
-                                    "TGZ fixture" to "maestro-files.tgz",
-                                    "TAR.ZST fixture" to "maestro-files.tar.zst",
-                                    "TZAP fixture" to "maestro-files.tzap"
-                                ).forEach { (label, assetName) ->
+                                    MaestroFixture("ZIP fixture", "maestro-files.zip"),
+                                    MaestroFixture("7z fixture", "maestro-files.7z"),
+                                    MaestroFixture("TGZ fixture", "maestro-files.tgz"),
+                                    MaestroFixture("TAR.ZST fixture", "maestro-files.tar.zst"),
+                                    MaestroFixture("TZAP fixture", "maestro-files.tzap"),
+                                    MaestroFixture(
+                                        "Split ZIP fixture",
+                                        "maestro-split.zip",
+                                        listOf("maestro-split.z01")
+                                    ),
+                                    MaestroFixture(
+                                        "Split 7z fixture",
+                                        "maestro-split.7z.001",
+                                        listOf("maestro-split.7z.002")
+                                    ),
+                                    MaestroFixture(
+                                        "Split TZAP fixture",
+                                        "maestro-split.vol000.tzap",
+                                        listOf(
+                                            "maestro-split.vol001.tzap",
+                                            "maestro-split.vol002.tzap",
+                                            "maestro-split.vol003.tzap",
+                                            "maestro-split.vol004.tzap",
+                                            "maestro-split.vol005.tzap"
+                                        )
+                                    ),
+                                    MaestroFixture(
+                                        "Multipart RAR fixture",
+                                        "maestro-split-rar.part1.rar",
+                                        listOf(
+                                            "maestro-split-rar.part2.rar",
+                                            "maestro-split-rar.part3.rar",
+                                            "maestro-split-rar.part4.rar",
+                                            "maestro-split-rar.part5.rar"
+                                        )
+                                    ),
+                                    MaestroFixture("DEB fixture", "maestro-files.deb"),
+                                    MaestroFixture("CAB fixture", "maestro-files.cab")
+                                ).forEach { fixture ->
                                     DropdownMenuItem(
-                                        text = { Text(label) },
+                                        text = { Text(fixture.label) },
                                         onClick = {
                                             showFixtureMenu = false
-                                            startMaestroFixtureImport(assetName)
+                                            startMaestroFixtureImport(fixture.assetName, fixture.companionAssetNames)
                                         }
                                     )
                                 }
@@ -546,6 +582,12 @@ private fun ZManagerApp(
         }
     }
 }
+
+private data class MaestroFixture(
+    val label: String,
+    val assetName: String,
+    val companionAssetNames: List<String> = emptyList()
+)
 
 @Composable
 private fun ArchiveListingPanel(

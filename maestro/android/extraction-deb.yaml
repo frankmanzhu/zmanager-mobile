@@ -1,0 +1,19 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- tapOn: "Load test fixture"
+- tapOn: "DEB fixture"
+- extendedWaitUntil:
+    visible: "Archive - 3 entries"
+    timeout: 15000
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*Extraction complete: 3 files saved to App storage.*"
+    timeout: 30000

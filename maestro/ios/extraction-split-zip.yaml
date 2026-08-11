@@ -1,0 +1,17 @@
+appId: org.tzap.zmanager.mobile
+---
+- launchApp:
+    clearState: true
+- tapOn: "Load test fixture"
+- tapOn: "Split ZIP fixture"
+- extendedWaitUntil:
+    visible: "SPLIT ZIP - 6 entries"
+    timeout: 15000
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*Extraction complete: 6 files saved to App storage.*"
+    timeout: 30000

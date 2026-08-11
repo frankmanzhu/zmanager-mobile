@@ -37,6 +37,23 @@ final class ZManagerMobileTests: XCTestCase {
         )
     }
 
+    func testArchiveImportChoosesTheFirstMultipartVolume() {
+        XCTAssertEqual(
+            ArchiveImportStore.primaryArchiveName(["payload.vol002.tzap", "payload.vol000.tzap"]),
+            "payload.vol000.tzap"
+        )
+        XCTAssertEqual(
+            ArchiveImportStore.primaryArchiveName(["payload.part2.rar", "payload.part1.rar"]),
+            "payload.part1.rar"
+        )
+        XCTAssertEqual(
+            ArchiveImportStore.primaryArchiveName(["payload.7z.002", "payload.7z.001"]),
+            "payload.7z.001"
+        )
+        XCTAssertEqual(
+            ArchiveImportStore.primaryArchiveName(["payload.z01", "payload.zip"]), "payload.zip")
+    }
+
     func testArchiveListingLoaderReturnsSummary() {
         let loader = ArchiveListingLoader(
             bridge: FakeArchiveBridgeClient(

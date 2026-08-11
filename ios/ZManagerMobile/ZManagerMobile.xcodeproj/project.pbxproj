@@ -18,6 +18,23 @@
 		01A000000000000000000009 /* maestro-files.tar.zst in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010E /* maestro-files.tar.zst */; };
 		01A00000000000000000000A /* maestro-files.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010F /* maestro-files.tzap */; };
 		01A00000000000000000000B /* maestro-files.aar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000110 /* maestro-files.aar */; };
+		01A00000000000000000000C /* maestro-files.cab in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000111 /* maestro-files.cab */; };
+		01A00000000000000000000D /* maestro-files.deb in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000112 /* maestro-files.deb */; };
+		01A00000000000000000000E /* maestro-split-rar.part1.rar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000113 /* maestro-split-rar.part1.rar */; };
+		01A00000000000000000000F /* maestro-split-rar.part2.rar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000114 /* maestro-split-rar.part2.rar */; };
+		01A000000000000000000010 /* maestro-split-rar.part3.rar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000115 /* maestro-split-rar.part3.rar */; };
+		01A000000000000000000011 /* maestro-split-rar.part4.rar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000116 /* maestro-split-rar.part4.rar */; };
+		01A000000000000000000012 /* maestro-split-rar.part5.rar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000117 /* maestro-split-rar.part5.rar */; };
+		01A000000000000000000013 /* maestro-split.7z.001 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000118 /* maestro-split.7z.001 */; };
+		01A000000000000000000014 /* maestro-split.7z.002 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000119 /* maestro-split.7z.002 */; };
+		01A000000000000000000015 /* maestro-split.vol000.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011A /* maestro-split.vol000.tzap */; };
+		01A000000000000000000016 /* maestro-split.vol001.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011B /* maestro-split.vol001.tzap */; };
+		01A000000000000000000017 /* maestro-split.vol002.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011C /* maestro-split.vol002.tzap */; };
+		01A000000000000000000018 /* maestro-split.vol003.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011D /* maestro-split.vol003.tzap */; };
+		01A000000000000000000019 /* maestro-split.vol004.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011E /* maestro-split.vol004.tzap */; };
+		01A00000000000000000001A /* maestro-split.vol005.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011F /* maestro-split.vol005.tzap */; };
+		01A00000000000000000001B /* maestro-split.z01 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000120 /* maestro-split.z01 */; };
+		01A00000000000000000001C /* maestro-split.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000121 /* maestro-split.zip */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +64,23 @@
 		01A00000000000000000010E /* maestro-files.tar.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.zst; sourceTree = "<group>"; };
 		01A00000000000000000010F /* maestro-files.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tzap; sourceTree = "<group>"; };
 		01A000000000000000000110 /* maestro-files.aar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.aar; sourceTree = "<group>"; };
+		01A000000000000000000111 /* maestro-files.cab */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.cab; sourceTree = "<group>"; };
+		01A000000000000000000112 /* maestro-files.deb */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.deb; sourceTree = "<group>"; };
+		01A000000000000000000113 /* maestro-split-rar.part1.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part1.rar; sourceTree = "<group>"; };
+		01A000000000000000000114 /* maestro-split-rar.part2.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part2.rar; sourceTree = "<group>"; };
+		01A000000000000000000115 /* maestro-split-rar.part3.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part3.rar; sourceTree = "<group>"; };
+		01A000000000000000000116 /* maestro-split-rar.part4.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part4.rar; sourceTree = "<group>"; };
+		01A000000000000000000117 /* maestro-split-rar.part5.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part5.rar; sourceTree = "<group>"; };
+		01A000000000000000000118 /* maestro-split.7z.001 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.7z.001; sourceTree = "<group>"; };
+		01A000000000000000000119 /* maestro-split.7z.002 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.7z.002; sourceTree = "<group>"; };
+		01A00000000000000000011A /* maestro-split.vol000.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol000.tzap; sourceTree = "<group>"; };
+		01A00000000000000000011B /* maestro-split.vol001.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol001.tzap; sourceTree = "<group>"; };
+		01A00000000000000000011C /* maestro-split.vol002.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol002.tzap; sourceTree = "<group>"; };
+		01A00000000000000000011D /* maestro-split.vol003.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol003.tzap; sourceTree = "<group>"; };
+		01A00000000000000000011E /* maestro-split.vol004.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol004.tzap; sourceTree = "<group>"; };
+		01A00000000000000000011F /* maestro-split.vol005.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol005.tzap; sourceTree = "<group>"; };
+		01A000000000000000000120 /* maestro-split.z01 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.z01; sourceTree = "<group>"; };
+		01A000000000000000000121 /* maestro-split.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-split.zip; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +123,23 @@
 				01A00000000000000000010E /* maestro-files.tar.zst */,
 				01A00000000000000000010F /* maestro-files.tzap */,
 				01A000000000000000000110 /* maestro-files.aar */,
+				01A000000000000000000111 /* maestro-files.cab */,
+				01A000000000000000000112 /* maestro-files.deb */,
+				01A000000000000000000113 /* maestro-split-rar.part1.rar */,
+				01A000000000000000000114 /* maestro-split-rar.part2.rar */,
+				01A000000000000000000115 /* maestro-split-rar.part3.rar */,
+				01A000000000000000000116 /* maestro-split-rar.part4.rar */,
+				01A000000000000000000117 /* maestro-split-rar.part5.rar */,
+				01A000000000000000000118 /* maestro-split.7z.001 */,
+				01A000000000000000000119 /* maestro-split.7z.002 */,
+				01A00000000000000000011A /* maestro-split.vol000.tzap */,
+				01A00000000000000000011B /* maestro-split.vol001.tzap */,
+				01A00000000000000000011C /* maestro-split.vol002.tzap */,
+				01A00000000000000000011D /* maestro-split.vol003.tzap */,
+				01A00000000000000000011E /* maestro-split.vol004.tzap */,
+				01A00000000000000000011F /* maestro-split.vol005.tzap */,
+				01A000000000000000000120 /* maestro-split.z01 */,
+				01A000000000000000000121 /* maestro-split.zip */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -218,6 +269,23 @@
 				01A000000000000000000009 /* maestro-files.tar.zst in Resources */,
 				01A00000000000000000000A /* maestro-files.tzap in Resources */,
 				01A00000000000000000000B /* maestro-files.aar in Resources */,
+				01A00000000000000000000C /* maestro-files.cab in Resources */,
+				01A00000000000000000000D /* maestro-files.deb in Resources */,
+				01A00000000000000000000E /* maestro-split-rar.part1.rar in Resources */,
+				01A00000000000000000000F /* maestro-split-rar.part2.rar in Resources */,
+				01A000000000000000000010 /* maestro-split-rar.part3.rar in Resources */,
+				01A000000000000000000011 /* maestro-split-rar.part4.rar in Resources */,
+				01A000000000000000000012 /* maestro-split-rar.part5.rar in Resources */,
+				01A000000000000000000013 /* maestro-split.7z.001 in Resources */,
+				01A000000000000000000014 /* maestro-split.7z.002 in Resources */,
+				01A000000000000000000015 /* maestro-split.vol000.tzap in Resources */,
+				01A000000000000000000016 /* maestro-split.vol001.tzap in Resources */,
+				01A000000000000000000017 /* maestro-split.vol002.tzap in Resources */,
+				01A000000000000000000018 /* maestro-split.vol003.tzap in Resources */,
+				01A000000000000000000019 /* maestro-split.vol004.tzap in Resources */,
+				01A00000000000000000001A /* maestro-split.vol005.tzap in Resources */,
+				01A00000000000000000001B /* maestro-split.z01 in Resources */,
+				01A00000000000000000001C /* maestro-split.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

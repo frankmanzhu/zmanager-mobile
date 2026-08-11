@@ -25,61 +25,98 @@ class ArchiveImporter(context: Context) {
 
     @Throws(IOException::class)
     fun importUri(uri: Uri): ImportedArchive {
+        return importUris(listOf(uri))
+    }
+
+    @Throws(IOException::class)
+    fun importUris(uris: List<Uri>): ImportedArchive {
         val resolver = appContext.contentResolver
-        val metadata = ArchiveImportMetadata.fromUri(appContext, uri)
-        return importStream(
-            displayName = metadata.displayName ?: uri.lastPathSegment,
-            sourceMimeType = metadata.mimeType
-        ) {
-            resolver.openInputStream(uri) ?: throw IOException("Unable to open selected archive.")
+        val inputs = uris.map { uri ->
+            val metadata = ArchiveImportMetadata.fromUri(appContext, uri)
+            ArchiveImportInput(
+                displayName = metadata.displayName ?: uri.lastPathSegment,
+                sourceMimeType = metadata.mimeType
+            ) {
+                resolver.openInputStream(uri) ?: throw IOException("Unable to open selected archive.")
+            }
         }
+        return importGroup(inputs)
     }
 
     @Throws(IOException::class)
     fun importAsset(assetName: String): ImportedArchive {
-        return importStream(
-            displayName = assetName,
-            sourceMimeType = null
-        ) {
-            appContext.assets.open(assetName)
-        }
+        return importAssets(assetName, listOf(assetName))
     }
 
     @Throws(IOException::class)
-    private fun importStream(
-        displayName: String?,
-        sourceMimeType: String?,
-        openInputStream: () -> InputStream
+    fun importAssets(primaryAssetName: String, assetNames: List<String>): ImportedArchive {
+        val inputs = assetNames.map { assetName ->
+            ArchiveImportInput(assetName, null) {
+                appContext.assets.open(assetName)
+            }
+        }
+        return importGroup(inputs, primaryName = primaryAssetName)
+    }
+
+    @Throws(IOException::class)
+    private fun importGroup(
+        inputs: List<ArchiveImportInput>,
+        primaryName: String? = null
     ): ImportedArchive {
-        val sanitizedDisplayName = ArchiveImportNames.sanitizedDisplayName(displayName)
+        if (inputs.isEmpty()) {
+            throw IOException("Select an archive before importing.")
+        }
+        val sanitizedNames = inputs.map { ArchiveImportNames.sanitizedDisplayName(it.displayName) }
+        if (sanitizedNames.toSet().size != sanitizedNames.size) {
+            throw IOException("Selected archive volumes have conflicting names.")
+        }
+        val selectedPrimaryName = primaryName?.let(ArchiveImportNames::sanitizedDisplayName)
+            ?: ArchiveImportNames.primaryArchiveName(sanitizedNames)
+            ?: sanitizedNames.first()
+        val primaryIndex = sanitizedNames.indexOf(selectedPrimaryName)
+        if (primaryIndex < 0) {
+            throw IOException("The selected primary archive volume is missing.")
+        }
         val importRoot = File(appContext.cacheDir, "imported-archives").also { root ->
             if (!root.exists() && !root.mkdirs()) {
                 throw IOException("Unable to create archive import cache.")
             }
         }
-        val destination = File(importRoot, "${UUID.randomUUID()}-$sanitizedDisplayName")
+        val importGroup = File(importRoot, UUID.randomUUID().toString())
+        if (!importGroup.mkdirs()) {
+            throw IOException("Unable to create archive import cache.")
+        }
 
         try {
-            openInputStream().use { input ->
-                FileOutputStream(destination).use { output ->
-                    input.copyTo(output)
+            inputs.zip(sanitizedNames).forEach { (input, name) ->
+                FileOutputStream(File(importGroup, name)).use { output ->
+                    input.openInputStream().use { stream ->
+                        stream.copyTo(output)
+                    }
                 }
             }
         } catch (error: IOException) {
-            destination.delete()
+            importGroup.deleteRecursively()
             throw error
         }
+        val destination = File(importGroup, sanitizedNames[primaryIndex])
 
         return ImportedArchive(
             id = UUID.randomUUID().toString(),
-            displayName = sanitizedDisplayName,
+            displayName = sanitizedNames[primaryIndex],
             localPath = destination.absolutePath,
             byteSize = destination.length().takeIf { it >= 0 },
-            sourceMimeType = sourceMimeType,
+            sourceMimeType = inputs[primaryIndex].sourceMimeType,
             importedAtEpochMillis = System.currentTimeMillis()
         )
     }
 }
+
+private data class ArchiveImportInput(
+    val displayName: String?,
+    val sourceMimeType: String?,
+    val openInputStream: () -> InputStream
+)
 
 object ArchiveImportIntents {
     fun firstArchiveUri(intent: Intent): Uri? {
@@ -120,6 +157,13 @@ object ArchiveImportNames {
             .take(120)
 
         return cleaned.takeUnless { it.isBlank() || it == "." || it == ".." } ?: "archive"
+    }
+
+    fun primaryArchiveName(names: List<String>): String? {
+        return names.firstOrNull { it.endsWith(".vol000.tzap", ignoreCase = true) }
+            ?: names.firstOrNull { it.matches(Regex("(?i).+\\.part1\\.rar")) }
+            ?: names.firstOrNull { it.matches(Regex("(?i).+\\.7z\\.001")) }
+            ?: names.firstOrNull { it.endsWith(".zip", ignoreCase = true) }
     }
 }
 
