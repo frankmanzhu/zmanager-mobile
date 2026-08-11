@@ -1,10 +1,10 @@
 # ZManager Mobile Implementation Plan
 
-Last reviewed: 2026-07-05
+Last reviewed: 2026-08-11
 
 ## Purpose
 
-This document turns the launch requirements in [mobile-launch-spec.md](mobile-launch-spec.md) into an implementation plan for Android, iOS, and `zmanager-mobile-core`.
+This document turns the launch requirements in [mobile-launch-spec.md](mobile-launch-spec.md) into an implementation plan for Android, iOS, and the Rust bridge owned by the sibling `zmanager` repository (`crates/zmanager-ffi`, over `zmanager-core`). This checkout contains the native shells, checked-in generated bindings, and platform tests; it does not contain a Rust workspace.
 
 The launch goal is a polished native archive workbench backed by shared Rust archive behavior. Kotlin and Swift own platform UI and file-provider lifetimes. Rust owns archive detection, listing, testing, planning, extraction, creation, cancellation, and normalized archive errors.
 
@@ -63,7 +63,7 @@ iOS:
 
 Shared:
 
-- Rust `rust/zmanager-mobile-core`
+- Rust bridge from the sibling `zmanager` repository (`crates/zmanager-ffi`)
 - UniFFI bridge over `zmanager-core`
 - DTO-oriented API surface
 - Job-based long-running operations
@@ -72,26 +72,25 @@ Shared:
 
 ### Track 0: Foundation
 
-Goal: make the repository buildable, testable, and ready for cross-platform bridge work.
+Goal: make this repository and its sibling Rust bridge buildable, testable, and ready for cross-platform bridge work.
 
 Deliverables:
 
-- Confirm Rust workspace builds with `cargo check`.
+- Confirm the sibling `zmanager-ffi` crate builds and tests through `scripts/check-rust.sh`.
 - Confirm Android app skeleton opens in Android Studio and can build a debug target.
 - Confirm iOS project opens in Xcode and builds against the generated UniFFI bindings once available.
 - Add local fixture directory conventions for archive test files.
-- Add a documented way to regenerate UniFFI bindings.
+- Use the existing documented regeneration command: `../zmanager/scripts/regenerate-bindings.sh`.
 - Add CI placeholders or scripts for Rust checks, Android checks, and iOS checks.
 - Store generated Android Kotlin bindings in `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`.
 - Store generated iOS Swift bindings in `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
-- Add `scripts/generate-uniffi-bindings.sh` as the documented regeneration path.
 - Do not check generated native binary artifacts into the repository by default; build or copy them through Gradle and Xcode integration scripts.
 - Reuse the ZManager Desktop app icon as the mobile app icon source and generate platform-specific icon assets from it.
 
 Definition of done:
 
 - A new contributor can follow [local-development.md](local-development.md) and run the available checks.
-- The bridge crate compiles without platform UI dependencies.
+- The sibling bridge crate compiles without platform UI dependencies.
 - Platform apps can depend on the bridge without duplicating archive logic.
 
 ### Track 1: Bridge Reality
@@ -111,11 +110,15 @@ start_extract(request)
 plan_create(request)
 start_create(request)
 poll_job_events(request)
-pause_job(request)
-resume_job(request)
 cancel_job(request)
 clear_sensitive_state()
 ```
+
+`pause_job` and `resume_job` are not part of the current generated Android or
+iOS bridge. They are optional future bridge additions, not launch prerequisites.
+The native UI must not expose pause/resume until those calls, their DTOs, and
+their lifecycle semantics exist in `zmanager-ffi` and have passed bridge and
+platform tests.
 
 Initial implementation order:
 
@@ -126,10 +129,9 @@ Initial implementation order:
 5. Implement `materialize_preview` for one safe temporary entry at a time.
 6. Implement `plan_extract` without final writes, backed by `zmanager-core` extraction safety.
 7. Implement job infrastructure for `start_extract`, `poll_job_events`, and `cancel_job`.
-8. Add `pause_job` and `resume_job` only for operations with a proven safe resumable implementation; keep controls hidden otherwise.
-9. Implement `plan_create` and `start_create`.
-10. Implement verify-after-compression by testing the created archive through the same bridge error model.
-11. Implement `clear_sensitive_state`.
+8. Implement `plan_create` and `start_create`.
+9. Implement verify-after-compression by testing the created archive through the same bridge error model.
+10. Implement `clear_sensitive_state`.
 
 Bridge rules:
 
@@ -142,7 +144,8 @@ Bridge rules:
 - Launch job progress uses a pull model, matching ZManager Desktop: native shells call `poll_job_events` instead of subscribing to pushed platform-native streams.
 - Mobile polling should add an explicit event cursor or sequence acknowledgement so app suspend/resume, duplicate-safe UI updates, and terminal event retention are deterministic.
 - Platform-native streams are future work after the polling contract is proven.
-- Pause/resume state must be explicit in `JobEvent`; unsupported pause must be represented as unavailable, not as a disabled mystery control.
+- The current generated job contract supports queued/running/completed/failed/cancelled status and started, entry-started, bytes-processed, entry-finished, warning, completed, failed, and cancelled events. Native progress must derive from those fields. Percent, warning totals, cancellation-requested, and pause/resume events require an explicit bridge contract change before they can be required by UI.
+- If a future bridge adds pause/resume, capability and interruption semantics must be explicit; unsupported pause must be represented as unavailable, not as a disabled mystery control.
 - Password-required handling is a preflight or retry state for launch, not a mid-job wait state.
 - `start_extract` and `start_create` must receive any required password in their initial request after the native UI has prompted.
 - Do not add a job event that waits for a password unless the bridge also adds an explicit, redacted, time-bounded `provide_password` or resume API.
@@ -154,7 +157,7 @@ Definition of done:
 
 - Android and iOS can call the same bridge surface.
 - Password-required, wrong-password, unsupported archive, damaged archive, cancellation, and redaction tests pass at the bridge boundary.
-- The bridge can list real ZIP, RAR extraction-supported, 7z, tar-family, AppleArchive / AAR, and XIP fixtures where core support exists.
+- The sibling bridge can list real ZIP, RAR extraction-supported, 7z, tar-family, AppleArchive / AAR, and XIP fixtures where core support exists.
 
 ### Track 2: Read-Only Workbench
 
@@ -237,11 +240,24 @@ Planning requirements:
 
 Collision behavior:
 
-- Replace.
-- Skip.
-- Keep both.
-- Cancel.
+- `REFUSE`: stop planning/start or require the user to choose another policy.
+- `REPLACE`: overwrite only the entries explicitly marked `replaceExisting` by the plan.
+- `RENAME`: the UI may label this `Keep both`; the native commit coordinator must use the bridge-provided renamed destination path.
+- `SKIP` is an entry result, not a selectable collision policy in the current bridge. Do not present a `Skip` policy until the bridge adds one.
 - Only show collision actions that the selected destination can honor safely.
+
+The current generated `PlanExtractRequest` only contains `archivePath`,
+`destinationRoot`, `password`, `selectedPaths`, `stripComponents`, and
+`collisionPolicy`. Before shipping external-destination extraction, extend the
+bridge contract with:
+
+- a plan id or canonical request fingerprint returned by `plan_extract` and required by `start_extract`, so approval cannot start a different request;
+- a native-provided destination snapshot/capability DTO containing safe relative existing paths, writable/collision capabilities, and a snapshot/version token; and
+- an explicit staging/output manifest contract whose paths are relative to the staging root and whose terminal paths cannot leak arbitrary host paths.
+
+Until that contract exists, plan review may be implemented against an app-owned
+destination only. The UI must not claim that a SAF or Files-provider collision
+list is complete when the provider was not inspected.
 
 Cancellation behavior:
 
@@ -254,13 +270,14 @@ Cancellation behavior:
 
 Progress events:
 
-- percent when known
+- bytes/entry progress from the current generated event fields; percent is derived only when the denominator is known and is labeled estimated unless the bridge adds an explicit percent field
 - entries completed
 - current filename
 - bytes written when available
-- warning count
-- cancel state
-- paused or resumable state when supported
+- total bytes/entries when available
+- warning messages from warning events
+- local cancellation-requested state while `cancel_job` is in flight
+- paused or resumable state only after a future bridge capability exists
 
 Completion summary:
 
@@ -280,6 +297,8 @@ Definition of done:
 - Batch extraction uses the same planning, staging, progress, cancellation, and completion summary model as single-archive extraction.
 - Completion summary matches actual output.
 - Staging cleanup is deterministic after success, cancellation, and failure.
+- External-destination collision review is based on a native destination snapshot and clearly reports when a provider cannot provide one.
+- The accepted plan is bound to the start request; destination changes, archive changes, selected-entry changes, password retries, or collision-policy changes require a new plan.
 
 ### Track 4: Create Archive
 
@@ -393,7 +412,7 @@ Goal: make all public claims, docs, in-app strings, and tested behavior agree.
 
 Deliverables:
 
-- V2 format exposure matrix.
+- V2 format exposure matrix at `docs/mobile-format-matrix.md`, with one row per launch-scope operation and explicit bridge/core, Android, iOS, and UI evidence.
 - Supported-format help page or in-app surface.
 - Settings/about/license/help screen.
 - Android and iOS app icons generated from the ZManager Desktop icon.
@@ -419,6 +438,11 @@ Definition of done:
 ### ArchiveHandle
 
 Purpose: identify a bridge-readable archive source without exposing platform provider lifetimes to Rust.
+
+The current generated bridge is path-based (`archivePath`), not handle-based.
+Treat this as a native/session model unless and until the sibling bridge adds an
+opaque handle API; do not imply that a native handle is already accepted by
+UniFFI.
 
 Fields to consider:
 
@@ -509,9 +533,12 @@ Purpose: describe exactly what extraction would do before final output is writte
 Fields to consider:
 
 - plan id
+- canonical request fingerprint or equivalent start-binding token
 - archive handle id
 - selected entries
 - destination summary
+- destination snapshot/version used for collision analysis
+- staging root handle or app-controlled staging path; never an external provider URI
 - expected output root
 - estimated uncompressed size
 - collision list
@@ -555,11 +582,15 @@ Fields to consider:
 - collision policy support
 - low-storage status when available
 - permission state
+- provider capability snapshot/version
+- native destination handle kept only in the platform layer
 
 Rules:
 
 - Rust may write directly only to app-owned filesystem paths with stable access.
-- For platform-owned destinations, Rust writes to staging and the native shell commits.
+- For platform-owned destinations, Rust writes to an app-controlled staging root and the native shell commits the plan's relative output manifest.
+- `destinationRoot` in the current extract request is a Rust-readable staging path, not an Android `content://` URI, an iOS security-scoped URL, or the user's external destination. The user-facing destination is carried by `DestinationPlan` in native state.
+- Share/export is a commit strategy after staging, not a Rust destination root. It does not support preflight collision claims for an external folder.
 
 ### JobId
 
@@ -586,18 +617,17 @@ Delivery model:
 Event kinds:
 
 - started
-- progress
-- paused
-- resumed
+- entry-started
+- bytes-processed
+- entry-finished
 - warning
-- cancellation requested
 - cancelled
 - completed
 - failed
 
 Progress fields:
 
-- percent when known
+- percent when known only after a bridge field is added; otherwise derive a bounded estimate from bytes or entries and label it as estimated
 - entries completed
 - total entries when known
 - current entry display name
@@ -610,10 +640,8 @@ Rules:
 - Events must not include passwords.
 - Launch jobs must not block waiting for a password; password-required and wrong-password states are returned before job start or from a failed start request.
 - Events should avoid unredacted full paths by default.
-- Completion events must include enough counts for the completion summary.
-- Pause/resume events must include whether the job can actually resume after process interruption or only after an in-process pause.
-- Launch pause/resume is in-process and cooperative only. If the app process dies, the job becomes interrupted and must surface recovery, retry, export, or cleanup state rather than pretending it can resume.
-- Process-survivable resume requires a future durable job manifest, core checkpoint support, password-free or safely re-promptable state, and deterministic staging/commit recovery tests.
+- Completion events/terminal summaries must include enough counts for the extraction job summary; native commit results must add commit failures and partial-output information.
+- Pause/resume is future work. If added, it must include whether the job can resume after process interruption or only after an in-process pause. Process-survivable resume requires a durable job manifest, core checkpoint support, password-free or safely re-promptable state, and deterministic staging/commit recovery tests.
 
 ### PreviewMaterialization
 
@@ -711,11 +739,19 @@ Recent archive bookmarks:
 
 - Recents are display-only app records, not durable archive capabilities.
 - Store display name, archive type when known, size hint when known, last opened time, source kind, and an app-cache handle only while the cached copy still exists.
-- Do not store passwords, original provider URIs, iOS security-scoped URL or bookmark data, full external paths by default, or platform permission tokens.
+- Do not store passwords, original provider URIs, iOS security-scoped URL or bookmark data, full external paths by default, or platform permission tokens in recent-archive records.
 - If the cached copy still exists, tapping a recent archive may reopen it.
 - If the cache was cleaned or the source was provider-backed without a retained cache copy, tapping the recent archive asks the user to pick or open the archive again.
 - Users can remove individual recent entries.
 - Recents age out after 30 days and are capped at 20 items.
+
+Default destinations are a separate explicit user setting. If a user chooses
+“use as default,” the native platform may persist the minimum provider
+reference required to reacquire access (for example, a persistable Android SAF
+grant or an iOS security-scoped bookmark) in native-owned storage only. It must
+never cross the bridge, appear in diagnostics, or be silently treated as valid:
+each use revalidates access and falls back to destination selection when the
+provider grant/bookmark is stale or revoked.
 
 Android:
 
@@ -752,9 +788,25 @@ Destination strategies:
 - Share/export destination: Rust writes to staging, native shell invokes platform share/export.
 - Default destination: native shell resolves the saved setting into one of the supported destination strategies each time; stale or revoked defaults fall back to prompting.
 
+Extraction sequencing:
+
+1. Native creates a unique staging root in app-controlled storage.
+2. Native snapshots the selected destination where the provider permits it and calls `plan_extract` with the staging root plus that snapshot/capability input.
+3. After explicit approval, native calls `start_extract` with the same accepted-plan binding and staging root.
+4. Native validates the bridge-provided relative output manifest, commits files to the external destination, and records a native `CommitResult` containing committed, skipped, failed, and partial-output counts.
+5. Only the combined Rust terminal result and native commit result can produce `Completed`.
+
+The native commit coordinator may enumerate staging files, but it must not parse
+archive metadata or reconstruct archive paths. It consumes the plan's safe
+relative destination paths, rejects unexpected files, refuses unsafe path
+components, and handles symlink/hardlink/special-file entries according to the
+plan status. A provider that cannot support a complete snapshot must use a
+conservative collision mode and report that limitation before approval.
+
 Commit rules:
 
 - Do not claim success until native commit succeeds or partial success is explained.
+- Do not report `extracted` as committed until the native commit succeeds; Rust's written count is an intermediate staging count.
 - Preserve a recovery record when partial output may exist.
 - Successful commits delete staging immediately after completion summary and report data are captured.
 - Cancellation before commit deletes staging immediately.
@@ -764,6 +816,7 @@ Commit rules:
 - Startup cleanup removes recovery records older than 7 days.
 - Saved operation reports are separate from staging and recovery records, and may remain until the user deletes them.
 - Split-volume output is committed as a set; partial commit must identify which volumes exist and offer retry/export/discard.
+- Native commit cancellation is cooperative at file boundaries and has its own terminal result; `cancel_job` only cancels the Rust job and cannot by itself undo files already committed by the platform shell.
 
 ## Password Handling Plan
 
@@ -776,6 +829,14 @@ Password lifecycle:
 5. Native UI clears visible password state.
 6. Wrong-password retry reuses the archive handle but prompts for a fresh password.
 7. `clear_sensitive_state()` is called on app background timeout and other sensitive-state boundaries.
+
+For an already-started password-bearing job, the bridge may need a transient
+job-scoped secret until the job reaches a terminal state. The native shell must
+clear the visible/input password immediately, but must not silently clear the
+bridge secret and then claim the job completed. The bridge contract must define
+whether `clear_sensitive_state()` cancels active password-bearing jobs; if it
+does, the UI reports an interrupted/cancelled operation and offers a fresh
+retry. There is no mid-job password prompt in the launch contract.
 
 Native requirements:
 
@@ -995,14 +1056,16 @@ Android-specific tasks:
 - Implement app cache cleanup rules.
 - Implement SAF tree/document destination selection.
 - Implement staged commit to SAF destinations.
+- Add explicit app-owned test destination support for deterministic UI E2E, while routing production SAF commits through the same commit coordinator.
 - Implement default destination settings and revoked-default recovery.
 - Implement permission revocation handling.
 - Implement low-storage handling where platform APIs allow.
 - Implement tablet/foldable two-pane archive detail and batch queue layouts.
 - Use an Android foreground service for long user-started archive jobs that may continue after the app is backgrounded.
 - Keep `detect_archive`, `list_archive`, `plan_extract`, `plan_create`, and small preview materialization foreground-only.
-- Run `start_extract`, `start_create`, `test_archive`, verify-after-compression, and batch jobs through the foreground service when they may outlive the visible activity.
+- Run `start_extract`, `start_create`, verify-after-compression jobs, and batch jobs through the foreground service when they may outlive the visible activity. `test_archive`, `detect_archive`, `list_archive`, and `plan_*` are synchronous bridge calls and should run off the main thread; they are not foreground-service jobs unless the bridge contract changes.
 - The foreground service owns the notification, polls bridge jobs, exposes cancellation, and records cleanup or recovery state.
+- Add the required manifest permissions, foreground-service declaration/type, notification channel, notification action for cancellation, service-to-UI result handoff, and process-death cleanup/recovery behavior before enabling long-running background extraction.
 - Do not use WorkManager at launch for archive jobs; persisted rescheduling conflicts with transient passwords, bridge process state, SAF permission lifetimes, and deterministic staging cleanup.
 - Treat WorkManager as future work only for password-free, resumable jobs with persisted manifests.
 - Implement Android 15+ foreground-service timeout handling and tests for target SDK 35 behavior.
@@ -1010,6 +1073,7 @@ Android-specific tasks:
 
 Android tests:
 
+- Add an `androidTest` source set, instrumentation runner, Compose test dependencies, and a test-only destination/fixture seam; the current project has JVM tests only and no Android instrumentation target.
 - `content://` archive copy.
 - Share/open intent.
 - Revoked URI permission.
@@ -1023,6 +1087,7 @@ Android tests:
 - Tablet/foldable two-pane layout.
 - Android 8 through target SDK behavior.
 - Password redaction in logs and diagnostics.
+- Compose/instrumentation coverage for destination picker return, service notification cancellation, and process recreation.
 
 ## iOS Implementation Plan
 
@@ -1049,13 +1114,14 @@ iOS-specific tasks:
 - Implement security-scoped access open/close wrapper.
 - Copy provider-backed files to app temporary storage when needed.
 - Implement app sandbox destination flow.
-- Implement true user-selected destination folders for app sandbox destinations first, then for Files-backed `On My iPhone` and iCloud Drive folders after provider-gated security-scope and staged-commit tests pass.
+- Implement an app-owned Documents destination first for deterministic extraction and E2E; then implement true user-selected Files folders for `On My iPhone` and iCloud Drive after provider-gated security-scope and staged-commit tests pass.
 - Route third-party Files providers through export/share fallback until that provider class passes the same destination-commit and recovery tests.
 - Implement export/share fallback destinations.
 - Implement default destination settings and revoked-default recovery.
 - Implement staged commit while holding security-scoped access.
 - Handle iCloud file unavailable states.
 - Add Shortcuts and X-Callback-URL entry points after safe request validation exists.
+- Add a Share Extension target and its app-group/import handoff if “share/import” means accepting files from the iOS share sheet; `onOpenURL` and document types alone do not provide a Share Extension.
 - Add iPad multi-window support.
 - Treat long extraction as foreground-first at launch.
 - Implement background task support only after lifecycle and partial-output behavior is tested.
@@ -1063,6 +1129,7 @@ iOS-specific tasks:
 
 iOS tests:
 
+- Add an XCUITest target if native UI automation is needed; the current Xcode project has unit tests only. Maestro remains the cross-platform device E2E runner.
 - Document picker import.
 - Share/import extension.
 - Security scope opens and closes.
@@ -1079,6 +1146,8 @@ iOS tests:
 - iPad multi-window.
 - True user-selected destination where platform support allows it.
 - Password redaction in logs and diagnostics.
+- Share Extension import handoff and cleanup.
+- SwiftUI UI-test target or Maestro-equivalent device coverage for plan, commit, and completion states.
 
 ## Rust Implementation Plan
 
@@ -1094,7 +1163,7 @@ Rust responsibilities:
 - Create execution.
 - Extract execution.
 - Progress events.
-- Pause/resume support where safe.
+- Optional pause/resume support only after the bridge contract exists and the operation proves safe.
 - Cooperative cancellation.
 - Normalized archive errors.
 - Redaction-safe diagnostics.
@@ -1111,16 +1180,16 @@ Recommended internal areas:
 - Password redaction utilities.
 - Diagnostic detail sanitizer.
 
-Rust tasks:
+Rust tasks (implemented in the sibling `zmanager` repository):
 
-- Wire `zmanager-mobile-core` to `zmanager-core`.
+- Wire `crates/zmanager-ffi` to `zmanager-core` and keep the generated bindings in this repository synchronized.
 - Replace placeholder listing behavior.
 - Normalize core errors into mobile bridge errors.
 - Build extraction plans without writes.
 - Materialize one preview entry at a time through extraction safety.
 - Ensure extraction jobs report progress and support cancellation.
 - Ensure create jobs report progress and support cancellation.
-- Add pause/resume only for job implementations that can preserve a coherent staging and output state. Launch support is in-process only unless a specific operation proves durable checkpoint/resume semantics.
+- Keep pause/resume out of the launch bridge until a job implementation can preserve a coherent staging and output state. If added later, launch support is in-process only unless a specific operation proves durable checkpoint/resume semantics.
 - Add verify-after-compression by invoking bridge-supported test behavior on created archives.
 - Support archive-items-separately and split-volume creation where core support and destination commit behavior are ready.
 - Surface old filename charset behavior through stable metadata, warnings, and selection DTOs. Core chooses an automatic best interpretation by default, marks ambiguous or non-UTF-8 path interpretation with warnings, and lets native UI request a different safe interpretation before preview, planning, extraction, or selected share/export.
@@ -1128,6 +1197,7 @@ Rust tasks:
 - Ensure password-bearing DTOs are never printed in debug logs.
 - Implement `clear_sensitive_state`.
 - Add bridge-boundary tests for required error and redaction cases.
+- Add contract tests for plan/start binding, destination snapshot/capability input, staging-relative output manifests, cursor gaps, terminal-summary retention, and native-commit-facing counts.
 
 Rust tests:
 
@@ -1148,6 +1218,13 @@ Rust tests:
 ## Format Exposure Plan
 
 Mobile UI must expose every launch-scope format after the format passes launch quality gates on Android and iOS. Failing gates block launch until fixed, or until the launch spec is explicitly changed.
+
+The matrix is a release artifact, not a list of intentions. A format is not
+considered exposed because it appears in a Rust enum or generated binding. Each
+row must link to a bridge fixture/test, Android and iOS file-access/destination
+evidence, user-facing limitations, and the exact UI surface that exposes the
+operation. Unknown or untested status is a release blocker for a format marked
+launch scope.
 
 Read/list/extract exposure:
 
@@ -1358,6 +1435,12 @@ Exit criteria:
 
 ### End-To-End Smoke Tests
 
+The current Maestro workflows cover archive import/listing/testing only. Full
+extraction E2E is not complete until the scenarios in
+[mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md) are
+implemented and passing on both platforms; do not count a Rust terminal event
+as a successful extraction until the native destination commit has completed.
+
 Core flows:
 
 - open archive from app
@@ -1453,26 +1536,38 @@ ZManager Mobile is launch-ready when:
 ## Suggested Implementation Order
 
 1. Make bridge healthcheck and binding generation work end to end.
-2. Implement app-controlled input import on Android and iOS.
-3. Implement `detect_archive` and `list_archive`.
-4. Build archive detail UI and password-required listing flow.
-5. Implement search/sort/tree-list selection plus selected preview materialization.
-6. Implement normalized bridge errors and warning DTOs.
-7. Implement `test_archive`.
-8. Implement `plan_extract` and extraction plan review UI.
-9. Implement staged extraction jobs, polling, progress, cancellation, and destination commit.
-10. Implement completion summary, saved reports, and cleanup/recovery records.
-11. Implement create planning and create jobs.
-12. Implement encrypted ZIP creation, verify-after-compression, archive-items-separately, split-volume creation, and password redaction tests.
-13. Add AppleArchive / AAR, XIP, and legacy charset exposure after the relevant format gates pass.
-14. Add Photos picker, iPad drag/drop, default destinations, batch extraction, and saved reports.
-15. Add Shortcuts/X-Callback-URL and pause/resume once request validation and job-state invariants are proven.
-16. Complete tablet/iPad, multi-window, accessibility, background-task, and screenshot QA.
-17. Complete format exposure matrix and fixture corpus.
-18. Run release GUI QA and no-prior-knowledge usability probes.
+2. Freeze the bridge contract for plan/start binding, destination snapshots/capabilities, staging-relative output manifests, terminal summaries, event cursor behavior, and normalized errors; regenerate bindings from the sibling `zmanager` repo.
+3. Add Android instrumentation/Compose test infrastructure and the iOS UI-test/Share Extension targets needed by the selected coverage; keep Maestro as the device-level cross-platform runner.
+4. Implement app-controlled input import on Android and iOS.
+5. Implement `detect_archive` and `list_archive`.
+6. Build archive detail UI and password-required listing flow.
+7. Implement search/sort/tree-list selection plus selected preview materialization.
+8. Implement normalized bridge errors and warning DTOs.
+9. Implement `test_archive`.
+10. Implement native app-owned destination commit first, then `plan_extract` and extraction plan review UI.
+11. Implement staged extraction jobs, polling, progress, cancellation, native provider commit, and recovery state.
+12. Add the deterministic full-extraction Maestro happy path before edge-case E2E flows.
+13. Implement completion summary, saved reports, and cleanup/recovery records.
+14. Implement create planning and create jobs.
+15. Implement encrypted ZIP creation, verify-after-compression, archive-items-separately, split-volume creation, and password redaction tests.
+16. Add AppleArchive / AAR, XIP, and legacy charset exposure after the relevant format gates pass.
+17. Add Photos picker, iPad drag/drop, default destinations, batch extraction, and saved reports.
+18. Add Shortcuts/X-Callback-URL and pause/resume only after request validation and job-state invariants are proven.
+19. Complete provider-specific, background-service, tablet/iPad, multi-window, accessibility, screenshot, and edge-case E2E QA.
+20. Complete format exposure matrix and fixture corpus.
+21. Run release GUI QA and no-prior-knowledge usability probes.
 
 ## Open Implementation Decisions
 
-No open implementation decisions remain in this plan. Any new decision that changes launch scope, format claims, privacy posture, or archive behavior belongs in [mobile-launch-spec.md](mobile-launch-spec.md) before this implementation plan is updated.
+The following are explicit implementation gates, not implicit assumptions:
 
-Implementation may still discover bugs or provider-specific limitations, but those should be resolved against the documented decisions above rather than becoming implicit scope changes.
+- **Plan/start binding:** choose a plan id or canonical request fingerprint and add it to the sibling bridge before provider-backed extraction is enabled.
+- **Destination snapshot contract:** define how Android SAF and iOS Files providers report existing relative paths, writable capability, collision capability, and snapshot invalidation. A provider that cannot provide this data must use conservative collision behavior and say so in plan review.
+- **Staging manifest and commit result:** define the native-consumed relative output manifest and the commit result/recovery record so Rust staging counts are not mistaken for committed output.
+- **Progress contract:** decide whether the bridge adds explicit percent, warning totals, and cancellation-requested events or whether native UI continues to derive them from the current event fields.
+- **Pause/resume:** deferred; no UI or required bridge call until the bridge contract and interruption semantics exist.
+- **Android background execution:** choose the foreground-service type, notification/lifecycle policy, and exact maximum job behavior for target SDK 35 before enabling jobs that outlive the visible activity.
+- **iOS provider allowlist:** approve providers one at a time after security-scoped lifetime, coordinated write, interruption, and recovery tests; third-party providers default to export/share fallback.
+- **iOS share/import scope:** add a Share Extension target if share-sheet import is launch scope; `onOpenURL` alone is not an extension.
+
+Any decision that changes launch scope, format claims, privacy posture, or archive behavior belongs in [mobile-launch-spec.md](mobile-launch-spec.md) before this implementation plan is updated. Provider-specific limitations and implementation bugs should be resolved against these gates rather than becoming implicit scope changes.

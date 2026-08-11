@@ -83,10 +83,12 @@ ios/
     ZManagerMobile.xcodeproj/
     ZManagerMobile/
 
-rust/
-  Cargo.toml
-  zmanager-mobile-core/
-    Cargo.toml
-    src/
-    uniffi/
+../zmanager/
+  crates/zmanager-ffi/
+  crates/zmanager-core/
 ```
+
+The mobile checkout keeps the generated UniFFI bindings under the Android and
+iOS source trees; it does not contain a Rust workspace. See
+`scripts/check-rust.sh` and `docs/local-development.md` for the sibling-repo
+build and binding-regeneration commands.

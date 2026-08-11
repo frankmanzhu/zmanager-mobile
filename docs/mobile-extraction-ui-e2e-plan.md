@@ -4,7 +4,7 @@ Status: proposed
 
 This plan covers the missing extraction-plan review, destination selection, staged extraction, native destination commit, progress, cancellation, and completion UI on Android and iOS. It also defines full archive-extraction UI E2E coverage.
 
-The current app already has generated UniFFI types and functions for `plan_extract`, `start_extract`, `poll_job_events`, and `cancel_job`, but the native app only implements listing, preview, and test. The work below should be built on those generated bindings; do not hand-edit generated files or move archive behavior into Kotlin or Swift.
+The current app already has generated UniFFI types and functions for `plan_extract`, `start_extract`, `poll_job_events`, and `cancel_job`, but the native app only implements listing, preview, and test. The current extract request has no plan-binding token or external-destination snapshot, and the current job events do not include percent, warning totals, cancellation-requested, or pause/resume fields. Add those contract pieces in the sibling `zmanager-ffi` crate before enabling provider-backed extraction; do not hand-edit generated files or move archive behavior into Kotlin or Swift.
 
 ## Current gap
 
@@ -25,6 +25,11 @@ The current app already has generated UniFFI types and functions for `plan_extra
 7. On approval, the app calls `start_extract`, polls `poll_job_events` using the returned cursor, and renders progress and cancellation state.
 8. Rust writes to app-controlled staging for platform-owned destinations. The native commit coordinator copies/moves staged files into the selected destination while the native permission lifetime is active.
 9. The app reports success only after commit succeeds. It then removes staging, or presents retry/export/discard recovery actions when commit is partial or fails.
+
+The accepted plan must be bound to the subsequent `start_extract` request by a
+plan id or canonical request fingerprint. Destination changes, selected-entry
+changes, password retries, and collision-policy changes invalidate the plan and
+require a new preflight.
 
 ## Shared state model
 
@@ -58,7 +63,7 @@ Plan review must expose stable accessibility/test labels for:
 - `Estimated size`
 - `N writable`, `N skipped`, and `N blocked`
 - `Warnings` / `Blocked entries`
-- collision policy: `Refuse`, `Replace`, `Keep both`
+- collision policy: `Refuse`, `Replace`, `Keep both` (bridge `RENAME`)
 - `Choose destination`, `Review extraction`, `Extract`, and `Cancel`
 
 Progress must expose:
@@ -310,4 +315,3 @@ Implementation is complete when:
 7. Add deterministic fixture/test-destination hooks and the full happy-path Maestro flows.
 8. Add edge-case Maestro flows plus provider/lifecycle instrumentation.
 9. Run Android/iOS builds, native tests, Maestro flows, screenshot/accessibility QA, and update the release gates.
-

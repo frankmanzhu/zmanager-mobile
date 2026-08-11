@@ -67,7 +67,7 @@ iOS:
 
 Shared:
 
-- Rust `zmanager-mobile-core` UniFFI bridge
+- Rust UniFFI bridge owned by the sibling `zmanager` repository (`crates/zmanager-ffi`) over `zmanager-core`
 - ZManager-Core for archive logic
 - Native UI and platform file access do not share code
 - All format support is implemented in `zmanager-core` or Rust-owned backends behind the mobile bridge. Kotlin and Swift do not call AppleArchive, XIP, `aa`, `xip`, libarchive, or other archive engines directly.
