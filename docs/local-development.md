@@ -47,9 +47,11 @@ bridge. The landing-screen smoke flow continues to exercise the native
 
 The current app does not yet expose extraction-plan approval or destination
 commit UI, so the Maestro suite deliberately does not claim end-to-end coverage
-of full extraction. It covers the implemented safe single-file materialization
-path and archive verification; add plan, progress, cancel, and destination
-assertions alongside that UI when it lands.
+of full extraction. The implementation and coverage plan is documented in
+[mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md). It covers
+the planned extraction state machine, Android SAF and iOS security-scoped
+destination commits, deterministic test destinations, and the full Maestro
+scenario matrix to add when the UI lands.
 
 ## iOS
 

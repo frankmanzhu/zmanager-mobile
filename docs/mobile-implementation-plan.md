@@ -199,6 +199,10 @@ Definition of done:
 
 Goal: provide planned, cancellable extraction with deterministic cleanup and user-readable completion.
 
+The native UI and full device-level E2E work for this track is detailed in
+[mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md). That plan
+is the implementation companion for the bridge-facing requirements below.
+
 Extraction flow:
 
 1. User selects all entries or selected entries.
