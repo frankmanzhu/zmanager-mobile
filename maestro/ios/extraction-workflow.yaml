@@ -14,5 +14,5 @@ appId: org.tzap.zmanager.mobile
     timeout: 15000
 - tapOn: "Start extraction"
 - extendedWaitUntil:
-    visible: ".*Extraction complete:.*"
+    visible: ".*Extraction complete: 5 files saved to App storage.*"
     timeout: 30000

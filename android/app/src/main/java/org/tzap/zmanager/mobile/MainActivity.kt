@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -106,6 +109,7 @@ private fun ZManagerApp(
     var listingRequestId by remember { mutableStateOf(0L) }
     var previewRequestId by remember { mutableStateOf(0L) }
     var testRequestId by remember { mutableStateOf(0L) }
+    var showFixtureMenu by remember { mutableStateOf(false) }
 
     fun clearPreviewState() {
         cleanupPreview(previewState)
@@ -126,6 +130,16 @@ private fun ZManagerApp(
         extractionPasswordInput = ""
     }
 
+    fun extractionSelectedPaths(entries: List<ArchiveEntrySummary>): List<String> {
+        val summaryEntries = (listingState as? ArchiveListingState.Ready)?.summary?.entries
+            ?: return entries.map { it.path }
+        return if (entries.mapTo(mutableSetOf()) { it.path } == summaryEntries.mapTo(mutableSetOf()) { it.path }) {
+            emptyList()
+        } else {
+            entries.map { it.path }
+        }
+    }
+
     fun planExtraction(
         archive: ImportedArchive,
         entries: List<ArchiveEntrySummary>,
@@ -133,13 +147,17 @@ private fun ZManagerApp(
         password: String?
     ) {
         clearExtractionState()
+        val selectedPaths = extractionSelectedPaths(entries)
         extractionState = ArchiveExtractionUiState.Planning(destination.label)
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     extractionCoordinator.plan(
                         archive = archive,
-                        selectedPaths = entries.map { it.path },
+                        // An empty selection means every entry. Preserve that
+                        // contract so full extraction reaches the format's
+                        // native backend instead of the per-entry fallback.
+                        selectedPaths = selectedPaths,
                         destination = destination,
                         password = password,
                         collisionPolicy = ExtractionCollisionPolicy.REFUSE
@@ -284,7 +302,7 @@ private fun ZManagerApp(
         }
     }
 
-    fun startMaestroFixtureImport() {
+    fun startMaestroFixtureImport(assetName: String = "maestro-files.zip") {
         importRequestId += 1
         val currentImportRequestId = importRequestId
         listingRequestId += 1
@@ -300,7 +318,7 @@ private fun ZManagerApp(
         selectedEntryIds = emptySet()
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { importer.importAsset("maestro-files.zip") }
+                runCatching { importer.importAsset(assetName) }
             }
             if (currentImportRequestId != importRequestId) {
                 return@launch
@@ -311,7 +329,7 @@ private fun ZManagerApp(
                     loadArchiveListing(archive, null)
                 }
                 .onFailure {
-                    importError = "Unable to import the Maestro fixture."
+                    importError = "Unable to import the test fixture."
                 }
             isImporting = false
         }
@@ -482,11 +500,39 @@ private fun ZManagerApp(
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
                     if (BuildConfig.DEBUG) {
+                        Box {
+                            OutlinedButton(
+                                enabled = !isImporting,
+                                onClick = { startMaestroFixtureImport() }
+                            ) {
+                                Text("Load Maestro fixture")
+                            }
+                            DropdownMenu(
+                                expanded = showFixtureMenu,
+                                onDismissRequest = { showFixtureMenu = false }
+                            ) {
+                                listOf(
+                                    "ZIP fixture" to "maestro-files.zip",
+                                    "7z fixture" to "maestro-files.7z",
+                                    "TGZ fixture" to "maestro-files.tgz",
+                                    "TAR.ZST fixture" to "maestro-files.tar.zst",
+                                    "TZAP fixture" to "maestro-files.tzap"
+                                ).forEach { (label, assetName) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            showFixtureMenu = false
+                                            startMaestroFixtureImport(assetName)
+                                        }
+                                    )
+                                }
+                            }
+                        }
                         OutlinedButton(
                             enabled = !isImporting,
-                            onClick = { startMaestroFixtureImport() }
+                            onClick = { showFixtureMenu = true }
                         ) {
-                            Text("Load Maestro fixture")
+                            Text("Load test fixture")
                         }
                     }
                     Button(

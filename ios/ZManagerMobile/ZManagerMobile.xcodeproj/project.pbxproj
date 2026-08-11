@@ -13,6 +13,11 @@
 		01A000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000107 /* Assets.xcassets */; };
 		01A000000000000000000005 /* zmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000108 /* zmanager.swift */; };
 		01A000000000000000000006 /* maestro-files.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010B /* maestro-files.zip */; };
+		01A000000000000000000007 /* maestro-files.7z in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010C /* maestro-files.7z */; };
+		01A000000000000000000008 /* maestro-files.tgz in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010D /* maestro-files.tgz */; };
+		01A000000000000000000009 /* maestro-files.tar.zst in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010E /* maestro-files.tar.zst */; };
+		01A00000000000000000000A /* maestro-files.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000010F /* maestro-files.tzap */; };
+		01A00000000000000000000B /* maestro-files.aar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000110 /* maestro-files.aar */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +42,11 @@
 		01A000000000000000000109 /* zmanagerFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = zmanagerFFI.h; sourceTree = "<group>"; };
 		01A00000000000000000010A /* zmanagerFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = zmanagerFFI.modulemap; sourceTree = "<group>"; };
 		01A00000000000000000010B /* maestro-files.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-files.zip; sourceTree = "<group>"; };
+		01A00000000000000000010C /* maestro-files.7z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.7z; sourceTree = "<group>"; };
+		01A00000000000000000010D /* maestro-files.tgz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = MaestroFixtures/maestro-files.tgz; sourceTree = "<group>"; };
+		01A00000000000000000010E /* maestro-files.tar.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.zst; sourceTree = "<group>"; };
+		01A00000000000000000010F /* maestro-files.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tzap; sourceTree = "<group>"; };
+		01A000000000000000000110 /* maestro-files.aar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.aar; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +84,11 @@
 				01A000000000000000000104 /* Info.plist */,
 				01A000000000000000000107 /* Assets.xcassets */,
 				01A00000000000000000010B /* maestro-files.zip */,
+				01A00000000000000000010C /* maestro-files.7z */,
+				01A00000000000000000010D /* maestro-files.tgz */,
+				01A00000000000000000010E /* maestro-files.tar.zst */,
+				01A00000000000000000010F /* maestro-files.tzap */,
+				01A000000000000000000110 /* maestro-files.aar */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -198,6 +213,11 @@
 			files = (
 				01A000000000000000000004 /* Assets.xcassets in Resources */,
 				01A000000000000000000006 /* maestro-files.zip in Resources */,
+				01A000000000000000000007 /* maestro-files.7z in Resources */,
+				01A000000000000000000008 /* maestro-files.tgz in Resources */,
+				01A000000000000000000009 /* maestro-files.tar.zst in Resources */,
+				01A00000000000000000000A /* maestro-files.tzap in Resources */,
+				01A00000000000000000000B /* maestro-files.aar in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,9 +4,10 @@ appId: org.tzap.zmanager.mobile
 
 - launchApp:
     clearState: true
-- tapOn: "Load Maestro fixture"
+- tapOn: "Load test fixture"
+- tapOn: "TZAP fixture"
 - extendedWaitUntil:
-    visible: "ZIP - 5 entries"
+    visible: "TZAP - 5 entries"
     timeout: 15000
 - tapOn: "Extract"
 - extendedWaitUntil:

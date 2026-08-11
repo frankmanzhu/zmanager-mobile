@@ -39,7 +39,7 @@ class ArchiveImporter(context: Context) {
     fun importAsset(assetName: String): ImportedArchive {
         return importStream(
             displayName = assetName,
-            sourceMimeType = "application/zip"
+            sourceMimeType = null
         ) {
             appContext.assets.open(assetName)
         }

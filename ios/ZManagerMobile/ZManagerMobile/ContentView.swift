@@ -70,6 +70,27 @@ struct ContentView: View {
                     importModel.importMaestroFixture()
                 }
                 .disabled(importModel.isImporting)
+                Menu("Load test fixture") {
+                    Button("ZIP fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.zip")
+                    }
+                    Button("7z fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.7z")
+                    }
+                    Button("TGZ fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tgz")
+                    }
+                    Button("TAR.ZST fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.zst")
+                    }
+                    Button("TZAP fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tzap")
+                    }
+                    Button("Apple Archive fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.aar")
+                    }
+                }
+                .disabled(importModel.isImporting)
 #endif
                 Button(importModel.isImporting ? "Importing" : "Open Archive") {
                     isFileImporterPresented = true
@@ -1284,10 +1305,15 @@ final class ArchiveImportModel: ObservableObject {
     }
 
     func importMaestroFixture() {
-        guard let fixtureURL = Bundle.main.url(
-            forResource: "maestro-files",
-            withExtension: "zip"
-        ) else {
+        importMaestroFixture(named: "maestro-files.zip")
+    }
+
+    func importMaestroFixture(named fixtureName: String) {
+        let fixtureURL = Bundle.main.url(
+            forResource: fixtureName,
+            withExtension: nil
+        )
+        guard let fixtureURL else {
             errorMessage = "The Maestro fixture is not available in this build."
             return
         }
@@ -1341,6 +1367,15 @@ final class ArchiveImportModel: ObservableObject {
         return selected.isEmpty ? summary.entries : selected
     }
 
+    private func extractionSelectedPaths(for selectedEntries: [ArchiveEntrySummary]) -> [String] {
+        guard case .ready(let summary) = listingState else {
+            return selectedEntries.map(\.path)
+        }
+        let selectedPaths = Set(selectedEntries.map(\.path))
+        let allPaths = Set(summary.entries.map(\.path))
+        return selectedPaths == allPaths ? [] : selectedEntries.map(\.path)
+    }
+
     func planExtraction(
         selectedEntries: [ArchiveEntrySummary],
         destination: ExtractionDestination? = nil,
@@ -1349,13 +1384,17 @@ final class ArchiveImportModel: ObservableObject {
         guard let archive = importedArchive else { return }
         clearExtractionState()
         let destination = destination ?? extractionCoordinator.appStorageDestination()
+        let selectedPaths = extractionSelectedPaths(for: selectedEntries)
         extractionState = .planning(destination.label)
         Task {
             do {
                 let review = try await Task.detached(priority: .userInitiated) {
                     try self.extractionCoordinator.plan(
                         archive: archive,
-                        selectedPaths: selectedEntries.map(\.path),
+                        // An empty selection means every entry. Preserve that
+                        // bridge contract so full extraction reaches the
+                        // format's native backend rather than per-entry I/O.
+                        selectedPaths: selectedPaths,
                         destination: destination,
                         password: password,
                         collisionPolicy: .refuse

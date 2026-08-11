@@ -37,14 +37,15 @@ MAESTRO_PLATFORM=android ./scripts/check-maestro.sh
 MAESTRO_PLATFORM=ios ./scripts/check-maestro.sh
 ```
 
-`scripts/check-maestro.sh` regenerates the deterministic fixture archive before it
-runs. Build and install the debug app after changing fixture source files so the
-debug-only **Load Maestro fixture** action is present. The workflow suite imports
-that archive through the same app-cache import path as normal files, browses text,
-JSON, SVG, Markdown, and PDF entries, verifies the archive through the Rust
-bridge, and covers the complete plan-review, staged extraction, native commit,
-and completion flow in `extraction-workflow.yaml`. The landing-screen smoke flow
-continues to exercise the native `Open Archive` picker entry point.
+`scripts/check-maestro.sh` regenerates deterministic ZIP, 7z, TGZ, TAR.ZST,
+TZAP, and Apple Archive fixtures before it runs. Build and install the debug app
+after changing fixture source files so the debug-only **Load test fixture** menu
+is present. The extraction matrix covers ZIP, 7z, TGZ, TAR.ZST, and TZAP on
+Android; iOS covers those five plus Apple Archive. Each format flow imports the
+archive through the normal app-cache path, confirms its five-entry listing,
+reviews the extraction plan, starts the job, and asserts that all five files were
+committed to app storage. The landing-screen smoke flow continues to exercise the
+native `Open Archive` picker entry point.
 
 The E2E destination is deterministic app storage. The UI also supports Android
 SAF tree destinations and iOS security-scoped folders; exercise those

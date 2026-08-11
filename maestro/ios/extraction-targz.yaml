@@ -4,9 +4,10 @@ appId: org.tzap.zmanager.mobile
 
 - launchApp:
     clearState: true
-- tapOn: "Load Maestro fixture"
+- tapOn: "Load test fixture"
+- tapOn: "TGZ fixture"
 - extendedWaitUntil:
-    visible: "ZIP - 5 entries"
+    visible: "TAR.GZ - 5 entries"
     timeout: 15000
 - tapOn: "Extract"
 - extendedWaitUntil:
