@@ -25,6 +25,9 @@ struct ContentView: View {
                 Button("Load nested fixture") {
                     importModel.importMaestroFixture(named: "maestro-nested.zip")
                 }
+                Button("Create debug folder archive") {
+                    importModel.createDebugFixture()
+                }
 #endif
             }
 
@@ -80,6 +83,7 @@ struct ContentView: View {
                 onRetryExtractionPassword: { importModel.retryExtractionWithPassword(selectedEntries: $0) },
                 repackagingState: importModel.repackagingState,
                 onRepackageEntries: importModel.startRepackaging,
+                onStartRepackaging: importModel.runRepackaging,
                 onCancelRepackaging: importModel.cancelRepackaging
             )
             if let message = importModel.nestedOpenError {
@@ -101,7 +105,10 @@ struct ContentView: View {
                 archive: importModel.importedArchive,
                 state: importModel.localSendState,
                 onDiscover: importModel.discoverLocalSendDevices,
-                onSend: { importModel.sendCurrentArchive(to: $0) }
+                onSend: { importModel.sendCurrentArchive(to: $0) },
+                onCancelSend: importModel.cancelLocalSend,
+                onStartReceive: importModel.startLocalReceive,
+                onStopReceive: importModel.stopLocalReceive
             )
 
             Spacer()
@@ -356,6 +363,25 @@ struct ArchiveCreationSourceStager {
         try? fileManager.removeItem(at: staged.root)
     }
 
+    /// Deterministic app-owned source used by debug/device E2E only.
+    func stageDebugFixture() throws -> StagedCreationSources {
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
+        let folder = root.appendingPathComponent("fixture-folder", isDirectory: true)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        do {
+            try Data("ZManager Mobile creation fixture\n".utf8)
+                .write(to: folder.appendingPathComponent("readme.txt"))
+            let nested = folder.appendingPathComponent("nested", isDirectory: true)
+            try fileManager.createDirectory(at: nested, withIntermediateDirectories: true)
+            try Data([0, 1, 2, 3, 4, 5]).write(to: nested.appendingPathComponent("data.bin"))
+            return StagedCreationSources(root: root, sourcePaths: [folder.path])
+        } catch {
+            try? fileManager.removeItem(at: root)
+            throw error
+        }
+    }
+
     private func uniqueTarget(root: URL, name: String) -> URL {
         let safeName = name.isEmpty ? "file" : name
         var candidate = root.appendingPathComponent(safeName)
@@ -397,6 +423,7 @@ struct ArchiveListingPanel: View {
     let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
     let repackagingState: ArchiveRepackagingState
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
+    let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
     var body: some View {
@@ -432,6 +459,7 @@ struct ArchiveListingPanel: View {
                 onRetryExtractionPassword: onRetryExtractionPassword,
                 repackagingState: repackagingState,
                 onRepackageEntries: onRepackageEntries,
+                onStartRepackaging: onStartRepackaging,
                 onCancelRepackaging: onCancelRepackaging
             )
         case .passwordRequired(let error):
@@ -489,6 +517,7 @@ struct ArchiveListingReadyPanel: View {
     let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
     let repackagingState: ArchiveRepackagingState
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
+    let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
     private var groups: [ArchiveEntryGroup] {
@@ -582,7 +611,11 @@ struct ArchiveListingReadyPanel: View {
                 onCancel: onCancelExtraction,
                 onRetryWithPassword: onRetryExtractionPassword
             )
-            ArchiveRepackagingPanel(state: repackagingState, onCancel: onCancelRepackaging)
+            ArchiveRepackagingPanel(
+                state: repackagingState,
+                onStart: onStartRepackaging,
+                onCancel: onCancelRepackaging
+            )
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if groups.isEmpty {
@@ -630,6 +663,7 @@ struct ArchiveListingReadyPanel: View {
 
 struct ArchiveRepackagingPanel: View {
     let state: ArchiveRepackagingState
+    let onStart: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -639,6 +673,26 @@ struct ArchiveRepackagingPanel: View {
         case .planning:
             Text("Preparing repackaging plan")
                 .font(.subheadline)
+        case .review(let review):
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Ready to repackage \(review.request.selectedPaths.count) selected path(s)")
+                    .font(.subheadline)
+                Text("Output: \(review.request.destinationArchivePath)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Format: \(String(describing: review.request.format)); verification enabled")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(review.extractionReview.plan.warnings, id: \.message) { warning in
+                    Text(warning.message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                HStack {
+                    Button("Start", action: onStart)
+                    Button("Cancel", action: onCancel)
+                }
+            }
         case .running(_, let message):
             HStack {
                 Text(message).font(.subheadline)
@@ -974,6 +1028,7 @@ enum ArchiveTestState: Equatable {
 enum ArchiveRepackagingState {
     case idle
     case planning
+    case review(ArchiveRepackagingReview)
     case running(ArchiveRepackagingReview, String)
     case completed(outputPath: String, verified: Bool)
     case cancelled
@@ -981,7 +1036,7 @@ enum ArchiveRepackagingState {
 
     var isBusy: Bool {
         switch self {
-        case .planning, .running: return true
+        case .planning, .review, .running: return true
         default: return false
         }
     }
@@ -1534,6 +1589,9 @@ final class ArchiveImportModel: ObservableObject {
     private let creationSourceStager: ArchiveCreationSourceStager
     private let repackagingCoordinator: ArchiveRepackagingCoordinator
     private let localSendClient: LocalSendClient
+    private let localSendReceiver: LocalSendReceiver
+    private var activeLocalSendDevice: LocalSendDevice?
+    private var activeLocalSendSessionID: String?
     private var stagedCreationSources: StagedCreationSources?
     private var importGeneration = 0
     private var listingGeneration = 0
@@ -1551,7 +1609,8 @@ final class ArchiveImportModel: ObservableObject {
         creationCoordinator: ArchiveCreationCoordinator = ArchiveCreationCoordinator(),
         creationSourceStager: ArchiveCreationSourceStager = ArchiveCreationSourceStager(),
         repackagingCoordinator: ArchiveRepackagingCoordinator? = nil,
-        localSendClient: LocalSendClient = LocalSendClient()
+        localSendClient: LocalSendClient = LocalSendClient(),
+        localSendReceiver: LocalSendReceiver = LocalSendReceiver()
     ) {
         self.importStore = importStore
         self.listingLoader = listingLoader
@@ -1565,6 +1624,11 @@ final class ArchiveImportModel: ObservableObject {
             creation: creationCoordinator
         )
         self.localSendClient = localSendClient
+        self.localSendReceiver = localSendReceiver
+    }
+
+    deinit {
+        localSendReceiver.stop()
     }
 
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
@@ -1687,7 +1751,9 @@ final class ArchiveImportModel: ObservableObject {
 
     func startRepackaging(selectedEntries: [ArchiveEntrySummary]) {
         guard let archive = importedArchive else { return }
-        let selectedPaths = extractionSelectedPaths(for: selectedEntries)
+        // Repackaging requires an explicit source selection. An empty list is
+        // reserved by extraction for "the whole archive".
+        let selectedPaths = selectedEntries.map(\.path)
         let suffix: String
         switch creationFormat {
         case .zip: suffix = ".zip"
@@ -1709,28 +1775,38 @@ final class ArchiveImportModel: ObservableObject {
                 let review = try await Task.detached(priority: .userInitiated) {
                     try self.repackagingCoordinator.plan(request: request)
                 }.value
-                repackagingState = .running(review, "Repackaging selected entries")
-                let outcome = await repackagingCoordinator.run(review: review) { message in
-                    Task { @MainActor in self.repackagingState = .running(review, message) }
-                }
-                switch outcome {
-                case .completed(let outputPath, let verified):
-                    repackagingState = .completed(outputPath: outputPath, verified: verified)
-                case .cancelled:
-                    repackagingState = .cancelled
-                case .failed(let message):
-                    repackagingState = .failed(message)
-                }
-                passwordInput = ""
-                creationPasswordInput = ""
+                repackagingState = .review(review)
             } catch {
                 repackagingState = .failed(error.localizedDescription)
             }
         }
     }
 
+    func runRepackaging() {
+        guard case .review(let review) = repackagingState else { return }
+        repackagingState = .running(review, "Repackaging selected entries")
+        Task {
+            let outcome = await repackagingCoordinator.run(review: review) { message in
+                Task { @MainActor in self.repackagingState = .running(review, message) }
+            }
+            switch outcome {
+            case .completed(let outputPath, let verified):
+                repackagingState = .completed(outputPath: outputPath, verified: verified)
+            case .cancelled:
+                repackagingState = .cancelled
+            case .failed(let message):
+                repackagingState = .failed(message)
+            }
+            passwordInput = ""
+            creationPasswordInput = ""
+        }
+    }
+
     func cancelRepackaging() {
-        if case .running(let review, _) = repackagingState {
+        if case .review(let review) = repackagingState {
+            repackagingCoordinator.discard(review: review)
+            repackagingState = .idle
+        } else if case .running(let review, _) = repackagingState {
             repackagingCoordinator.cancel(review: review)
         }
     }
@@ -1806,6 +1882,16 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
+    #if DEBUG
+    func createDebugFixture() {
+        do {
+            try planCreation(staged: creationSourceStager.stageDebugFixture())
+        } catch {
+            creationState = .failed(error.localizedDescription)
+        }
+    }
+    #endif
+
     func startCreation(_ review: ArchiveCreationReview) {
         creationPasswordInput = ""
         creationState = .starting(review)
@@ -1862,15 +1948,55 @@ final class ArchiveImportModel: ObservableObject {
             do {
                 let file = LocalSendTransferFile(url: URL(fileURLWithPath: archive.localPath), displayName: archive.displayName)
                 let session = try await localSendClient.prepareUpload(to: device, files: [file])
+                activeLocalSendDevice = device
+                activeLocalSendSessionID = session.sessionID
                 localSendState = .sending(device, "Uploading \(archive.displayName)")
                 try await localSendClient.upload(to: device, session: session, files: [file])
+                activeLocalSendDevice = nil
+                activeLocalSendSessionID = nil
                 localSendState = .completed(device)
             } catch is CancellationError {
+                activeLocalSendDevice = nil
+                activeLocalSendSessionID = nil
                 localSendState = .failed("LocalSend transfer cancelled.")
             } catch {
+                activeLocalSendDevice = nil
+                activeLocalSendSessionID = nil
                 localSendState = .failed(error.localizedDescription)
             }
         }
+    }
+
+    func cancelLocalSend() {
+        guard case .sending = localSendState else { return }
+        let device = activeLocalSendDevice
+        let sessionID = activeLocalSendSessionID
+        localSendClient.cancelActiveUpload()
+        activeLocalSendDevice = nil
+        activeLocalSendSessionID = nil
+        Task {
+            if let device, let sessionID {
+                try? await localSendClient.cancel(to: device, sessionID: sessionID)
+            }
+            localSendState = .failed("LocalSend transfer cancelled.")
+        }
+    }
+
+    func startLocalReceive() {
+        guard case .idle = localSendState else { return }
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ZManagerMobile/ReceivedFiles", isDirectory: true)
+        do {
+            let port = try localSendReceiver.start(destinationRoot: root)
+            localSendState = .receiving(port)
+        } catch {
+            localSendState = .failed("Unable to receive LocalSend files.")
+        }
+    }
+
+    func stopLocalReceive() {
+        localSendReceiver.stop()
+        localSendState = .idle
     }
 
     private func planCreation(staged: StagedCreationSources) throws {
@@ -2203,14 +2329,25 @@ struct LocalSendPanel: View {
     let state: LocalSendUIState
     let onDiscover: () -> Void
     let onSend: (LocalSendDevice) -> Void
+    let onCancelSend: () -> Void
+    let onStartReceive: () -> Void
+    let onStopReceive: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Share on local network").font(.headline)
             Button(state.isDiscovering ? "Discovering" : "Find LocalSend devices", action: onDiscover)
                 .disabled(archive == nil || state.isDiscovering)
+            if case .receiving(let port) = state {
+                Button("Stop receiving", action: onStopReceive)
+                Text("Receiving LocalSend files on port \(port) into app storage.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Button("Receive files", action: onStartReceive)
+            }
             switch state {
-            case .idle, .discovering:
+            case .idle, .receiving, .discovering:
                 EmptyView()
             case .devices(let devices):
                 if devices.isEmpty { Text("No compatible devices found.") }
@@ -2222,7 +2359,11 @@ struct LocalSendPanel: View {
                     }
                 }
             case .sending(let device, let message):
-                Text("\(message) to \(device.alias)")
+                HStack {
+                    Text("\(message) to \(device.alias)")
+                    Spacer()
+                    Button("Cancel", action: onCancelSend)
+                }
             case .completed(let device):
                 Text("Sent to \(device.alias)")
             case .failed(let message):
@@ -2656,6 +2797,7 @@ final class ArchiveCreationCoordinator: @unchecked Sendable {
         let name = safeName.isEmpty ? "archive.zip" : safeName
         let root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ZManagerMobile/CreatedArchives", isDirectory: true)
+        try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         return root.appendingPathComponent(name)
     }
 
@@ -3044,6 +3186,7 @@ struct LocalSendUploadSession {
 
 enum LocalSendUIState {
     case idle
+    case receiving(Int)
     case discovering
     case devices([LocalSendDevice])
     case sending(LocalSendDevice, String)
@@ -3139,6 +3282,49 @@ final class LocalSendClient: @unchecked Sendable {
         }
     }
 
+    /// HTTP registration fallback for networks where multicast discovery is unavailable.
+    func discoverHTTP(hosts: [String]) async -> [LocalSendDevice] {
+        await withTaskGroup(of: LocalSendDevice?.self, returning: [LocalSendDevice].self) { group in
+            for host in hosts {
+                group.addTask {
+                    guard let url = URL(string: "http://\(host):\(Self.defaultPort)/api/localsend/v2/register") else {
+                        return nil
+                    }
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.httpBody = try? JSONSerialization.data(withJSONObject: self.announcement(announce: false))
+                    guard let (data, response) = try? await URLSession.shared.data(for: request),
+                          (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let alias = json["alias"] as? String else {
+                        return nil
+                    }
+                    let port = json["port"] as? Int ?? Self.defaultPort
+                    let fingerprint = json["fingerprint"] as? String
+                    guard fingerprint != self.fingerprint else { return nil }
+                    return LocalSendDevice(
+                        id: "\(host):\(port)",
+                        address: host,
+                        port: port,
+                        protocolName: (json["protocol"] as? String) ?? "http",
+                        alias: alias,
+                        version: (json["version"] as? String) ?? "2.0",
+                        deviceModel: json["deviceModel"] as? String,
+                        deviceType: json["deviceType"] as? String,
+                        fingerprint: fingerprint,
+                        download: (json["download"] as? Bool) ?? false
+                    )
+                }
+            }
+            var devices = [String: LocalSendDevice]()
+            for await device in group {
+                if let device { devices[device.id] = device }
+            }
+            return Array(devices.values)
+        }
+    }
+
     func prepareUpload(
         to device: LocalSendDevice,
         files: [LocalSendTransferFile],
@@ -3194,14 +3380,14 @@ final class LocalSendClient: @unchecked Sendable {
             request.httpMethod = "POST"
             activeTask = URLSession.shared.uploadTask(with: request, fromFile: file.url)
             guard let activeTask else { throw URLError(.cannotCreateFile) }
+            activeTask.resume()
             try await activeTask.value()
             self.activeTask = nil
         }
     }
 
     func cancel(to device: LocalSendDevice, sessionID: String) async throws {
-        activeTask?.cancel()
-        activeTask = nil
+        cancelActiveUpload()
         guard let baseURL = device.baseURL else { throw URLError(.badURL) }
         var components = URLComponents(url: baseURL.appendingPathComponent("api/localsend/v2/cancel"), resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "sessionId", value: sessionID)]
@@ -3210,6 +3396,11 @@ final class LocalSendClient: @unchecked Sendable {
         request.httpMethod = "POST"
         let (_, response) = try await URLSession.shared.data(for: request)
         try validate(response)
+    }
+
+    func cancelActiveUpload() {
+        activeTask?.cancel()
+        activeTask = nil
     }
 
     private func announcement(announce: Bool) -> [String: Any] {
@@ -3243,10 +3434,355 @@ final class LocalSendClient: @unchecked Sendable {
     }
 }
 
+/// LocalSend upload receiver. The listener owns only app-storage paths and
+/// commits a file after size, token, and optional SHA-256 checks succeed.
+final class LocalSendReceiver: @unchecked Sendable {
+    private struct ExpectedFile {
+        let id: String
+        let displayName: String
+        let expectedBytes: Int64
+        let sha256: String?
+        let token: String
+    }
+
+    private final class ReceiveSession {
+        let root: URL
+        let destinationRoot: URL
+        let files: [String: ExpectedFile]
+        var completed = Set<String>()
+
+        init(root: URL, destinationRoot: URL, files: [String: ExpectedFile]) {
+            self.root = root
+            self.destinationRoot = destinationRoot
+            self.files = files
+        }
+    }
+
+    private final class RequestState {
+        var headerBuffer = Data()
+        var bodyBuffer = Data()
+        var headersParsed = false
+        var method = ""
+        var path = ""
+        var headers = [String: String]()
+        var remaining = 0
+        var session: ReceiveSession?
+        var sessionID: String?
+        var expected: ExpectedFile?
+        var preparedSessionID: String?
+        var temporaryFile: URL?
+        var fileHandle: FileHandle?
+        var digest = SHA256()
+    }
+
+    private let alias: String
+    private let fingerprint: String
+    private let port: UInt16
+    private let fileManager: FileManager
+    private let queue = DispatchQueue(label: "org.tzap.zmanager.localsend.receiver")
+    private var listener: NWListener?
+    private var announceConnection: NWConnectionGroup?
+    private var announceTimer: DispatchSourceTimer?
+    private var sessions = [String: ReceiveSession]()
+    private var destinationRoot: URL?
+
+    init(
+        alias: String = "ZManager Mobile",
+        fingerprint: String = UUID().uuidString,
+        port: UInt16 = UInt16(LocalSendClient.defaultPort),
+        fileManager: FileManager = .default
+    ) {
+        self.alias = alias
+        self.fingerprint = fingerprint
+        self.port = port
+        self.fileManager = fileManager
+    }
+
+    func start(destinationRoot: URL) throws -> Int {
+        guard listener == nil else { throw LocalSendTransferError.receiverAlreadyRunning }
+        try fileManager.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
+        let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: port)!)
+        self.destinationRoot = destinationRoot
+        self.listener = listener
+        listener.newConnectionHandler = { [weak self] connection in
+            self?.accept(connection)
+        }
+        listener.stateUpdateHandler = { state in
+            if case .failed(let error) = state {
+                NSLog("LocalSend receiver stopped: \(error.localizedDescription)")
+            }
+        }
+        listener.start(queue: queue)
+        startAnnouncements()
+        return Int(port)
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+        announceTimer?.cancel()
+        announceTimer = nil
+        announceConnection?.cancel()
+        announceConnection = nil
+        sessions.values.forEach { try? fileManager.removeItem(at: $0.root) }
+        sessions.removeAll()
+        destinationRoot = nil
+    }
+
+    private func accept(_ connection: NWConnection) {
+        connection.stateUpdateHandler = { [weak self] state in
+            if case .ready = state {
+                let request = RequestState()
+                self?.receive(connection, request: request)
+            }
+        }
+        connection.start(queue: queue)
+    }
+
+    private func receive(_ connection: NWConnection, request: RequestState) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
+            guard let self else { connection.cancel(); return }
+            if let data, !data.isEmpty {
+                do {
+                    try self.consume(data, request: request)
+                    if request.remaining == 0, request.headersParsed {
+                        self.finish(connection, request: request)
+                        return
+                    }
+                } catch {
+                    self.respond(connection, status: 400, body: error.localizedDescription)
+                    return
+                }
+            }
+            if isComplete || error != nil {
+                connection.cancel()
+            } else {
+                self.receive(connection, request: request)
+            }
+        }
+    }
+
+    private func consume(_ data: Data, request: RequestState) throws {
+        if !request.headersParsed {
+            request.headerBuffer.append(data)
+            guard let marker = request.headerBuffer.range(of: Data("\r\n\r\n".utf8)) else {
+                guard request.headerBuffer.count <= 16 * 1024 else { throw LocalSendTransferError.invalidResponse }
+                return
+            }
+            let headerData = request.headerBuffer.subdata(in: 0..<marker.lowerBound)
+            let bodyStart = marker.upperBound
+            request.headerBuffer = Data(request.headerBuffer[bodyStart...])
+            let lines = String(decoding: headerData, as: UTF8.self).components(separatedBy: "\r\n")
+            let requestParts = lines.first?.split(separator: " ", maxSplits: 2).map(String.init) ?? []
+            guard requestParts.count == 3 else { throw LocalSendTransferError.invalidResponse }
+            request.method = requestParts[0]
+            request.path = requestParts[1]
+            for line in lines.dropFirst() {
+                let parts = line.split(separator: ":", maxSplits: 1).map(String.init)
+                if parts.count == 2 { request.headers[parts[0].lowercased()] = parts[1].trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+            guard request.method == "POST", let length = Int(request.headers["content-length"] ?? "0"), length >= 0 else {
+                throw LocalSendTransferError.invalidResponse
+            }
+            request.remaining = length
+            request.headersParsed = true
+            if request.path.hasPrefix("/api/localsend/v2/upload") {
+                try prepareUploadFile(request)
+            }
+            let initialBody = request.headerBuffer
+            request.headerBuffer.removeAll(keepingCapacity: false)
+            if !initialBody.isEmpty { try consumeBody(initialBody, request: request) }
+            return
+        }
+        try consumeBody(data, request: request)
+    }
+
+    private func consumeBody(_ data: Data, request: RequestState) throws {
+        guard request.remaining > 0 else { return }
+        let count = min(request.remaining, data.count)
+        let chunk = data.prefix(count)
+        if request.path.hasPrefix("/api/localsend/v2/upload") {
+            try request.fileHandle?.write(contentsOf: Data(chunk))
+            request.digest.update(data: Data(chunk))
+        } else {
+            guard request.bodyBuffer.count + count <= 4 * 1024 * 1024 else { throw LocalSendTransferError.invalidResponse }
+            request.bodyBuffer.append(chunk)
+        }
+        request.remaining -= count
+    }
+
+    private func prepareUploadFile(_ request: RequestState) throws {
+        guard let destinationRoot, let components = URLComponents(string: "http://localhost\(request.path)"),
+              let sessionID = components.queryItems?.first(where: { $0.name == "sessionId" })?.value,
+              let fileID = components.queryItems?.first(where: { $0.name == "fileId" })?.value,
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
+              let session = sessions[sessionID], let expected = session.files[fileID], expected.token == token else {
+            throw LocalSendTransferError.rejected
+        }
+        request.session = session
+        request.sessionID = sessionID
+        request.expected = expected
+        let temporary = session.root.appendingPathComponent("\(fileID).part")
+        fileManager.createFile(atPath: temporary.path, contents: nil)
+        request.temporaryFile = temporary
+        request.fileHandle = try FileHandle(forWritingTo: temporary)
+        _ = destinationRoot
+    }
+
+    private func finish(_ connection: NWConnection, request: RequestState) {
+        do {
+            if request.path.hasPrefix("/api/localsend/v2/prepare-upload") {
+                try prepare(request)
+                respond(connection, status: 200, json: prepareResponse(request))
+            } else if request.path.hasPrefix("/api/localsend/v2/upload") {
+                try commit(request)
+                respond(connection, status: 200, body: "OK")
+            } else if request.path.hasPrefix("/api/localsend/v2/cancel") {
+                cancel(request)
+                respond(connection, status: 200, body: "OK")
+            } else {
+                respond(connection, status: 404, body: "Not found")
+            }
+        } catch {
+            try? request.fileHandle?.close()
+            try? request.temporaryFile.map { try fileManager.removeItem(at: $0) }
+            respond(connection, status: 400, body: error.localizedDescription)
+        }
+    }
+
+    private func prepare(_ request: RequestState) throws {
+        guard let root = destinationRoot,
+              let json = try JSONSerialization.jsonObject(with: request.bodyBuffer) as? [String: Any],
+              let files = json["files"] as? [String: Any], !files.isEmpty else {
+            throw LocalSendTransferError.invalidResponse
+        }
+        let sessionID = UUID().uuidString
+        let sessionRoot = root.appendingPathComponent(".localsend/\(sessionID)", isDirectory: true)
+        try fileManager.createDirectory(at: sessionRoot, withIntermediateDirectories: true)
+        var expected = [String: ExpectedFile]()
+        for (key, rawValue) in files {
+            guard let value = rawValue as? [String: Any] else { throw LocalSendTransferError.invalidResponse }
+            let id = value["id"] as? String ?? key
+            let name = Self.sanitizeIncomingName(value["fileName"] as? String ?? id)
+            expected[id] = ExpectedFile(
+                id: id,
+                displayName: name,
+                expectedBytes: (value["size"] as? NSNumber)?.int64Value ?? -1,
+                sha256: value["sha256"] as? String,
+                token: UUID().uuidString
+            )
+        }
+        let session = ReceiveSession(root: sessionRoot, destinationRoot: root, files: expected)
+        sessions[sessionID] = session
+        request.session = session
+        request.preparedSessionID = sessionID
+    }
+
+    private func prepareResponse(_ request: RequestState) -> [String: Any] {
+        let sessionID = request.preparedSessionID ?? ""
+        let files = request.session?.files.reduce(into: [String: String]()) { result, item in result[item.key] = item.value.token } ?? [:]
+        return ["sessionId": sessionID, "files": files]
+    }
+
+    private func commit(_ request: RequestState) throws {
+        guard let session = request.session, let expected = request.expected, let temporary = request.temporaryFile else {
+            throw LocalSendTransferError.rejected
+        }
+        try request.fileHandle?.close()
+        let values = try temporary.resourceValues(forKeys: [.fileSizeKey])
+        let bytes = Int64(values.fileSize ?? 0)
+        guard expected.expectedBytes < 0 || expected.expectedBytes == bytes else { throw LocalSendTransferError.rejected }
+        if let sha256 = expected.sha256 {
+            let actual = request.digest.finalize().map { String(format: "%02x", $0) }.joined()
+            guard actual.caseInsensitiveCompare(sha256) == .orderedSame else { throw LocalSendTransferError.rejected }
+        }
+        let target = Self.uniqueTarget(root: session.destinationRoot, name: expected.displayName, fileManager: fileManager)
+        try fileManager.moveItem(at: temporary, to: target)
+        session.completed.insert(expected.id)
+        if session.completed.count == session.files.count, let sessionID = request.sessionID {
+            sessions.removeValue(forKey: sessionID)
+            try? fileManager.removeItem(at: session.root)
+        }
+    }
+
+    private func cancel(_ request: RequestState) {
+        let sessionID = URLComponents(string: "http://localhost\(request.path)")?.queryItems?.first(where: { $0.name == "sessionId" })?.value
+        if let sessionID, let session = sessions.removeValue(forKey: sessionID) { try? fileManager.removeItem(at: session.root) }
+    }
+
+    private func respond(_ connection: NWConnection, status: Int, body: String) {
+        respond(connection, status: status, contentType: "text/plain; charset=utf-8", data: Data(body.utf8))
+    }
+
+    private func respond(_ connection: NWConnection, status: Int, json: [String: Any]) {
+        let data = (try? JSONSerialization.data(withJSONObject: json)) ?? Data()
+        respond(connection, status: status, contentType: "application/json", data: data)
+    }
+
+    private func respond(_ connection: NWConnection, status: Int, contentType: String, data: Data) {
+        let reason = (200..<300).contains(status) ? "OK" : "Error"
+        var response = Data("HTTP/1.1 \(status) \(reason)\r\nContent-Type: \(contentType)\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n".utf8)
+        response.append(data)
+        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+    }
+
+    private func startAnnouncements() {
+        guard let group = try? NWMulticastGroup(for: [NWEndpoint.hostPort(host: NWEndpoint.Host(LocalSendClient.multicastAddress), port: NWEndpoint.Port(rawValue: port)!)]) else { return }
+        let connection = NWConnectionGroup(with: group, using: .udp)
+        announceConnection = connection
+        connection.start(queue: queue)
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now(), repeating: 1)
+        timer.setEventHandler(handler: DispatchWorkItem { [weak self] in
+            guard let self, let connection = self.announceConnection else { return }
+            let announcement = LocalSendAnnouncement(
+                alias: self.alias,
+                version: "2.0",
+                deviceModel: UIDevice.current.model,
+                deviceType: "mobile",
+                fingerprint: self.fingerprint,
+                port: Int(self.port),
+                protocol: "http",
+                download: true,
+                announce: true
+            )
+            if let data = try? JSONEncoder().encode(announcement) { connection.send(content: data, completion: { _ in }) }
+        })
+        announceTimer = timer
+        timer.resume()
+    }
+
+    static func sanitizeIncomingName(_ raw: String) -> String {
+        let name = raw.split(separator: "/").last.map(String.init)?.split(separator: "\\").last.map(String.init) ?? raw
+        let cleaned = name.replacingOccurrences(of: #"[\\/:*?\"<>|]"#, with: "_", options: .regularExpression)
+            .filter { !$0.isNewline && $0.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) } }
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return cleaned.isEmpty ? "received-file" : cleaned
+    }
+
+    private static func uniqueTarget(root: URL, name: String, fileManager: FileManager) -> URL {
+        let safe = sanitizeIncomingName(name)
+        var candidate = root.appendingPathComponent(safe)
+        var index = 1
+        while fileManager.fileExists(atPath: candidate.path) {
+            let base = candidate.deletingPathExtension().lastPathComponent
+            let ext = candidate.pathExtension
+            candidate = root.appendingPathComponent(ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)")
+            index += 1
+        }
+        return candidate
+    }
+}
+
 private extension URLSessionTask {
     func value() async throws {
         while state == .running { try await Task.sleep(nanoseconds: 50_000_000) }
         if state == .canceling { throw CancellationError() }
+        guard let response = response as? HTTPURLResponse,
+              (200..<300).contains(response.statusCode) else {
+            throw LocalSendTransferError.rejected
+        }
     }
 }
 
@@ -3254,12 +3790,14 @@ enum LocalSendTransferError: LocalizedError {
     case missingToken
     case rejected
     case invalidResponse
+    case receiverAlreadyRunning
 
     var errorDescription: String? {
         switch self {
         case .missingToken: return "The LocalSend device did not provide an upload token."
         case .rejected: return "The LocalSend device rejected the transfer."
         case .invalidResponse: return "The LocalSend device returned an invalid response."
+        case .receiverAlreadyRunning: return "LocalSend receiving is already enabled."
         }
     }
 }

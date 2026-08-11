@@ -1,0 +1,32 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Create debug folder archive"
+- extendedWaitUntil:
+    visible: "Start creation"
+    timeout: 15000
+- tapOn: "Start creation"
+- extendedWaitUntil:
+    visible: "Verified"
+    timeout: 30000
+- tapOn: "Load nested fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 1 entries"
+    timeout: 15000
+- swipe:
+    start: 50%, 80%
+    end: 50%, 25%
+    duration: 500
+- tapOn: "maestro-inner.zip"
+- tapOn: "Create archive from selection"
+- extendedWaitUntil:
+    visible: ".*Ready to repackage.*"
+    timeout: 15000
+- tapOn: "Start"
+- extendedWaitUntil:
+    visible: "Verified"
+    timeout: 30000

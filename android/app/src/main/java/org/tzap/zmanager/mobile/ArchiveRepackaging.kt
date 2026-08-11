@@ -32,6 +32,7 @@ sealed interface ArchiveRepackagingOutcome {
 sealed interface ArchiveRepackagingUiState {
     data object Idle : ArchiveRepackagingUiState
     data object Planning : ArchiveRepackagingUiState
+    data class Review(val review: ArchiveRepackagingReview) : ArchiveRepackagingUiState
     data class Running(val review: ArchiveRepackagingReview, val message: String) : ArchiveRepackagingUiState
     data class Completed(val outcome: ArchiveRepackagingOutcome.Completed) : ArchiveRepackagingUiState
     data object Cancelled : ArchiveRepackagingUiState

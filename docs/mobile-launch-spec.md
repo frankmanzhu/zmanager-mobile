@@ -1,6 +1,6 @@
 # ZManager Mobile Launch Specification
 
-Last reviewed: 2026-07-05
+Last reviewed: 2026-08-11
 
 ## Purpose
 
@@ -67,6 +67,17 @@ Before release, Android and iOS device E2E must cover at minimum:
 - exercise LocalSend protocol behavior against a controlled test peer; and
 - verify TalkBack/VoiceOver labels, password redaction, and cleanup after
   interrupted flows.
+
+Current verification status: deterministic nested browsing, native-folder
+creation, archive-folder repackaging, and receive-mode lifecycle flows pass on
+both Android and iOS simulators. Android unit tests (25) and iOS XCTest
+coverage (17) pass. A controlled LocalSend peer upload has passed against the
+Android receiver, and the iOS simulator validates the same upload protocol in
+XCTest, including checksum, traversal-safe naming, destination commit, and
+staging cleanup. The complete release gate remains open for user-selected
+receive destinations, arbitrary-file share/export, trust/PIN UX, large-job
+cancellation cleanup, lifecycle/background behavior, accessibility, native
+picker instrumentation, and physical-device compatibility coverage.
 
 ## Product Contract
 

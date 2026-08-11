@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,6 +97,7 @@ private fun ZManagerApp(
     val repackagingCoordinator = remember(context) { ArchiveRepackagingCoordinator(context, extractionCoordinator, creationCoordinator) }
     val creationSourceStager = remember(context) { ArchiveCreationSourceStager(context) }
     val localSendClient = remember { LocalSendClient() }
+    val localSendReceiver = remember { LocalSendReceiver() }
     val scope = rememberCoroutineScope()
     var importedArchive by remember { mutableStateOf<ImportedArchive?>(null) }
     var listingState by remember { mutableStateOf<ArchiveListingState>(ArchiveListingState.Idle) }
@@ -118,6 +120,8 @@ private fun ZManagerApp(
     var createPasswordInput by remember { mutableStateOf("") }
     var stagedCreationSources by remember { mutableStateOf<StagedCreationSources?>(null) }
     var localSendState by remember { mutableStateOf<LocalSendUiState>(LocalSendUiState.Idle) }
+    var activeLocalSendSession by remember { mutableStateOf<Pair<LocalSendDevice, String>?>(null) }
+    var receiveSession by remember { mutableStateOf<LocalSendReceiverSession?>(null) }
     val archiveSessions = remember { ArchiveSessionStack() }
     var nestedNavigationVersion by remember { mutableStateOf(0) }
     var nestedOpenError by remember { mutableStateOf<String?>(null) }
@@ -126,6 +130,10 @@ private fun ZManagerApp(
     var previewRequestId by remember { mutableStateOf(0L) }
     var testRequestId by remember { mutableStateOf(0L) }
     var showFixtureMenu by remember { mutableStateOf(false) }
+
+    DisposableEffect(localSendReceiver) {
+        onDispose { localSendReceiver.stop() }
+    }
 
     fun clearPreviewState() {
         cleanupPreview(previewState)
@@ -165,7 +173,10 @@ private fun ZManagerApp(
 
     fun startRepackaging(entries: List<ArchiveEntrySummary>) {
         val archive = importedArchive ?: return
-        val selectedPaths = extractionSelectedPaths(entries)
+        // Repackaging requires an explicit source selection. An empty list is
+        // reserved by extraction for "the whole archive", which would make
+        // the repackaging coordinator reject a deliberate whole-archive pick.
+        val selectedPaths = entries.map { it.path }
         val outputName = when (createFormat) {
             CreateArchiveFormat.ZIP -> "repackaged.zip"
             CreateArchiveFormat.SEVEN_Z -> "repackaged.7z"
@@ -189,22 +200,28 @@ private fun ZManagerApp(
                 }
             }
             planned.onSuccess { review ->
-                repackagingState = ArchiveRepackagingUiState.Running(review, "Repackaging selected entries")
-                val outcome = withContext(Dispatchers.IO) {
-                    repackagingCoordinator.run(review) { message ->
-                        scope.launch { repackagingState = ArchiveRepackagingUiState.Running(review, message) }
-                    }
-                }
-                repackagingState = when (outcome) {
-                    is ArchiveRepackagingOutcome.Completed -> ArchiveRepackagingUiState.Completed(outcome)
-                    ArchiveRepackagingOutcome.Cancelled -> ArchiveRepackagingUiState.Cancelled
-                    is ArchiveRepackagingOutcome.Failed -> ArchiveRepackagingUiState.Failed(outcome.message)
-                }
-                passwordInput = ""
-                createPasswordInput = ""
+                repackagingState = ArchiveRepackagingUiState.Review(review)
             }.onFailure {
                 repackagingState = ArchiveRepackagingUiState.Failed(it.message ?: "Unable to repackage the selection.")
             }
+        }
+    }
+
+    fun runRepackaging(review: ArchiveRepackagingReview) {
+        repackagingState = ArchiveRepackagingUiState.Running(review, "Repackaging selected entries")
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                repackagingCoordinator.run(review) { message ->
+                    scope.launch { repackagingState = ArchiveRepackagingUiState.Running(review, message) }
+                }
+            }
+            repackagingState = when (outcome) {
+                is ArchiveRepackagingOutcome.Completed -> ArchiveRepackagingUiState.Completed(outcome)
+                ArchiveRepackagingOutcome.Cancelled -> ArchiveRepackagingUiState.Cancelled
+                is ArchiveRepackagingOutcome.Failed -> ArchiveRepackagingUiState.Failed(outcome.message)
+            }
+            passwordInput = ""
+            createPasswordInput = ""
         }
     }
 
@@ -241,6 +258,16 @@ private fun ZManagerApp(
                 },
                 onFailure = { error -> ArchiveCreationUiState.Failed(error.message ?: "Unable to plan archive creation.") }
             )
+        }
+    }
+
+    fun stageDebugCreationFixture() {
+        if (!BuildConfig.DEBUG) return
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { creationSourceStager.stageDebugFixture() }
+            }.onSuccess(::planCreation)
+                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage creation fixture.") }
         }
     }
 
@@ -553,14 +580,56 @@ private fun ZManagerApp(
                 runCatching {
                     val file = LocalSendFile(file = File(archive.localPath), displayName = archive.displayName)
                     val session = localSendClient.prepareUpload(device, listOf(file))
-                    localSendClient.upload(device, session, listOf(file))
+                    activeLocalSendSession = device to session.sessionId
+                    localSendClient.upload(device, session, listOf(file)) { item, sent, total ->
+                        scope.launch {
+                            localSendState = LocalSendUiState.Sending(
+                                device,
+                                "Uploading ${item.displayName}: $sent/$total bytes"
+                            )
+                        }
+                    }
                 }
             }
+            activeLocalSendSession = null
             localSendState = result.fold(
                 onSuccess = { LocalSendUiState.Completed(device) },
                 onFailure = { LocalSendUiState.Failed(it.message ?: "LocalSend transfer failed.") }
             )
         }
+    }
+
+    fun cancelLocalSend() {
+        val active = activeLocalSendSession
+        localSendClient.cancel()
+        activeLocalSendSession = null
+        if (active != null) {
+            scope.launch(Dispatchers.IO) { runCatching { localSendClient.cancel(active.first, active.second) } }
+        }
+        localSendState = LocalSendUiState.Failed("LocalSend transfer cancelled.")
+    }
+
+    fun startLocalReceive() {
+        if (receiveSession != null) return
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    localSendReceiver.start(File(context.filesDir, "ReceivedFiles"))
+                }
+            }
+            result.onSuccess {
+                receiveSession = it
+                localSendState = LocalSendUiState.Receiving(it.port)
+            }.onFailure {
+                localSendState = LocalSendUiState.Failed("Unable to receive LocalSend files.")
+            }
+        }
+    }
+
+    fun stopLocalReceive() {
+        scope.launch(Dispatchers.IO) { localSendReceiver.stop() }
+        receiveSession = null
+        localSendState = LocalSendUiState.Idle
     }
 
     val documentPicker = rememberLauncherForActivityResult(
@@ -653,6 +722,14 @@ private fun ZManagerApp(
                         ) {
                             Text("Load nested fixture")
                         }
+                        OutlinedButton(
+                            enabled = creationState !is ArchiveCreationUiState.Planning &&
+                                creationState !is ArchiveCreationUiState.Starting &&
+                                creationState !is ArchiveCreationUiState.Running,
+                            onClick = ::stageDebugCreationFixture
+                        ) {
+                            Text("Create debug folder archive")
+                        }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     importedArchive?.let { archive ->
@@ -706,12 +783,15 @@ private fun ZManagerApp(
                             }
                         }
                     )
-                    LocalSendPanel(
-                        archive = importedArchive,
-                        state = localSendState,
-                        onDiscover = ::discoverLocalSendDevices,
-                        onSend = ::sendCurrentArchive
-                    )
+            LocalSendPanel(
+                archive = importedArchive,
+                state = localSendState,
+                onDiscover = ::discoverLocalSendDevices,
+                onSend = ::sendCurrentArchive,
+                onCancelSend = ::cancelLocalSend,
+                onStartReceive = ::startLocalReceive,
+                onStopReceive = ::stopLocalReceive
+            )
                     ArchiveListingPanel(
                         state = listingState,
                         passwordInput = passwordInput,
@@ -802,9 +882,19 @@ private fun ZManagerApp(
                         },
                         repackagingState = repackagingState,
                         onRepackageEntries = ::startRepackaging,
+                        onStartRepackaging = { state ->
+                            if (state is ArchiveRepackagingUiState.Review) runRepackaging(state.review)
+                        },
                         onCancelRepackaging = { state ->
-                            if (state is ArchiveRepackagingUiState.Running) {
-                                scope.launch(Dispatchers.IO) { repackagingCoordinator.cancel(state.review) }
+                            when (state) {
+                                is ArchiveRepackagingUiState.Review -> {
+                                    repackagingCoordinator.discard(state.review)
+                                    repackagingState = ArchiveRepackagingUiState.Idle
+                                }
+                                is ArchiveRepackagingUiState.Running -> {
+                                    scope.launch(Dispatchers.IO) { repackagingCoordinator.cancel(state.review) }
+                                }
+                                else -> Unit
                             }
                         }
                     )
@@ -999,15 +1089,25 @@ private fun LocalSendPanel(
     archive: ImportedArchive?,
     state: LocalSendUiState,
     onDiscover: () -> Unit,
-    onSend: (LocalSendDevice) -> Unit
+    onSend: (LocalSendDevice) -> Unit,
+    onCancelSend: () -> Unit,
+    onStartReceive: () -> Unit,
+    onStopReceive: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Share on local network", style = MaterialTheme.typography.titleMedium)
         Button(enabled = archive != null && state !is LocalSendUiState.Discovering, onClick = onDiscover) {
             Text(if (state is LocalSendUiState.Discovering) "Discovering" else "Find LocalSend devices")
         }
+        if (state is LocalSendUiState.Receiving) {
+            OutlinedButton(onClick = onStopReceive) { Text("Stop receiving") }
+            Text("Receiving LocalSend files on port ${state.port} into app storage.")
+        } else {
+            OutlinedButton(onClick = onStartReceive) { Text("Receive files") }
+        }
         when (state) {
             LocalSendUiState.Idle, LocalSendUiState.Discovering -> Unit
+            is LocalSendUiState.Receiving -> Unit
             is LocalSendUiState.Devices -> {
                 if (state.devices.isEmpty()) Text("No compatible devices found.")
                 state.devices.forEach { device ->
@@ -1017,7 +1117,10 @@ private fun LocalSendPanel(
                     }
                 }
             }
-            is LocalSendUiState.Sending -> Text("${state.message} to ${state.device.alias}")
+            is LocalSendUiState.Sending -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${state.message} to ${state.device.alias}", modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = onCancelSend) { Text("Cancel") }
+            }
             is LocalSendUiState.Completed -> Text("Sent to ${state.device.alias}")
             is LocalSendUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
         }
@@ -1061,6 +1164,7 @@ private fun ArchiveListingPanel(
     onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit,
     repackagingState: ArchiveRepackagingUiState,
     onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onStartRepackaging: (ArchiveRepackagingUiState) -> Unit,
     onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
 ) {
     when (state) {
@@ -1104,6 +1208,7 @@ private fun ArchiveListingPanel(
             onRetryExtractionWithPassword = onRetryExtractionWithPassword,
             repackagingState = repackagingState,
             onRepackageEntries = onRepackageEntries,
+            onStartRepackaging = onStartRepackaging,
             onCancelRepackaging = onCancelRepackaging
         )
         is ArchiveListingState.PasswordRequired -> {
@@ -1184,6 +1289,7 @@ private fun ArchiveListingReadyPanel(
     onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit,
     repackagingState: ArchiveRepackagingUiState,
     onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onStartRepackaging: (ArchiveRepackagingUiState) -> Unit,
     onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
 ) {
     val groups = summary.visibleGroups(searchQuery, sort, viewMode)
@@ -1269,6 +1375,7 @@ private fun ArchiveListingReadyPanel(
     }
     Button(
         enabled = selectedEntries.isNotEmpty() && repackagingState !is ArchiveRepackagingUiState.Planning &&
+            repackagingState !is ArchiveRepackagingUiState.Review &&
             repackagingState !is ArchiveRepackagingUiState.Running,
         onClick = { onRepackageEntries(selectedEntries) }
     ) {
@@ -1276,6 +1383,7 @@ private fun ArchiveListingReadyPanel(
     }
     ArchiveRepackagingPanel(
         state = repackagingState,
+        onStart = onStartRepackaging,
         onCancel = onCancelRepackaging
     )
     ArchivePreviewPanel(
@@ -1362,11 +1470,24 @@ private fun ArchiveListingReadyPanel(
 @Composable
 private fun ArchiveRepackagingPanel(
     state: ArchiveRepackagingUiState,
+    onStart: (ArchiveRepackagingUiState) -> Unit,
     onCancel: (ArchiveRepackagingUiState) -> Unit
 ) {
     when (state) {
         ArchiveRepackagingUiState.Idle -> Unit
         ArchiveRepackagingUiState.Planning -> Text("Preparing repackaging plan")
+        is ArchiveRepackagingUiState.Review -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Ready to repackage ${state.review.request.selectedPaths.size} selected path(s)")
+            Text("Output: ${state.review.request.destinationArchivePath}", style = MaterialTheme.typography.bodySmall)
+            Text("Format: ${state.review.request.format.name}; verification enabled", style = MaterialTheme.typography.bodySmall)
+            state.review.extractionReview.plan.warnings.forEach { warning ->
+                Text(warning.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onStart(state) }) { Text("Start") }
+                OutlinedButton(onClick = { onCancel(state) }) { Text("Cancel") }
+            }
+        }
         is ArchiveRepackagingUiState.Running -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(state.message, modifier = Modifier.weight(1f))
             TextButton(onClick = { onCancel(state) }) { Text("Cancel") }

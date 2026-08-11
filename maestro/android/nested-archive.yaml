@@ -36,5 +36,9 @@ appId: org.tzap.zmanager.mobile
     start: 50%, 25%
     end: 50%, 80%
     duration: 500
-- assertVisible: "maestro-nested.zip / maestro-inner.zip"
+- assertVisible: "maestro-nested.zip"
+- swipe:
+    start: 50%, 80%
+    end: 50%, 25%
+    duration: 500
 - assertVisible: "maestro-inner.zip"

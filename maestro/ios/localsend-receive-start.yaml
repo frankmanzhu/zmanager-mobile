@@ -1,0 +1,11 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Receive files"
+- extendedWaitUntil:
+    visible: ".*Receiving LocalSend files.*"
+    timeout: 10000

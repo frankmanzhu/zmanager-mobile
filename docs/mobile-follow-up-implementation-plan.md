@@ -53,15 +53,31 @@ Implementation status for the current workstream:
 - Android and iOS nested session stacks, materialization, cleanup, breadcrumbs,
   Back navigation, and archive-entry actions are wired.
 - Android and iOS archive-folder repackaging coordinators compose extraction
-  into private staging followed by the existing create planner/job.
-- Android and iOS have an outbound LocalSend subsystem with v2.2 metadata,
-  multicast discovery, HTTP registration fallback primitives, upload
-  preparation, SHA-256 metadata, upload, cancellation primitives, and local
-  network permission declarations.
-- Remaining launch work is the full output/export/share polish, receive mode,
-  lifecycle/background hardening, multipart nested-volume policy, native
-  instrumentation/UI tests, deterministic nested/repackaging fixtures, and
-  Android/iOS device E2E against a controlled LocalSend peer.
+  into private staging followed by the existing create planner/job, with a
+  native review checkpoint before the jobs start.
+- Android and iOS have outbound LocalSend primitives with v2.2 metadata,
+  multicast discovery, HTTP registration fallback, upload preparation,
+  SHA-256 metadata, upload, cancellation, and visible transfer cancellation;
+  Android also reports upload byte progress. Both shells have an app-owned
+  upload receiver with token, size, checksum, traversal, and staging-cleanup
+  validation.
+- Multipart nested entries are explicitly rejected as single-file nested
+  archives until volume grouping is implemented.
+- Deterministic nested and create/repackage fixtures are bundled in both
+  shells. Nested browsing, native-folder creation, archive-folder
+  repackaging, and receive-mode lifecycle Maestro flows pass on Android and
+  iOS simulators.
+- Android unit tests (25 tests) and iOS XCTest coverage (17 tests) pass for the
+  current bridge/coordinator/protocol coverage. A controlled LocalSend peer
+  upload passes against Android through an adb-forwarded socket, and the iOS
+  simulator runs the same validated upload path in XCTest.
+
+Remaining launch work is full output/export/share polish and arbitrary-file
+selection, user-selected receive destinations, LocalSend trust/PIN UX,
+reverse-download support if required, lifecycle/background hardening,
+repackaging password-retry UX, native SAF/security-scoped instrumentation,
+accessibility/device-matrix coverage, and cancellation-cleanup E2E for large
+transfers and archive jobs.
 
 ## Track 1: Nested archive browsing
 
@@ -223,14 +239,18 @@ local networks can block multicast or the default port.
 
 ### Phase 3B: receive from LocalSend devices
 
-Add receiving after outbound sharing is stable:
+The current receive implementation covers LocalSend's upload API, where the
+mobile app owns the HTTP receiver and another device sends files to it. It
+must:
 
 - advertise the app only while receiving is enabled;
 - expose `download: true` only while the temporary receiver is active;
-- implement `prepare-download` and `download`;
 - ask the user for a destination before writing files;
 - sanitize incoming names and reject traversal or unsafe paths; and
 - remove incomplete files after cancellation, timeout, or process termination.
+
+The reverse-transfer `prepare-download`/`download` API is a separate optional
+compatibility phase and must not be conflated with upload receiving.
 
 ### Ownership and security
 

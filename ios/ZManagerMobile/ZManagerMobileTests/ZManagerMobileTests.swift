@@ -1,4 +1,6 @@
 import XCTest
+import Foundation
+import CryptoKit
 @testable import ZManagerMobile
 
 final class ZManagerMobileTests: XCTestCase {
@@ -302,6 +304,51 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(json["version"] as? String, "2.0")
         XCTAssertEqual(json["port"] as? Int, LocalSendClient.defaultPort)
         XCTAssertEqual(json["announce"] as? Bool, true)
+    }
+
+    func testLocalSendReceiverSanitizesIncomingNames() {
+        XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName("../../evil.zip"), "evil.zip")
+        XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName(".."), "received-file")
+        XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName("nested\\archive.zip"), "archive.zip")
+    }
+
+    func testLocalSendReceiverAcceptsAndCommitsValidatedUpload() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let receiver = LocalSendReceiver(port: 53319, fileManager: fileManager)
+        try receiver.start(destinationRoot: root)
+        defer { receiver.stop() }
+
+        let payload = Data("controlled LocalSend peer payload\n".utf8)
+        let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+        let fileID = "file-1"
+        let prepareBody: [String: Any] = [
+            "files": [fileID: [
+                "id": fileID,
+                "fileName": "../controlled-peer.txt",
+                "size": payload.count,
+                "sha256": digest
+            ]]
+        ]
+        var prepare = URLRequest(url: URL(string: "http://127.0.0.1:53319/api/localsend/v2/prepare-upload")!)
+        prepare.httpMethod = "POST"
+        prepare.httpBody = try JSONSerialization.data(withJSONObject: prepareBody)
+        prepare.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (prepareData, prepareResponse) = try await URLSession.shared.data(for: prepare)
+        XCTAssertEqual((prepareResponse as? HTTPURLResponse)?.statusCode, 200, String(data: prepareData, encoding: .utf8) ?? "<empty>")
+        let prepareJSON = try XCTUnwrap(try JSONSerialization.jsonObject(with: prepareData) as? [String: Any])
+        let sessionID = try XCTUnwrap(prepareJSON["sessionId"] as? String)
+        let files = try XCTUnwrap(prepareJSON["files"] as? [String: String])
+        let token = try XCTUnwrap(files[fileID])
+        var upload = URLRequest(url: URL(string: "http://127.0.0.1:53319/api/localsend/v2/upload?sessionId=\(sessionID)&fileId=\(fileID)&token=\(token)")!)
+        upload.httpMethod = "POST"
+        upload.httpBody = payload
+        let (_, uploadResponse) = try await URLSession.shared.data(for: upload)
+        XCTAssertEqual((uploadResponse as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("controlled-peer.txt")), payload)
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent(".localsend").appendingPathComponent(sessionID).path))
     }
 
     func testExtractionCoordinatorCommitsCompletedStagingOutput() async throws {

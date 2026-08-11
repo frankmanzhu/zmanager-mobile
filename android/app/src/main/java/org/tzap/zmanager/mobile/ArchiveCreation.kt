@@ -103,6 +103,24 @@ class ArchiveCreationSourceStager(private val context: Context) {
         }
     }
 
+    /** Deterministic app-owned source used by debug/device E2E only. */
+    fun stageDebugFixture(): StagedCreationSources {
+        val root = File(context.cacheDir, "creation-sources/${UUID.randomUUID()}")
+        val folder = File(root, "fixture-folder")
+        check(folder.mkdirs()) { "Unable to prepare archive creation staging." }
+        return try {
+            File(folder, "readme.txt").writeText("ZManager Mobile creation fixture\n")
+            File(folder, "nested/data.bin").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(0, 1, 2, 3, 4, 5))
+            }
+            StagedCreationSources(root, listOf(folder.absolutePath))
+        } catch (error: Throwable) {
+            root.deleteRecursively()
+            throw error
+        }
+    }
+
     fun discard(staged: StagedCreationSources) {
         staged.root.deleteRecursively()
     }

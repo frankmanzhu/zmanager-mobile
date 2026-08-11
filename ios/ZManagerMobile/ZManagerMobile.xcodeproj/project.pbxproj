@@ -35,6 +35,7 @@
 		01A00000000000000000001A /* maestro-split.vol005.tzap in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000011F /* maestro-split.vol005.tzap */; };
 		01A00000000000000000001B /* maestro-split.z01 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000120 /* maestro-split.z01 */; };
 		01A00000000000000000001C /* maestro-split.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000121 /* maestro-split.zip */; };
+		01A00000000000000000001D /* maestro-nested.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000122 /* maestro-nested.zip */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +82,7 @@
 		01A00000000000000000011F /* maestro-split.vol005.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol005.tzap; sourceTree = "<group>"; };
 		01A000000000000000000120 /* maestro-split.z01 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.z01; sourceTree = "<group>"; };
 		01A000000000000000000121 /* maestro-split.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-split.zip; sourceTree = "<group>"; };
+		01A000000000000000000122 /* maestro-nested.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-nested.zip; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -140,6 +142,7 @@
 				01A00000000000000000011F /* maestro-split.vol005.tzap */,
 				01A000000000000000000120 /* maestro-split.z01 */,
 				01A000000000000000000121 /* maestro-split.zip */,
+				01A000000000000000000122 /* maestro-nested.zip */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -286,6 +289,7 @@
 				01A00000000000000000001A /* maestro-split.vol005.tzap in Resources */,
 				01A00000000000000000001B /* maestro-split.z01 in Resources */,
 				01A00000000000000000001C /* maestro-split.zip in Resources */,
+				01A00000000000000000001D /* maestro-nested.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -39,6 +39,7 @@ data class LocalSendUploadSession(val sessionId: String, val tokens: Map<String,
 
 sealed interface LocalSendUiState {
     data object Idle : LocalSendUiState
+    data class Receiving(val port: Int) : LocalSendUiState
     data object Discovering : LocalSendUiState
     data class Devices(val devices: List<LocalSendDevice>) : LocalSendUiState
     data class Sending(val device: LocalSendDevice, val message: String) : LocalSendUiState
@@ -51,7 +52,13 @@ object LocalSendProtocol {
     const val defaultPort = 53317
     const val protocolVersion = "2.0"
 
-    fun announcement(alias: String, fingerprint: String, port: Int = defaultPort): JSONObject =
+    fun announcement(
+        alias: String,
+        fingerprint: String,
+        port: Int = defaultPort,
+        download: Boolean = false,
+        announce: Boolean = true
+    ): JSONObject =
         JSONObject().apply {
             put("alias", alias)
             put("version", protocolVersion)
@@ -60,8 +67,8 @@ object LocalSendProtocol {
             put("fingerprint", fingerprint)
             put("port", port)
             put("protocol", "http")
-            put("download", false)
-            put("announce", true)
+            put("download", download)
+            put("announce", announce)
         }
 
     fun prepareUploadBody(
