@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
+import org.tzap.zmanager.mobile.bridge.generated.CreateArchiveFormat
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import java.io.File
 import java.util.Locale
@@ -89,6 +92,10 @@ private fun ZManagerApp(
     val importer = remember(context) { ArchiveImporter(context) }
     val listingRepository = remember { ArchiveListingRepository() }
     val extractionCoordinator = remember(context) { ArchiveExtractionCoordinator(context) }
+    val creationCoordinator = remember(context) { ArchiveCreationCoordinator(context) }
+    val repackagingCoordinator = remember(context) { ArchiveRepackagingCoordinator(context, extractionCoordinator, creationCoordinator) }
+    val creationSourceStager = remember(context) { ArchiveCreationSourceStager(context) }
+    val localSendClient = remember { LocalSendClient() }
     val scope = rememberCoroutineScope()
     var importedArchive by remember { mutableStateOf<ImportedArchive?>(null) }
     var listingState by remember { mutableStateOf<ArchiveListingState>(ArchiveListingState.Idle) }
@@ -105,6 +112,15 @@ private fun ZManagerApp(
     var testState by remember { mutableStateOf<ArchiveTestState>(ArchiveTestState.Idle) }
     var extractionState by remember { mutableStateOf<ArchiveExtractionUiState>(ArchiveExtractionUiState.Idle) }
     var extractionPasswordInput by remember { mutableStateOf("") }
+    var repackagingState by remember { mutableStateOf<ArchiveRepackagingUiState>(ArchiveRepackagingUiState.Idle) }
+    var creationState by remember { mutableStateOf<ArchiveCreationUiState>(ArchiveCreationUiState.Idle) }
+    var createFormat by remember { mutableStateOf(CreateArchiveFormat.ZIP) }
+    var createPasswordInput by remember { mutableStateOf("") }
+    var stagedCreationSources by remember { mutableStateOf<StagedCreationSources?>(null) }
+    var localSendState by remember { mutableStateOf<LocalSendUiState>(LocalSendUiState.Idle) }
+    val archiveSessions = remember { ArchiveSessionStack() }
+    var nestedNavigationVersion by remember { mutableStateOf(0) }
+    var nestedOpenError by remember { mutableStateOf<String?>(null) }
     var importRequestId by remember { mutableStateOf(0L) }
     var listingRequestId by remember { mutableStateOf(0L) }
     var previewRequestId by remember { mutableStateOf(0L) }
@@ -130,6 +146,13 @@ private fun ZManagerApp(
         extractionPasswordInput = ""
     }
 
+    fun clearCreationState() {
+        (creationState as? ArchiveCreationUiState.Review)?.review?.let(creationCoordinator::discard)
+        stagedCreationSources?.let(creationSourceStager::discard)
+        stagedCreationSources = null
+        creationState = ArchiveCreationUiState.Idle
+    }
+
     fun extractionSelectedPaths(entries: List<ArchiveEntrySummary>): List<String> {
         val summaryEntries = (listingState as? ArchiveListingState.Ready)?.summary?.entries
             ?: return entries.map { it.path }
@@ -137,6 +160,117 @@ private fun ZManagerApp(
             emptyList()
         } else {
             entries.map { it.path }
+        }
+    }
+
+    fun startRepackaging(entries: List<ArchiveEntrySummary>) {
+        val archive = importedArchive ?: return
+        val selectedPaths = extractionSelectedPaths(entries)
+        val outputName = when (createFormat) {
+            CreateArchiveFormat.ZIP -> "repackaged.zip"
+            CreateArchiveFormat.SEVEN_Z -> "repackaged.7z"
+            CreateArchiveFormat.TAR_ZST -> "repackaged.tar.zst"
+            CreateArchiveFormat.TZAP -> "repackaged.tzap"
+        }
+        repackagingState = ArchiveRepackagingUiState.Planning
+        scope.launch {
+            val planned = withContext(Dispatchers.IO) {
+                runCatching {
+                    repackagingCoordinator.plan(
+                        ArchiveRepackagingRequest(
+                            sourceArchive = archive,
+                            selectedPaths = selectedPaths,
+                            destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
+                            format = createFormat,
+                            sourcePassword = passwordInput.takeIf { it.isNotEmpty() },
+                            destinationPassword = createPasswordInput.takeIf { it.isNotEmpty() }
+                        )
+                    )
+                }
+            }
+            planned.onSuccess { review ->
+                repackagingState = ArchiveRepackagingUiState.Running(review, "Repackaging selected entries")
+                val outcome = withContext(Dispatchers.IO) {
+                    repackagingCoordinator.run(review) { message ->
+                        scope.launch { repackagingState = ArchiveRepackagingUiState.Running(review, message) }
+                    }
+                }
+                repackagingState = when (outcome) {
+                    is ArchiveRepackagingOutcome.Completed -> ArchiveRepackagingUiState.Completed(outcome)
+                    ArchiveRepackagingOutcome.Cancelled -> ArchiveRepackagingUiState.Cancelled
+                    is ArchiveRepackagingOutcome.Failed -> ArchiveRepackagingUiState.Failed(outcome.message)
+                }
+                passwordInput = ""
+                createPasswordInput = ""
+            }.onFailure {
+                repackagingState = ArchiveRepackagingUiState.Failed(it.message ?: "Unable to repackage the selection.")
+            }
+        }
+    }
+
+    fun planCreation(staged: StagedCreationSources) {
+        clearCreationState()
+        stagedCreationSources = staged
+        val outputName = when (createFormat) {
+            CreateArchiveFormat.ZIP -> "archive.zip"
+            CreateArchiveFormat.SEVEN_Z -> "archive.7z"
+            CreateArchiveFormat.TAR_ZST -> "archive.tar.zst"
+            CreateArchiveFormat.TZAP -> "archive.tzap"
+        }
+        creationState = ArchiveCreationUiState.Planning
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    creationCoordinator.plan(
+                            ArchiveCreationRequest(
+                            sourcePaths = staged.sourcePaths,
+                            destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
+                            format = createFormat,
+                            password = createPasswordInput.takeIf { it.isNotEmpty() }
+                        )
+                    )
+                }
+            }
+            creationState = result.fold(
+                onSuccess = { review ->
+                    if (review.plan.canStart) ArchiveCreationUiState.Review(review)
+                    else ArchiveCreationUiState.Failed(
+                        review.plan.warnings.firstOrNull()?.message
+                            ?: "This creation plan cannot be started."
+                    )
+                },
+                onFailure = { error -> ArchiveCreationUiState.Failed(error.message ?: "Unable to plan archive creation.") }
+            )
+        }
+    }
+
+    fun startCreation(review: ArchiveCreationReview) {
+        createPasswordInput = ""
+        creationState = ArchiveCreationUiState.Starting(review)
+        scope.launch {
+            val started = withContext(Dispatchers.IO) { runCatching { creationCoordinator.start(review) } }
+            started.onSuccess { jobId ->
+                creationState = ArchiveCreationUiState.Running(review, jobId, "Creating archive")
+                val outcome = withContext(Dispatchers.IO) {
+                    creationCoordinator.awaitCompletion(review, jobId) { progress ->
+                        scope.launch {
+                            creationState = ArchiveCreationUiState.Running(review, jobId, progress.message)
+                        }
+                    }
+                }
+                creationState = when (outcome) {
+                    is ArchiveCreationOutcome.Completed -> ArchiveCreationUiState.Completed(outcome)
+                    ArchiveCreationOutcome.Cancelled -> ArchiveCreationUiState.Cancelled
+                    is ArchiveCreationOutcome.Failed -> ArchiveCreationUiState.Failed(outcome.message)
+                }
+                stagedCreationSources?.let(creationSourceStager::discard)
+                stagedCreationSources = null
+            }.onFailure { error ->
+                creationCoordinator.discard(review)
+                stagedCreationSources?.let(creationSourceStager::discard)
+                stagedCreationSources = null
+                creationState = ArchiveCreationUiState.Failed(error.message ?: "Unable to create archive.")
+            }
         }
     }
 
@@ -276,6 +410,9 @@ private fun ZManagerApp(
         clearPreviewState()
         clearTestState()
         clearExtractionState()
+        archiveSessions.clear()
+        nestedNavigationVersion += 1
+        nestedOpenError = null
         isImporting = true
         importError = null
         importedArchive = null
@@ -312,6 +449,9 @@ private fun ZManagerApp(
         clearPreviewState()
         clearTestState()
         clearExtractionState()
+        archiveSessions.clear()
+        nestedNavigationVersion += 1
+        nestedOpenError = null
         isImporting = true
         importError = null
         importedArchive = null
@@ -338,6 +478,91 @@ private fun ZManagerApp(
         }
     }
 
+    fun openNestedArchive(entry: ArchiveEntrySummary) {
+        val parent = importedArchive ?: return
+        if (!NestedArchiveSupport.canOpen(entry)) return
+        nestedOpenError = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                listingRepository.materializePreview(parent, entry, null)
+            }
+            when (result) {
+                is ArchivePreviewState.Ready -> {
+                    val preview = result.summary
+                    val child = ImportedArchive(
+                        id = java.util.UUID.randomUUID().toString(),
+                        displayName = entry.displayName,
+                        localPath = preview.previewPath,
+                        byteSize = preview.writtenBytes.toLong(),
+                        sourceMimeType = null,
+                        importedAtEpochMillis = System.currentTimeMillis()
+                    )
+                    if (archiveSessions.current?.archive?.id != parent.id) {
+                        archiveSessions.push(parent)
+                    }
+                    archiveSessions.push(
+                        archive = child,
+                        parentEntryPath = entry.path,
+                        cleanupRoot = preview.cleanupRoot
+                    )
+                    importedArchive = child
+                    nestedNavigationVersion += 1
+                    loadArchiveListing(child, null)
+                }
+                is ArchivePreviewState.PasswordRequired -> {
+                    nestedOpenError = result.error.message
+                }
+                is ArchivePreviewState.Failed -> {
+                    nestedOpenError = result.error.message
+                }
+                else -> nestedOpenError = "Unable to open that nested archive."
+            }
+        }
+    }
+
+    fun navigateBackFromNested() {
+        val removed = archiveSessions.pop() ?: return
+        val parent = archiveSessions.current?.archive
+        if (parent == null) {
+            importedArchive = null
+            listingState = ArchiveListingState.Idle
+        } else {
+            importedArchive = parent
+            loadArchiveListing(parent, null)
+        }
+        nestedOpenError = null
+        nestedNavigationVersion += 1
+    }
+
+    fun discoverLocalSendDevices() {
+        localSendState = LocalSendUiState.Discovering
+        scope.launch {
+            val devices = withContext(Dispatchers.IO) { runCatching { localSendClient.discover() } }
+            localSendState = devices.fold(
+                onSuccess = { LocalSendUiState.Devices(it) },
+                onFailure = { LocalSendUiState.Failed("Unable to discover LocalSend devices.") }
+            )
+        }
+    }
+
+    fun sendCurrentArchive(device: LocalSendDevice) {
+        val archive = importedArchive ?: return
+        localSendState = LocalSendUiState.Sending(device, "Preparing transfer")
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val file = LocalSendFile(file = File(archive.localPath), displayName = archive.displayName)
+                    val session = localSendClient.prepareUpload(device, listOf(file))
+                    localSendClient.upload(device, session, listOf(file))
+                }
+            }
+            localSendState = result.fold(
+                onSuccess = { LocalSendUiState.Completed(device) },
+                onFailure = { LocalSendUiState.Failed(it.message ?: "LocalSend transfer failed.") }
+            )
+        }
+    }
+
     val documentPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -359,6 +584,36 @@ private fun ZManagerApp(
             planExtraction(archive, entries, ExtractionDestination.DocumentTree(uri), null)
         }
     }
+    val creationFilesPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    runCatching { creationSourceStager.stageFiles(uris) }
+                }.onSuccess(::planCreation)
+                    .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage selected files.") }
+            }
+        }
+    }
+    val creationFolderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    runCatching { creationSourceStager.stageTree(uri) }
+                }.onSuccess(::planCreation)
+                    .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage selected folder.") }
+            }
+        }
+    }
 
     LaunchedEffect(incomingIntent) {
         incomingIntent?.let { intent ->
@@ -374,10 +629,14 @@ private fun ZManagerApp(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 32.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
+                    // Keep this read so Compose invalidates after stack cleanup/pop operations.
+                    val currentNavigationVersion = nestedNavigationVersion
+                    if (currentNavigationVersion < 0) Text("")
                     Text(
                         text = "ZManager",
                         style = MaterialTheme.typography.headlineMedium
@@ -387,8 +646,25 @@ private fun ZManagerApp(
                         text = "Open an archive, inspect its contents, then extract safely.",
                         style = MaterialTheme.typography.bodyLarge
                     )
+                    if (BuildConfig.DEBUG) {
+                        OutlinedButton(
+                            enabled = !isImporting,
+                            onClick = { startMaestroFixtureImport("maestro-nested.zip") }
+                        ) {
+                            Text("Load nested fixture")
+                        }
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     importedArchive?.let { archive ->
+                        if (archiveSessions.current != null) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = ::navigateBackFromNested) { Text("Back") }
+                                Text(
+                                    text = archiveSessions.breadcrumbs.joinToString(" / ") { it.archive.displayName },
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                         Text(
                             text = "Imported ${archive.displayName}",
                             style = MaterialTheme.typography.titleMedium
@@ -408,6 +684,34 @@ private fun ZManagerApp(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+                    nestedOpenError?.let { message ->
+                        Text(message, color = MaterialTheme.colorScheme.error)
+                    }
+                    ArchiveCreationPanel(
+                        state = creationState,
+                        format = createFormat,
+                        password = createPasswordInput,
+                        onPasswordChanged = { createPasswordInput = it },
+                        onFormatChanged = { createFormat = it },
+                        onChooseFiles = { creationFilesPicker.launch(arrayOf("*/*")) },
+                        onChooseFolder = { creationFolderPicker.launch(null) },
+                        onStart = ::startCreation,
+                        onCancel = { state ->
+                            when (state) {
+                                is ArchiveCreationUiState.Running -> scope.launch(Dispatchers.IO) {
+                                    creationCoordinator.cancel(state.jobId)
+                                }
+                                is ArchiveCreationUiState.Review -> clearCreationState()
+                                else -> Unit
+                            }
+                        }
+                    )
+                    LocalSendPanel(
+                        archive = importedArchive,
+                        state = localSendState,
+                        onDiscover = ::discoverLocalSendDevices,
+                        onSend = ::sendCurrentArchive
+                    )
                     ArchiveListingPanel(
                         state = listingState,
                         passwordInput = passwordInput,
@@ -447,6 +751,7 @@ private fun ZManagerApp(
                                 startPreview(archive, entry, null)
                             }
                         },
+                        onOpenNestedArchive = ::openNestedArchive,
                         onSubmitPreviewPassword = { entry ->
                             importedArchive?.let { archive ->
                                 val password = previewPasswordInput.takeIf { it.isNotEmpty() }
@@ -494,6 +799,13 @@ private fun ZManagerApp(
                                 extractionPasswordInput = ""
                                 planExtraction(archive, entries, extractionCoordinator.appStorageDestination(), password)
                             }
+                        },
+                        repackagingState = repackagingState,
+                        onRepackageEntries = ::startRepackaging,
+                        onCancelRepackaging = { state ->
+                            if (state is ArchiveRepackagingUiState.Running) {
+                                scope.launch(Dispatchers.IO) { repackagingCoordinator.cancel(state.review) }
+                            }
                         }
                     )
                 }
@@ -502,6 +814,22 @@ private fun ZManagerApp(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
+                    OutlinedButton(
+                        enabled = creationState !is ArchiveCreationUiState.Planning &&
+                            creationState !is ArchiveCreationUiState.Starting &&
+                            creationState !is ArchiveCreationUiState.Running,
+                        onClick = { creationFilesPicker.launch(arrayOf("*/*")) }
+                    ) {
+                        Text("Create archive")
+                    }
+                    OutlinedButton(
+                        enabled = creationState !is ArchiveCreationUiState.Planning &&
+                            creationState !is ArchiveCreationUiState.Starting &&
+                            creationState !is ArchiveCreationUiState.Running,
+                        onClick = { creationFolderPicker.launch(null) }
+                    ) {
+                        Text("Create folder archive")
+                    }
                     if (BuildConfig.DEBUG) {
                         Box {
                             OutlinedButton(
@@ -520,6 +848,7 @@ private fun ZManagerApp(
                                     MaestroFixture("TGZ fixture", "maestro-files.tgz"),
                                     MaestroFixture("TAR.ZST fixture", "maestro-files.tar.zst"),
                                     MaestroFixture("TZAP fixture", "maestro-files.tzap"),
+                                    MaestroFixture("Nested ZIP fixture", "maestro-nested.zip"),
                                     MaestroFixture(
                                         "Split ZIP fixture",
                                         "maestro-split.zip",
@@ -590,6 +919,112 @@ private data class MaestroFixture(
 )
 
 @Composable
+private fun ArchiveCreationPanel(
+    state: ArchiveCreationUiState,
+    format: CreateArchiveFormat,
+    password: String,
+    onPasswordChanged: (String) -> Unit,
+    onFormatChanged: (CreateArchiveFormat) -> Unit,
+    onChooseFiles: () -> Unit,
+    onChooseFolder: () -> Unit,
+    onStart: (ArchiveCreationReview) -> Unit,
+    onCancel: (ArchiveCreationUiState) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Create archive", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CreateFormatButton("ZIP", CreateArchiveFormat.ZIP, format, onFormatChanged)
+            CreateFormatButton("7z", CreateArchiveFormat.SEVEN_Z, format, onFormatChanged)
+            CreateFormatButton("TAR.ZST", CreateArchiveFormat.TAR_ZST, format, onFormatChanged)
+            CreateFormatButton("TZAP", CreateArchiveFormat.TZAP, format, onFormatChanged)
+        }
+        OutlinedTextField(
+            value = password,
+            onValueChange = onPasswordChanged,
+            label = { Text("Optional password") },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        when (state) {
+            ArchiveCreationUiState.Idle -> Text("Choose files or a folder to begin.")
+            ArchiveCreationUiState.Planning -> Text("Preparing creation plan")
+            is ArchiveCreationUiState.Review -> {
+                Text("${state.review.plan.totalEntries} entries, ${state.review.plan.totalBytes} bytes")
+                state.review.plan.warnings.forEach { warning ->
+                    Text(warning.message, color = MaterialTheme.colorScheme.error)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onStart(state.review) }) { Text("Start") }
+                    TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
+                }
+            }
+            is ArchiveCreationUiState.Starting -> Text("Starting archive creation")
+            is ArchiveCreationUiState.Running -> {
+                Text(state.message)
+                TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
+            }
+            is ArchiveCreationUiState.Completed -> {
+                Text("Created ${state.outcome.outputPath}")
+                if (state.outcome.verified) Text("Verified")
+            }
+            ArchiveCreationUiState.Cancelled -> Text("Archive creation cancelled")
+            is ArchiveCreationUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
+        }
+        if (state is ArchiveCreationUiState.Idle || state is ArchiveCreationUiState.Failed || state is ArchiveCreationUiState.Completed) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onChooseFiles) { Text("Choose files") }
+                OutlinedButton(onClick = onChooseFolder) { Text("Choose folder") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateFormatButton(
+    label: String,
+    value: CreateArchiveFormat,
+    selected: CreateArchiveFormat,
+    onSelected: (CreateArchiveFormat) -> Unit
+) {
+    if (value == selected) {
+        Button(onClick = { onSelected(value) }) { Text(label) }
+    } else {
+        OutlinedButton(onClick = { onSelected(value) }) { Text(label) }
+    }
+}
+
+@Composable
+private fun LocalSendPanel(
+    archive: ImportedArchive?,
+    state: LocalSendUiState,
+    onDiscover: () -> Unit,
+    onSend: (LocalSendDevice) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Share on local network", style = MaterialTheme.typography.titleMedium)
+        Button(enabled = archive != null && state !is LocalSendUiState.Discovering, onClick = onDiscover) {
+            Text(if (state is LocalSendUiState.Discovering) "Discovering" else "Find LocalSend devices")
+        }
+        when (state) {
+            LocalSendUiState.Idle, LocalSendUiState.Discovering -> Unit
+            is LocalSendUiState.Devices -> {
+                if (state.devices.isEmpty()) Text("No compatible devices found.")
+                state.devices.forEach { device ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("${device.alias} (${device.address})", modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = { onSend(device) }) { Text("Send archive") }
+                    }
+                }
+            }
+            is LocalSendUiState.Sending -> Text("${state.message} to ${state.device.alias}")
+            is LocalSendUiState.Completed -> Text("Sent to ${state.device.alias}")
+            is LocalSendUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
 private fun ArchiveListingPanel(
     state: ArchiveListingState,
     passwordInput: String,
@@ -609,6 +1044,7 @@ private fun ArchiveListingPanel(
     previewPasswordInput: String,
     onPreviewPasswordInputChanged: (String) -> Unit,
     onPreviewEntry: (ArchiveEntrySummary) -> Unit,
+    onOpenNestedArchive: (ArchiveEntrySummary) -> Unit,
     onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit,
     testState: ArchiveTestState,
     testPasswordInput: String,
@@ -622,7 +1058,10 @@ private fun ArchiveListingPanel(
     onChooseDestination: () -> Unit,
     onStartExtraction: (ExtractionReview) -> Unit,
     onCancelExtraction: (ArchiveExtractionUiState) -> Unit,
-    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit
+    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit,
+    repackagingState: ArchiveRepackagingUiState,
+    onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
 ) {
     when (state) {
         ArchiveListingState.Idle -> Unit
@@ -648,6 +1087,7 @@ private fun ArchiveListingPanel(
             previewPasswordInput = previewPasswordInput,
             onPreviewPasswordInputChanged = onPreviewPasswordInputChanged,
             onPreviewEntry = onPreviewEntry,
+            onOpenNestedArchive = onOpenNestedArchive,
             onSubmitPreviewPassword = onSubmitPreviewPassword,
             testState = testState,
             testPasswordInput = testPasswordInput,
@@ -661,7 +1101,10 @@ private fun ArchiveListingPanel(
             onChooseDestination = onChooseDestination,
             onStartExtraction = onStartExtraction,
             onCancelExtraction = onCancelExtraction,
-            onRetryExtractionWithPassword = onRetryExtractionWithPassword
+            onRetryExtractionWithPassword = onRetryExtractionWithPassword,
+            repackagingState = repackagingState,
+            onRepackageEntries = onRepackageEntries,
+            onCancelRepackaging = onCancelRepackaging
         )
         is ArchiveListingState.PasswordRequired -> {
             Spacer(modifier = Modifier.height(8.dp))
@@ -724,6 +1167,7 @@ private fun ArchiveListingReadyPanel(
     previewPasswordInput: String,
     onPreviewPasswordInputChanged: (String) -> Unit,
     onPreviewEntry: (ArchiveEntrySummary) -> Unit,
+    onOpenNestedArchive: (ArchiveEntrySummary) -> Unit,
     onSubmitPreviewPassword: (ArchiveEntrySummary) -> Unit,
     testState: ArchiveTestState,
     testPasswordInput: String,
@@ -737,7 +1181,10 @@ private fun ArchiveListingReadyPanel(
     onChooseDestination: () -> Unit,
     onStartExtraction: (ExtractionReview) -> Unit,
     onCancelExtraction: (ArchiveExtractionUiState) -> Unit,
-    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit
+    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit,
+    repackagingState: ArchiveRepackagingUiState,
+    onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
 ) {
     val groups = summary.visibleGroups(searchQuery, sort, viewMode)
     val selectedEntries = summary.selectedEntries(selectedEntryIds)
@@ -820,6 +1267,17 @@ private fun ArchiveListingReadyPanel(
     ) {
         Text("Extract")
     }
+    Button(
+        enabled = selectedEntries.isNotEmpty() && repackagingState !is ArchiveRepackagingUiState.Planning &&
+            repackagingState !is ArchiveRepackagingUiState.Running,
+        onClick = { onRepackageEntries(selectedEntries) }
+    ) {
+        Text("Create archive from selection")
+    }
+    ArchiveRepackagingPanel(
+        state = repackagingState,
+        onCancel = onCancelRepackaging
+    )
     ArchivePreviewPanel(
         state = previewState,
         passwordInput = previewPasswordInput,
@@ -890,9 +1348,35 @@ private fun ArchiveListingReadyPanel(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                    if (NestedArchiveSupport.canOpen(entry)) {
+                        TextButton(onClick = { onOpenNestedArchive(entry) }) {
+                            Text("Open")
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ArchiveRepackagingPanel(
+    state: ArchiveRepackagingUiState,
+    onCancel: (ArchiveRepackagingUiState) -> Unit
+) {
+    when (state) {
+        ArchiveRepackagingUiState.Idle -> Unit
+        ArchiveRepackagingUiState.Planning -> Text("Preparing repackaging plan")
+        is ArchiveRepackagingUiState.Running -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(state.message, modifier = Modifier.weight(1f))
+            TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
+        }
+        is ArchiveRepackagingUiState.Completed -> {
+            Text("Created ${state.outcome.outputPath}")
+            Text(if (state.outcome.verified) "Verified" else "Created without verification")
+        }
+        ArchiveRepackagingUiState.Cancelled -> Text("Repackaging cancelled")
+        is ArchiveRepackagingUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
     }
 }
 

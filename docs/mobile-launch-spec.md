@@ -12,6 +12,62 @@ repackaging, and LocalSend-compatible local-network sharing is in
 
 ZManager Mobile targets a v2-level launch bar from the start. The app should feel like a complete native archive workbench, not a thin mobile wrapper around ZManager-Core.
 
+The detailed follow-up execution plan is in
+[mobile-follow-up-implementation-plan.md](mobile-follow-up-implementation-plan.md).
+
+## V2 Release Gates Added By The Follow-Up Plan
+
+### Nested archive workbench
+
+The archive view must expose `Open archive` only for supported single-file
+archive entries. Opening an entry materializes it through the Rust preview
+operation, creates a new archive session, and lists it through the normal Rust
+detection/listing path. Breadcrumbs and Back return to the parent session.
+Every materialized cleanup root is deleted when its session is popped,
+cancelled, replaced, or when the workbench is discarded. Multipart nested
+archives are not treated as complete single files until volume grouping is
+implemented.
+
+### Archive-folder repackaging
+
+Creating an archive from a selected folder inside an opened archive must compose
+the existing Rust operations in this order:
+
+```text
+planExtract -> startExtract -> private staging -> planCreate -> startCreate
+```
+
+The native shells may stage and commit files, but may not parse archive entries,
+apply extraction safety rules, or create archive bytes. The flow must expose
+plan warnings, password prompts, cancellation, verification, collision policy,
+and cleanup after success or failure.
+
+### LocalSend outbound sharing
+
+Outbound sharing is a separate transfer subsystem and must interoperate with
+LocalSend protocol v2.2: multicast discovery with HTTP registration fallback,
+explicit device selection, `prepare-upload`, per-file `upload`, SHA-256 metadata
+where practical, and `cancel`. Local archive operations remain usable with no
+network. The UI must show the local-network trust boundary and never log
+transfer tokens, file contents, passwords, or sensitive paths.
+
+Receiving is a separately gated phase. It is not considered launch-complete
+until temporary receiver lifecycle, destination selection, traversal-safe names,
+incomplete-transfer cleanup, and device compatibility tests pass.
+
+### End-to-end acceptance
+
+Before release, Android and iOS device E2E must cover at minimum:
+
+- open/list/test/extract a deterministic archive fixture;
+- open a nested archive and return to its parent;
+- create an archive from a native folder and verify the result;
+- repackage a selected archive folder through private staging;
+- cancel an in-flight archive job and confirm no partial final output;
+- exercise LocalSend protocol behavior against a controlled test peer; and
+- verify TalkBack/VoiceOver labels, password redaction, and cleanup after
+  interrupted flows.
+
 ## Product Contract
 
 ZManager Mobile is a native Android and iOS archive workbench backed by ZManager-Core.

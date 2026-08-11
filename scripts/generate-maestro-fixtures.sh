@@ -109,6 +109,22 @@ create_fixture "maestro-files.tar.zst" "tar.zst"
 create_fixture "maestro-files.tzap" "tzap"
 create_fixture "maestro-files.aar" "aar"
 
+# A deterministic archive-in-archive fixture exercises the native nested
+# session stack without adding archive parsing to either mobile shell.
+nested_dir="$temp_dir/nested"
+mkdir -p "$nested_dir/inner"
+cp "$SOURCE_DIR/docs/readme.txt" "$nested_dir/inner/readme.txt"
+(
+  cd "$nested_dir/inner"
+  zip -X -q "$nested_dir/maestro-inner.zip" readme.txt
+)
+(
+  cd "$nested_dir"
+  cargo run --quiet --manifest-path "$CLI_MANIFEST" -p zmanager-cli --bin zm -- \
+    --no-progress --no-color create "$temp_dir/maestro-nested.zip" maestro-inner.zip --format zip
+)
+copy_fixture "$temp_dir/maestro-nested.zip"
+
 create_split_fixture "maestro-split.zip" "zip" "4m" "--store"
 copy_fixture_group "$temp_dir/maestro-split.z*"
 

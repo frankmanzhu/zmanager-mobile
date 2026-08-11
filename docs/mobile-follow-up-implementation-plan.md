@@ -45,6 +45,24 @@ The main missing pieces are native create UI/coordinators, nested archive
 session navigation, LocalSend transport, and the corresponding device-level
 tests.
 
+Implementation status for the current workstream:
+
+- Rust-backed native archive creation is now wired through Android and iOS
+  staging/coordinator/UI paths, including optional password input and
+  verify-after-create reporting.
+- Android and iOS nested session stacks, materialization, cleanup, breadcrumbs,
+  Back navigation, and archive-entry actions are wired.
+- Android and iOS archive-folder repackaging coordinators compose extraction
+  into private staging followed by the existing create planner/job.
+- Android and iOS have an outbound LocalSend subsystem with v2.2 metadata,
+  multicast discovery, HTTP registration fallback primitives, upload
+  preparation, SHA-256 metadata, upload, cancellation primitives, and local
+  network permission declarations.
+- Remaining launch work is the full output/export/share polish, receive mode,
+  lifecycle/background hardening, multipart nested-volume policy, native
+  instrumentation/UI tests, deterministic nested/repackaging fixtures, and
+  Android/iOS device E2E against a controlled LocalSend peer.
+
 ## Track 1: Nested archive browsing
 
 ### User experience

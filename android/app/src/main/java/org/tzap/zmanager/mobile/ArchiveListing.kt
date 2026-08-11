@@ -3,6 +3,7 @@ package org.tzap.zmanager.mobile
 import org.tzap.zmanager.mobile.bridge.generated.ArchiveEntry
 import org.tzap.zmanager.mobile.bridge.generated.ArchiveEntryKind
 import org.tzap.zmanager.mobile.bridge.generated.CancelJobRequest
+import org.tzap.zmanager.mobile.bridge.generated.CreateArchiveFormat
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
@@ -10,11 +11,14 @@ import org.tzap.zmanager.mobile.bridge.generated.ListArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewRequest
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
+import org.tzap.zmanager.mobile.bridge.generated.PlanCreateRequest
+import org.tzap.zmanager.mobile.bridge.generated.PlanCreateResult
 import org.tzap.zmanager.mobile.bridge.generated.PlanExtractRequest
 import org.tzap.zmanager.mobile.bridge.generated.PlanExtractResult
 import org.tzap.zmanager.mobile.bridge.generated.PollJobEventsRequest
 import org.tzap.zmanager.mobile.bridge.generated.PollJobEventsResult
 import org.tzap.zmanager.mobile.bridge.generated.StartExtractRequest
+import org.tzap.zmanager.mobile.bridge.generated.StartCreateRequest
 import org.tzap.zmanager.mobile.bridge.generated.StartJobResult
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
@@ -23,9 +27,11 @@ import org.tzap.zmanager.mobile.bridge.generated.detectArchive as bridgeDetectAr
 import org.tzap.zmanager.mobile.bridge.generated.cancelJob as bridgeCancelJob
 import org.tzap.zmanager.mobile.bridge.generated.listArchive as bridgeListArchive
 import org.tzap.zmanager.mobile.bridge.generated.materializePreview as bridgeMaterializePreview
+import org.tzap.zmanager.mobile.bridge.generated.planCreate as bridgePlanCreate
 import org.tzap.zmanager.mobile.bridge.generated.planExtract as bridgePlanExtract
 import org.tzap.zmanager.mobile.bridge.generated.pollJobEvents as bridgePollJobEvents
 import org.tzap.zmanager.mobile.bridge.generated.startExtract as bridgeStartExtract
+import org.tzap.zmanager.mobile.bridge.generated.startCreate as bridgeStartCreate
 import org.tzap.zmanager.mobile.bridge.generated.testArchive as bridgeTestArchive
 import java.util.Locale
 
@@ -157,6 +163,10 @@ interface ArchiveBridgeGateway {
         collisionPolicy: ExtractionCollisionPolicy,
         planToken: String
     ): StartJobResult = throw UnsupportedOperationException("Extraction is unavailable in this bridge.")
+    fun planCreate(request: PlanCreateRequest): PlanCreateResult =
+        throw UnsupportedOperationException("Archive creation is unavailable in this bridge.")
+    fun startCreate(request: StartCreateRequest): StartJobResult =
+        throw UnsupportedOperationException("Archive creation is unavailable in this bridge.")
     fun pollJob(jobId: String, cursor: ULong): PollJobEventsResult =
         throw UnsupportedOperationException("Extraction is unavailable in this bridge.")
     fun cancelJob(jobId: String) = Unit
@@ -235,6 +245,10 @@ class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
             planToken = planToken
         )
     )
+
+    override fun planCreate(request: PlanCreateRequest): PlanCreateResult = bridgePlanCreate(request)
+
+    override fun startCreate(request: StartCreateRequest): StartJobResult = bridgeStartCreate(request)
 
     override fun pollJob(jobId: String, cursor: ULong): PollJobEventsResult =
         bridgePollJobEvents(PollJobEventsRequest(jobId = jobId, cursor = cursor))

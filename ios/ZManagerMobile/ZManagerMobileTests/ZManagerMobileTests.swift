@@ -246,6 +246,64 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertTrue(error.retryable)
     }
 
+    func testArchiveCreationCoordinatorPassesOptionsAndReportsVerification() async throws {
+        let bridge = CreationFakeBridgeClient()
+        let coordinator = ArchiveCreationCoordinator(bridge: bridge)
+        let review = try coordinator.plan(
+            request: ArchiveCreationRequest(
+                sourcePaths: ["/cache/input"],
+                destinationArchivePath: "/files/output.zip",
+                format: .zip,
+                password: "test-password",
+                verifyAfterCreate: true
+            )
+        )
+
+        XCTAssertTrue(review.plan.canStart)
+        XCTAssertEqual(bridge.plannedSourcePaths, ["/cache/input"])
+
+        let jobId = try coordinator.start(review: review)
+        XCTAssertEqual(bridge.startedRequest?.password, "test-password")
+        let outcome = try await coordinator.awaitCompletion(review: review, jobId: jobId) { _ in }
+
+        XCTAssertEqual(outcome, .completed(outputPath: "/files/output.zip", verified: true))
+        XCTAssertGreaterThan(bridge.pollCount, 0)
+    }
+
+    func testNestedArchiveSessionPopCleansMaterializedRoot() {
+        let cleanupRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: cleanupRoot, withIntermediateDirectories: true)
+        let stack = ArchiveSessionStack()
+        stack.push(
+            archive: testImportedArchive(),
+            cleanupRoot: cleanupRoot
+        )
+
+        _ = stack.pop()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cleanupRoot.path))
+    }
+
+    func testLocalSendAnnouncementUsesProtocolFields() throws {
+        let announcement = LocalSendAnnouncement(
+            alias: "ZManager Mobile",
+            version: "2.0",
+            deviceModel: "iPhone",
+            deviceType: "mobile",
+            fingerprint: "test-fingerprint",
+            port: LocalSendClient.defaultPort,
+            protocol: "http",
+            download: false,
+            announce: true
+        )
+        let data = try JSONEncoder().encode(announcement)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["version"] as? String, "2.0")
+        XCTAssertEqual(json["port"] as? Int, LocalSendClient.defaultPort)
+        XCTAssertEqual(json["announce"] as? Bool, true)
+    }
+
     func testExtractionCoordinatorCommitsCompletedStagingOutput() async throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -513,4 +571,95 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
     }
 
     func cancelExtractionJob(jobId: String) throws {}
+}
+
+private final class CreationFakeBridgeClient: ArchiveBridgeClient {
+    var plannedSourcePaths: [String] = []
+    var startedRequest: StartCreateRequest?
+    var pollCount = 0
+
+    func detectArchiveMetadata(path: String) throws -> DetectArchiveResult {
+        fatalError("Not used")
+    }
+
+    func listArchiveContents(path: String, password: String?) throws -> ListArchiveResult {
+        fatalError("Not used")
+    }
+
+    func materializePreviewEntry(path: String, entryPath: String, password: String?) throws -> MaterializePreviewResult {
+        fatalError("Not used")
+    }
+
+    func testArchiveContents(path: String, selectedPaths: [String], password: String?) throws -> TestArchiveResult {
+        fatalError("Not used")
+    }
+
+    func planCreation(request: PlanCreateRequest) throws -> PlanCreateResult {
+        plannedSourcePaths = request.sourcePaths
+        return PlanCreateResult(
+            sourcePaths: request.sourcePaths,
+            destinationArchivePath: request.destinationArchivePath,
+            format: request.format,
+            formatLabel: "ZIP",
+            entries: [],
+            totalEntries: 1,
+            totalBytes: 4,
+            excludedEntries: 0,
+            excludedBytes: 0,
+            outputExists: false,
+            replaceExisting: request.replaceExisting,
+            encrypted: request.password != nil,
+            preserveMetadata: request.preserveMetadata,
+            cleanSource: request.cleanSource,
+            verifyAfterCreate: request.verifyAfterCreate,
+            verifySupported: true,
+            canStart: true,
+            warnings: []
+        )
+    }
+
+    func startCreation(request: StartCreateRequest) throws -> StartJobResult {
+        startedRequest = request
+        return StartJobResult(jobId: "create-job", kind: .zipCreate, status: .running)
+    }
+
+    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+        pollCount += 1
+        return PollJobEventsResult(
+            jobId: jobId,
+            kind: .zipCreate,
+            status: .completed,
+            events: [
+                MobileJobEvent(
+                    sequence: 1,
+                    eventType: .completed,
+                    jobKind: .zipCreate,
+                    path: nil,
+                    bytes: 4,
+                    totalBytes: 4,
+                    totalBytesProcessed: 4,
+                    entries: 1,
+                    totalEntries: 1,
+                    message: "Complete",
+                    error: nil
+                )
+            ],
+            nextCursor: 1,
+            minRetainedSequence: 1,
+            isTerminal: true,
+            terminalSummary: JobTerminalSummary(
+                writtenEntries: 1,
+                skippedEntries: 0,
+                writtenBytes: 4,
+                encrypted: false,
+                volumeSize: nil,
+                volumeCount: 1,
+                outputPaths: ["/files/output.zip"],
+                verified: true,
+                verifiedEntries: 1,
+                verifiedBytes: 4,
+                warnings: []
+            )
+        )
+    }
 }
