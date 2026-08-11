@@ -2,18 +2,30 @@ package org.tzap.zmanager.mobile
 
 import org.tzap.zmanager.mobile.bridge.generated.ArchiveEntry
 import org.tzap.zmanager.mobile.bridge.generated.ArchiveEntryKind
+import org.tzap.zmanager.mobile.bridge.generated.CancelJobRequest
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.DetectArchiveResult
+import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.ListArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewRequest
 import org.tzap.zmanager.mobile.bridge.generated.MaterializePreviewResult
+import org.tzap.zmanager.mobile.bridge.generated.PlanExtractRequest
+import org.tzap.zmanager.mobile.bridge.generated.PlanExtractResult
+import org.tzap.zmanager.mobile.bridge.generated.PollJobEventsRequest
+import org.tzap.zmanager.mobile.bridge.generated.PollJobEventsResult
+import org.tzap.zmanager.mobile.bridge.generated.StartExtractRequest
+import org.tzap.zmanager.mobile.bridge.generated.StartJobResult
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveRequest
 import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import org.tzap.zmanager.mobile.bridge.generated.detectArchive as bridgeDetectArchive
+import org.tzap.zmanager.mobile.bridge.generated.cancelJob as bridgeCancelJob
 import org.tzap.zmanager.mobile.bridge.generated.listArchive as bridgeListArchive
 import org.tzap.zmanager.mobile.bridge.generated.materializePreview as bridgeMaterializePreview
+import org.tzap.zmanager.mobile.bridge.generated.planExtract as bridgePlanExtract
+import org.tzap.zmanager.mobile.bridge.generated.pollJobEvents as bridgePollJobEvents
+import org.tzap.zmanager.mobile.bridge.generated.startExtract as bridgeStartExtract
 import org.tzap.zmanager.mobile.bridge.generated.testArchive as bridgeTestArchive
 import java.util.Locale
 
@@ -130,6 +142,24 @@ interface ArchiveBridgeGateway {
         selectedPaths: List<String>,
         password: String?
     ): TestArchiveResult
+    fun planExtract(
+        archivePath: String,
+        destinationRoot: String,
+        selectedPaths: List<String>,
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ): PlanExtractResult = throw UnsupportedOperationException("Extraction is unavailable in this bridge.")
+    fun startExtract(
+        archivePath: String,
+        destinationRoot: String,
+        selectedPaths: List<String>,
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ): StartJobResult = throw UnsupportedOperationException("Extraction is unavailable in this bridge.")
+    fun pollJob(jobId: String, cursor: ULong): PollJobEventsResult =
+        throw UnsupportedOperationException("Extraction is unavailable in this bridge.")
+    fun cancelJob(jobId: String) = Unit
 }
 
 class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
@@ -168,6 +198,49 @@ class GeneratedArchiveBridgeGateway : ArchiveBridgeGateway {
                 selectedPaths = selectedPaths
             )
         )
+    }
+
+    override fun planExtract(
+        archivePath: String,
+        destinationRoot: String,
+        selectedPaths: List<String>,
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ): PlanExtractResult = bridgePlanExtract(
+        PlanExtractRequest(
+            archivePath = archivePath,
+            destinationRoot = destinationRoot,
+            password = password,
+            selectedPaths = selectedPaths,
+            stripComponents = 0UL,
+            collisionPolicy = collisionPolicy
+        )
+    )
+
+    override fun startExtract(
+        archivePath: String,
+        destinationRoot: String,
+        selectedPaths: List<String>,
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ): StartJobResult = bridgeStartExtract(
+        StartExtractRequest(
+            archivePath = archivePath,
+            destinationRoot = destinationRoot,
+            password = password,
+            selectedPaths = selectedPaths,
+            stripComponents = 0UL,
+            collisionPolicy = collisionPolicy,
+            planToken = planToken
+        )
+    )
+
+    override fun pollJob(jobId: String, cursor: ULong): PollJobEventsResult =
+        bridgePollJobEvents(PollJobEventsRequest(jobId = jobId, cursor = cursor))
+
+    override fun cancelJob(jobId: String) {
+        bridgeCancelJob(CancelJobRequest(jobId = jobId))
     }
 }
 

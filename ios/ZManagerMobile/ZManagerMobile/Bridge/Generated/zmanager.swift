@@ -2502,10 +2502,11 @@ public struct PlanExtractResult {
     public var estimatedBytes: UInt64?
     public var canStart: Bool
     public var warnings: [BridgeError]
+    public var planToken: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(archivePath: String, destinationRoot: String, format: ArchiveFormat, formatLabel: String, entries: [ExtractionPlanEntry], totalEntries: UInt64, writableEntries: UInt64, skippedEntries: UInt64, blockedEntries: UInt64, estimatedBytes: UInt64?, canStart: Bool, warnings: [BridgeError]) {
+    public init(archivePath: String, destinationRoot: String, format: ArchiveFormat, formatLabel: String, entries: [ExtractionPlanEntry], totalEntries: UInt64, writableEntries: UInt64, skippedEntries: UInt64, blockedEntries: UInt64, estimatedBytes: UInt64?, canStart: Bool, warnings: [BridgeError], planToken: String) {
         self.archivePath = archivePath
         self.destinationRoot = destinationRoot
         self.format = format
@@ -2518,6 +2519,7 @@ public struct PlanExtractResult {
         self.estimatedBytes = estimatedBytes
         self.canStart = canStart
         self.warnings = warnings
+        self.planToken = planToken
     }
 }
 
@@ -2564,6 +2566,9 @@ extension PlanExtractResult: Equatable, Hashable {
         if lhs.warnings != rhs.warnings {
             return false
         }
+        if lhs.planToken != rhs.planToken {
+            return false
+        }
         return true
     }
 
@@ -2580,6 +2585,7 @@ extension PlanExtractResult: Equatable, Hashable {
         hasher.combine(estimatedBytes)
         hasher.combine(canStart)
         hasher.combine(warnings)
+        hasher.combine(planToken)
     }
 }
 
@@ -2603,7 +2609,8 @@ public struct FfiConverterTypePlanExtractResult: FfiConverterRustBuffer {
                 blockedEntries: FfiConverterUInt64.read(from: &buf), 
                 estimatedBytes: FfiConverterOptionUInt64.read(from: &buf), 
                 canStart: FfiConverterBool.read(from: &buf), 
-                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
+                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf), 
+                planToken: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -2620,6 +2627,7 @@ public struct FfiConverterTypePlanExtractResult: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.estimatedBytes, into: &buf)
         FfiConverterBool.write(value.canStart, into: &buf)
         FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
+        FfiConverterString.write(value.planToken, into: &buf)
     }
 }
 
@@ -3040,16 +3048,18 @@ public struct StartExtractRequest {
     public var selectedPaths: [String]
     public var stripComponents: UInt64
     public var collisionPolicy: ExtractionCollisionPolicy
+    public var planToken: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(archivePath: String, destinationRoot: String, password: String?, selectedPaths: [String], stripComponents: UInt64, collisionPolicy: ExtractionCollisionPolicy) {
+    public init(archivePath: String, destinationRoot: String, password: String?, selectedPaths: [String], stripComponents: UInt64, collisionPolicy: ExtractionCollisionPolicy, planToken: String) {
         self.archivePath = archivePath
         self.destinationRoot = destinationRoot
         self.password = password
         self.selectedPaths = selectedPaths
         self.stripComponents = stripComponents
         self.collisionPolicy = collisionPolicy
+        self.planToken = planToken
     }
 }
 
@@ -3078,6 +3088,9 @@ extension StartExtractRequest: Equatable, Hashable {
         if lhs.collisionPolicy != rhs.collisionPolicy {
             return false
         }
+        if lhs.planToken != rhs.planToken {
+            return false
+        }
         return true
     }
 
@@ -3088,6 +3101,7 @@ extension StartExtractRequest: Equatable, Hashable {
         hasher.combine(selectedPaths)
         hasher.combine(stripComponents)
         hasher.combine(collisionPolicy)
+        hasher.combine(planToken)
     }
 }
 
@@ -3105,7 +3119,8 @@ public struct FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer {
                 password: FfiConverterOptionString.read(from: &buf), 
                 selectedPaths: FfiConverterSequenceString.read(from: &buf), 
                 stripComponents: FfiConverterUInt64.read(from: &buf), 
-                collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
+                collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf), 
+                planToken: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -3116,6 +3131,7 @@ public struct FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.selectedPaths, into: &buf)
         FfiConverterUInt64.write(value.stripComponents, into: &buf)
         FfiConverterTypeExtractionCollisionPolicy.write(value.collisionPolicy, into: &buf)
+        FfiConverterString.write(value.planToken, into: &buf)
     }
 }
 

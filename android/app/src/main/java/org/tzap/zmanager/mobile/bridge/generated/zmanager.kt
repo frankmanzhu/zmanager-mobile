@@ -2413,7 +2413,8 @@ data class PlanExtractResult (
     var `blockedEntries`: kotlin.ULong, 
     var `estimatedBytes`: kotlin.ULong?, 
     var `canStart`: kotlin.Boolean, 
-    var `warnings`: List<BridgeError>
+    var `warnings`: List<BridgeError>, 
+    var `planToken`: kotlin.String
 ) {
     
     companion object
@@ -2437,6 +2438,7 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
             FfiConverterOptionalULong.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceTypeBridgeError.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
@@ -2452,7 +2454,8 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
             FfiConverterULong.allocationSize(value.`blockedEntries`) +
             FfiConverterOptionalULong.allocationSize(value.`estimatedBytes`) +
             FfiConverterBoolean.allocationSize(value.`canStart`) +
-            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`)
+            FfiConverterSequenceTypeBridgeError.allocationSize(value.`warnings`) +
+            FfiConverterString.allocationSize(value.`planToken`)
     )
 
     override fun write(value: PlanExtractResult, buf: ByteBuffer) {
@@ -2468,6 +2471,7 @@ public object FfiConverterTypePlanExtractResult: FfiConverterRustBuffer<PlanExtr
             FfiConverterOptionalULong.write(value.`estimatedBytes`, buf)
             FfiConverterBoolean.write(value.`canStart`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+            FfiConverterString.write(value.`planToken`, buf)
     }
 }
 
@@ -2667,7 +2671,8 @@ data class StartExtractRequest (
     var `password`: kotlin.String?, 
     var `selectedPaths`: List<kotlin.String>, 
     var `stripComponents`: kotlin.ULong, 
-    var `collisionPolicy`: ExtractionCollisionPolicy
+    var `collisionPolicy`: ExtractionCollisionPolicy, 
+    var `planToken`: kotlin.String
 ) {
     
     companion object
@@ -2685,6 +2690,7 @@ public object FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer<StartE
             FfiConverterSequenceString.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterTypeExtractionCollisionPolicy.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
@@ -2694,7 +2700,8 @@ public object FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer<StartE
             FfiConverterOptionalString.allocationSize(value.`password`) +
             FfiConverterSequenceString.allocationSize(value.`selectedPaths`) +
             FfiConverterULong.allocationSize(value.`stripComponents`) +
-            FfiConverterTypeExtractionCollisionPolicy.allocationSize(value.`collisionPolicy`)
+            FfiConverterTypeExtractionCollisionPolicy.allocationSize(value.`collisionPolicy`) +
+            FfiConverterString.allocationSize(value.`planToken`)
     )
 
     override fun write(value: StartExtractRequest, buf: ByteBuffer) {
@@ -2704,6 +2711,7 @@ public object FfiConverterTypeStartExtractRequest: FfiConverterRustBuffer<StartE
             FfiConverterSequenceString.write(value.`selectedPaths`, buf)
             FfiConverterULong.write(value.`stripComponents`, buf)
             FfiConverterTypeExtractionCollisionPolicy.write(value.`collisionPolicy`, buf)
+            FfiConverterString.write(value.`planToken`, buf)
     }
 }
 

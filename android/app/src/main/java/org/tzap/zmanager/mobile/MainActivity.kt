@@ -47,6 +47,8 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
+import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import java.io.File
 import java.util.Locale
 
@@ -83,6 +85,7 @@ private fun ZManagerApp(
     val context = LocalContext.current
     val importer = remember(context) { ArchiveImporter(context) }
     val listingRepository = remember { ArchiveListingRepository() }
+    val extractionCoordinator = remember(context) { ArchiveExtractionCoordinator(context) }
     val scope = rememberCoroutineScope()
     var importedArchive by remember { mutableStateOf<ImportedArchive?>(null) }
     var listingState by remember { mutableStateOf<ArchiveListingState>(ArchiveListingState.Idle) }
@@ -97,6 +100,8 @@ private fun ZManagerApp(
     var selectedEntryIds by remember { mutableStateOf(emptySet<String>()) }
     var previewState by remember { mutableStateOf<ArchivePreviewState>(ArchivePreviewState.Idle) }
     var testState by remember { mutableStateOf<ArchiveTestState>(ArchiveTestState.Idle) }
+    var extractionState by remember { mutableStateOf<ArchiveExtractionUiState>(ArchiveExtractionUiState.Idle) }
+    var extractionPasswordInput by remember { mutableStateOf("") }
     var importRequestId by remember { mutableStateOf(0L) }
     var listingRequestId by remember { mutableStateOf(0L) }
     var previewRequestId by remember { mutableStateOf(0L) }
@@ -115,12 +120,77 @@ private fun ZManagerApp(
         testRequestId += 1
     }
 
+    fun clearExtractionState() {
+        (extractionState as? ArchiveExtractionUiState.Review)?.review?.let(extractionCoordinator::discard)
+        extractionState = ArchiveExtractionUiState.Idle
+        extractionPasswordInput = ""
+    }
+
+    fun planExtraction(
+        archive: ImportedArchive,
+        entries: List<ArchiveEntrySummary>,
+        destination: ExtractionDestination,
+        password: String?
+    ) {
+        clearExtractionState()
+        extractionState = ArchiveExtractionUiState.Planning(destination.label)
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    extractionCoordinator.plan(
+                        archive = archive,
+                        selectedPaths = entries.map { it.path },
+                        destination = destination,
+                        password = password,
+                        collisionPolicy = ExtractionCollisionPolicy.REFUSE
+                    )
+                }
+            }
+            extractionState = result.fold(
+                onSuccess = { review ->
+                    if (review.plan.canStart) ArchiveExtractionUiState.Review(review)
+                    else ArchiveExtractionUiState.Failed(
+                        review.plan.warnings.firstOrNull()?.message
+                            ?: "This extraction plan cannot be started."
+                    )
+                },
+                onFailure = { it.toExtractionUiState() }
+            )
+        }
+    }
+
+    fun startExtraction(review: ExtractionReview) {
+        extractionState = ArchiveExtractionUiState.Starting(review)
+        scope.launch {
+            val start = withContext(Dispatchers.IO) { runCatching { extractionCoordinator.start(review) } }
+            start.onSuccess { jobId ->
+                extractionState = ArchiveExtractionUiState.Running(review, jobId, "Extracting archive")
+                val outcome = withContext(Dispatchers.IO) {
+                    extractionCoordinator.awaitCompletion(review, jobId) { progress ->
+                        scope.launch {
+                            extractionState = ArchiveExtractionUiState.Running(review, jobId, progress.message)
+                        }
+                    }
+                }
+                extractionState = when (outcome) {
+                    is ExtractionOutcome.Completed -> ArchiveExtractionUiState.Completed(outcome)
+                    ExtractionOutcome.Cancelled -> ArchiveExtractionUiState.Cancelled
+                    is ExtractionOutcome.Failed -> ArchiveExtractionUiState.Failed(outcome.message)
+                }
+            }.onFailure { error ->
+                extractionCoordinator.discard(review)
+                extractionState = error.toExtractionUiState()
+            }
+        }
+    }
+
     fun loadArchiveListing(archive: ImportedArchive, password: String?) {
         listingRequestId += 1
         val currentListingRequestId = listingRequestId
         selectedEntryIds = emptySet()
         clearPreviewState()
         clearTestState()
+        clearExtractionState()
         listingState = ArchiveListingState.Loading
         scope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -187,6 +257,7 @@ private fun ZManagerApp(
         listingRequestId += 1
         clearPreviewState()
         clearTestState()
+        clearExtractionState()
         isImporting = true
         importError = null
         importedArchive = null
@@ -219,6 +290,7 @@ private fun ZManagerApp(
         listingRequestId += 1
         clearPreviewState()
         clearTestState()
+        clearExtractionState()
         isImporting = true
         importError = null
         importedArchive = null
@@ -249,6 +321,22 @@ private fun ZManagerApp(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { startImport(it) }
+    }
+    val destinationPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        val readySummary = (listingState as? ArchiveListingState.Ready)?.summary
+        val archive = importedArchive
+        if (uri != null && readySummary != null && archive != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            val entries = readySummary.selectedEntries(selectedEntryIds).ifEmpty { readySummary.entries }
+            planExtraction(archive, entries, ExtractionDestination.DocumentTree(uri), null)
+        }
     }
 
     LaunchedEffect(incomingIntent) {
@@ -359,6 +447,32 @@ private fun ZManagerApp(
                                 testPasswordInput = ""
                                 startArchiveTest(archive, entries, password)
                             }
+                        },
+                        extractionState = extractionState,
+                        extractionPasswordInput = extractionPasswordInput,
+                        onExtractionPasswordInputChanged = { extractionPasswordInput = it },
+                        onExtractEntries = { entries ->
+                            importedArchive?.let { archive ->
+                                planExtraction(archive, entries, extractionCoordinator.appStorageDestination(), null)
+                            }
+                        },
+                        onChooseDestination = { destinationPicker.launch(null) },
+                        onStartExtraction = ::startExtraction,
+                        onCancelExtraction = { state ->
+                            when (state) {
+                                is ArchiveExtractionUiState.Running -> scope.launch(Dispatchers.IO) {
+                                    extractionCoordinator.cancel(state.jobId)
+                                }
+                                is ArchiveExtractionUiState.Review -> clearExtractionState()
+                                else -> Unit
+                            }
+                        },
+                        onRetryExtractionWithPassword = { entries ->
+                            importedArchive?.let { archive ->
+                                val password = extractionPasswordInput.takeIf { it.isNotEmpty() }
+                                extractionPasswordInput = ""
+                                planExtraction(archive, entries, extractionCoordinator.appStorageDestination(), password)
+                            }
                         }
                     )
                 }
@@ -412,7 +526,15 @@ private fun ArchiveListingPanel(
     testPasswordInput: String,
     onTestPasswordInputChanged: (String) -> Unit,
     onTestEntries: (List<ArchiveEntrySummary>) -> Unit,
-    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit
+    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit,
+    extractionState: ArchiveExtractionUiState,
+    extractionPasswordInput: String,
+    onExtractionPasswordInputChanged: (String) -> Unit,
+    onExtractEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onChooseDestination: () -> Unit,
+    onStartExtraction: (ExtractionReview) -> Unit,
+    onCancelExtraction: (ArchiveExtractionUiState) -> Unit,
+    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit
 ) {
     when (state) {
         ArchiveListingState.Idle -> Unit
@@ -443,7 +565,15 @@ private fun ArchiveListingPanel(
             testPasswordInput = testPasswordInput,
             onTestPasswordInputChanged = onTestPasswordInputChanged,
             onTestEntries = onTestEntries,
-            onSubmitTestPassword = onSubmitTestPassword
+            onSubmitTestPassword = onSubmitTestPassword,
+            extractionState = extractionState,
+            extractionPasswordInput = extractionPasswordInput,
+            onExtractionPasswordInputChanged = onExtractionPasswordInputChanged,
+            onExtractEntries = onExtractEntries,
+            onChooseDestination = onChooseDestination,
+            onStartExtraction = onStartExtraction,
+            onCancelExtraction = onCancelExtraction,
+            onRetryExtractionWithPassword = onRetryExtractionWithPassword
         )
         is ArchiveListingState.PasswordRequired -> {
             Spacer(modifier = Modifier.height(8.dp))
@@ -511,7 +641,15 @@ private fun ArchiveListingReadyPanel(
     testPasswordInput: String,
     onTestPasswordInputChanged: (String) -> Unit,
     onTestEntries: (List<ArchiveEntrySummary>) -> Unit,
-    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit
+    onSubmitTestPassword: (List<ArchiveEntrySummary>) -> Unit,
+    extractionState: ArchiveExtractionUiState,
+    extractionPasswordInput: String,
+    onExtractionPasswordInputChanged: (String) -> Unit,
+    onExtractEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onChooseDestination: () -> Unit,
+    onStartExtraction: (ExtractionReview) -> Unit,
+    onCancelExtraction: (ArchiveExtractionUiState) -> Unit,
+    onRetryExtractionWithPassword: (List<ArchiveEntrySummary>) -> Unit
 ) {
     val groups = summary.visibleGroups(searchQuery, sort, viewMode)
     val selectedEntries = summary.selectedEntries(selectedEntryIds)
@@ -586,6 +724,14 @@ private fun ArchiveListingReadyPanel(
             Text("Test")
         }
     }
+    Button(
+        enabled = extractionState !is ArchiveExtractionUiState.Planning &&
+            extractionState !is ArchiveExtractionUiState.Starting &&
+            extractionState !is ArchiveExtractionUiState.Running,
+        onClick = { onExtractEntries(selectedEntries.ifEmpty { summary.entries }) }
+    ) {
+        Text("Extract")
+    }
     ArchivePreviewPanel(
         state = previewState,
         passwordInput = previewPasswordInput,
@@ -598,6 +744,16 @@ private fun ArchiveListingReadyPanel(
         passwordInput = testPasswordInput,
         onPasswordInputChanged = onTestPasswordInputChanged,
         onSubmitPassword = onSubmitTestPassword
+    )
+    ArchiveExtractionPanel(
+        state = extractionState,
+        selectedEntries = selectedEntries.ifEmpty { summary.entries },
+        passwordInput = extractionPasswordInput,
+        onPasswordInputChanged = onExtractionPasswordInputChanged,
+        onChooseDestination = onChooseDestination,
+        onStart = onStartExtraction,
+        onCancel = onCancelExtraction,
+        onRetryWithPassword = onRetryExtractionWithPassword
     )
     LazyColumn(
         modifier = Modifier
@@ -685,6 +841,82 @@ private fun EntryViewModeButton(
         OutlinedButton(onClick = { onSelected(value) }) {
             Text(label)
         }
+    }
+}
+
+private sealed interface ArchiveExtractionUiState {
+    data object Idle : ArchiveExtractionUiState
+    data class Planning(val destination: String) : ArchiveExtractionUiState
+    data class Review(val review: ExtractionReview) : ArchiveExtractionUiState
+    data class Starting(val review: ExtractionReview) : ArchiveExtractionUiState
+    data class Running(val review: ExtractionReview, val jobId: String, val message: String) : ArchiveExtractionUiState
+    data class Completed(val outcome: ExtractionOutcome.Completed) : ArchiveExtractionUiState
+    data object Cancelled : ArchiveExtractionUiState
+    data class PasswordRequired(val message: String) : ArchiveExtractionUiState
+    data class Failed(val message: String) : ArchiveExtractionUiState
+}
+
+private fun Throwable.toExtractionUiState(): ArchiveExtractionUiState = when (this) {
+    is ZmanagerGuiException.Bridge -> if (code == "password_required" || code == "invalid_password") {
+        ArchiveExtractionUiState.PasswordRequired(userMessage)
+    } else {
+        ArchiveExtractionUiState.Failed(userMessage)
+    }
+    else -> ArchiveExtractionUiState.Failed(message ?: "Unable to extract that archive.")
+}
+
+@Composable
+private fun ArchiveExtractionPanel(
+    state: ArchiveExtractionUiState,
+    selectedEntries: List<ArchiveEntrySummary>,
+    passwordInput: String,
+    onPasswordInputChanged: (String) -> Unit,
+    onChooseDestination: () -> Unit,
+    onStart: (ExtractionReview) -> Unit,
+    onCancel: (ArchiveExtractionUiState) -> Unit,
+    onRetryWithPassword: (List<ArchiveEntrySummary>) -> Unit
+) {
+    when (state) {
+        ArchiveExtractionUiState.Idle -> Unit
+        is ArchiveExtractionUiState.Planning -> Text("Preparing extraction plan for ${state.destination}")
+        is ArchiveExtractionUiState.Review -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Review extraction", style = MaterialTheme.typography.titleMedium)
+            Text("${state.review.plan.writableEntries} files will be extracted to ${state.review.destination.label}.")
+            state.review.plan.estimatedBytes?.let { Text("$it bytes estimated") }
+            state.review.plan.warnings.forEach { warning ->
+                Text(warning.message, color = MaterialTheme.colorScheme.error)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onChooseDestination) { Text("Choose folder") }
+                OutlinedButton(onClick = { onCancel(state) }) { Text("Cancel") }
+                Button(onClick = { onStart(state.review) }) { Text("Start extraction") }
+            }
+        }
+        is ArchiveExtractionUiState.Starting -> Text("Starting extraction")
+        is ArchiveExtractionUiState.Running -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(state.message)
+            OutlinedButton(onClick = { onCancel(state) }) { Text("Cancel extraction") }
+        }
+        is ArchiveExtractionUiState.Completed -> Text(
+            "Extraction complete: ${state.outcome.writtenEntries} files saved to ${state.outcome.destination}."
+        )
+        ArchiveExtractionUiState.Cancelled -> Text("Extraction cancelled")
+        is ArchiveExtractionUiState.PasswordRequired -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(state.message)
+            OutlinedTextField(
+                value = passwordInput,
+                onValueChange = onPasswordInputChanged,
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                enabled = passwordInput.isNotEmpty(),
+                onClick = { onRetryWithPassword(selectedEntries) }
+            ) { Text("Retry extraction") }
+        }
+        is ArchiveExtractionUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
     }
 }
 

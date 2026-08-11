@@ -229,6 +229,39 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertTrue(error.retryable)
     }
 
+    func testExtractionCoordinatorCommitsCompletedStagingOutput() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let bridge = FakeArchiveBridgeClient()
+        bridge.onStartExtraction = { stagingPath in
+            let output = URL(fileURLWithPath: stagingPath).appendingPathComponent("docs/readme.txt")
+            try fileManager.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("extracted".utf8).write(to: output)
+        }
+        let coordinator = ArchiveExtractionCoordinator(bridge: bridge, fileManager: fileManager)
+        let destination = ExtractionDestination.appStorage(root.appendingPathComponent("output", isDirectory: true))
+
+        let review = try coordinator.plan(
+            archive: testImportedArchive(),
+            selectedPaths: ["docs/readme.txt"],
+            destination: destination,
+            password: nil,
+            collisionPolicy: .refuse
+        )
+        let jobId = try coordinator.start(review: review)
+        let outcome = try await coordinator.awaitCompletion(review: review, jobId: jobId) { _ in }
+
+        guard case .completed(let entries, _) = outcome else {
+            return XCTFail("Expected completed extraction outcome.")
+        }
+        XCTAssertEqual(entries, 1)
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("output/docs/readme.txt")),
+            Data("extracted".utf8)
+        )
+    }
+
     private func testImportedArchive() -> ImportedArchive {
         ImportedArchive(
             id: UUID(),
@@ -320,6 +353,7 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
     var previewError: Error?
     var testError: Error?
     private(set) var testedSelectedPaths: [String] = []
+    var onStartExtraction: ((String) throws -> Void)?
 
     init(
         detection: DetectArchiveResult? = nil,
@@ -385,4 +419,81 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
         testedSelectedPaths = selectedPaths
         return testResult
     }
+
+    func planExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ) throws -> PlanExtractResult {
+        PlanExtractResult(
+            archivePath: path,
+            destinationRoot: destinationRoot,
+            format: .zip,
+            formatLabel: "ZIP",
+            entries: [
+                ExtractionPlanEntry(
+                    archivePath: "docs/readme.txt",
+                    normalizedPath: "docs/readme.txt",
+                    destinationPath: "docs/readme.txt",
+                    kind: .file,
+                    status: .write,
+                    reason: nil,
+                    size: 9,
+                    compressedSize: nil,
+                    replaceExisting: false
+                )
+            ],
+            totalEntries: 1,
+            writableEntries: 1,
+            skippedEntries: 0,
+            blockedEntries: 0,
+            estimatedBytes: 9,
+            canStart: true,
+            warnings: [],
+            planToken: "review-token"
+        )
+    }
+
+    func startExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ) throws -> StartJobResult {
+        try onStartExtraction?(destinationRoot)
+        return StartJobResult(jobId: "job-id", kind: .zipExtract, status: .running)
+    }
+
+    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+        PollJobEventsResult(
+            jobId: jobId,
+            kind: .zipExtract,
+            status: .completed,
+            events: [
+                MobileJobEvent(
+                    sequence: 1,
+                    eventType: .completed,
+                    jobKind: .zipExtract,
+                    path: nil,
+                    bytes: nil,
+                    totalBytes: 9,
+                    totalBytesProcessed: 9,
+                    entries: 1,
+                    totalEntries: 1,
+                    message: "Complete",
+                    error: nil
+                )
+            ],
+            nextCursor: 1,
+            minRetainedSequence: 1,
+            isTerminal: true,
+            terminalSummary: nil
+        )
+    }
+
+    func cancelExtractionJob(jobId: String) throws {}
 }

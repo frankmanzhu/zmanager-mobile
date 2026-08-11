@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @StateObject private var importModel = ArchiveImportModel()
     @State private var isFileImporterPresented = false
+    @State private var isDestinationPickerPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -50,7 +51,14 @@ struct ContentView: View {
                 onPreviewEntry: { importModel.startPreview(entry: $0) },
                 onSubmitPreviewPassword: { importModel.retryPreviewWithPassword(entry: $0) },
                 onTestEntries: { importModel.startTest(selectedEntries: $0) },
-                onSubmitTestPassword: { importModel.retryTestWithPassword(selectedEntries: $0) }
+                onSubmitTestPassword: { importModel.retryTestWithPassword(selectedEntries: $0) },
+                extractionState: importModel.extractionState,
+                extractionPassword: $importModel.extractionPasswordInput,
+                onExtractEntries: { importModel.planExtraction(selectedEntries: $0) },
+                onChooseDestination: { isDestinationPickerPresented = true },
+                onStartExtraction: importModel.startExtraction,
+                onCancelExtraction: importModel.cancelExtraction,
+                onRetryExtractionPassword: { importModel.retryExtractionWithPassword(selectedEntries: $0) }
             )
 
             Spacer()
@@ -77,6 +85,15 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             importModel.handleFileImporterResult(result)
+        }
+        .fileImporter(
+            isPresented: $isDestinationPickerPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                importModel.planExtraction(selectedEntries: importModel.currentSelectedEntries, destination: .folder(url))
+            }
         }
         .onOpenURL { url in
             importModel.importExternalURL(url)
@@ -174,6 +191,13 @@ struct ArchiveListingPanel: View {
     let onSubmitPreviewPassword: (ArchiveEntrySummary) -> Void
     let onTestEntries: ([ArchiveEntrySummary]) -> Void
     let onSubmitTestPassword: ([ArchiveEntrySummary]) -> Void
+    let extractionState: ArchiveExtractionState
+    @Binding var extractionPassword: String
+    let onExtractEntries: ([ArchiveEntrySummary]) -> Void
+    let onChooseDestination: () -> Void
+    let onStartExtraction: (ExtractionReview) -> Void
+    let onCancelExtraction: () -> Void
+    let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
 
     var body: some View {
         switch state {
@@ -197,7 +221,14 @@ struct ArchiveListingPanel: View {
                 onPreviewEntry: onPreviewEntry,
                 onSubmitPreviewPassword: onSubmitPreviewPassword,
                 onTestEntries: onTestEntries,
-                onSubmitTestPassword: onSubmitTestPassword
+                onSubmitTestPassword: onSubmitTestPassword,
+                extractionState: extractionState,
+                extractionPassword: $extractionPassword,
+                onExtractEntries: onExtractEntries,
+                onChooseDestination: onChooseDestination,
+                onStartExtraction: onStartExtraction,
+                onCancelExtraction: onCancelExtraction,
+                onRetryExtractionPassword: onRetryExtractionPassword
             )
         case .passwordRequired(let error):
             VStack(alignment: .leading, spacing: 8) {
@@ -244,6 +275,13 @@ struct ArchiveListingReadyPanel: View {
     let onSubmitPreviewPassword: (ArchiveEntrySummary) -> Void
     let onTestEntries: ([ArchiveEntrySummary]) -> Void
     let onSubmitTestPassword: ([ArchiveEntrySummary]) -> Void
+    let extractionState: ArchiveExtractionState
+    @Binding var extractionPassword: String
+    let onExtractEntries: ([ArchiveEntrySummary]) -> Void
+    let onChooseDestination: () -> Void
+    let onStartExtraction: (ExtractionReview) -> Void
+    let onCancelExtraction: () -> Void
+    let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
 
     private var groups: [ArchiveEntryGroup] {
         summary.visibleGroups(searchQuery: searchQuery, sort: sort, viewMode: viewMode)
@@ -307,6 +345,10 @@ struct ArchiveListingReadyPanel: View {
                     onTestEntries(selectedEntries)
                 }
                 .disabled(testState.isLoading)
+                Button("Extract") {
+                    onExtractEntries(selectedEntries.isEmpty ? summary.entries : selectedEntries)
+                }
+                .disabled(extractionState.isBusy)
             }
             ArchivePreviewPanel(
                 state: previewState,
@@ -318,6 +360,15 @@ struct ArchiveListingReadyPanel: View {
                 selectedEntries: selectedEntries,
                 password: $testPassword,
                 onSubmitPassword: onSubmitTestPassword
+            )
+            ArchiveExtractionPanel(
+                state: extractionState,
+                selectedEntries: selectedEntries.isEmpty ? summary.entries : selectedEntries,
+                password: $extractionPassword,
+                onChooseDestination: onChooseDestination,
+                onStart: onStartExtraction,
+                onCancel: onCancelExtraction,
+                onRetryWithPassword: onRetryExtractionPassword
             )
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
@@ -759,6 +810,52 @@ protocol ArchiveBridgeClient {
         selectedPaths: [String],
         password: String?
     ) throws -> TestArchiveResult
+    func planExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ) throws -> PlanExtractResult
+    func startExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ) throws -> StartJobResult
+    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult
+    func cancelExtractionJob(jobId: String) throws
+}
+
+extension ArchiveBridgeClient {
+    func planExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ) throws -> PlanExtractResult {
+        throw ArchiveExtractionError.unavailable
+    }
+
+    func startExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ) throws -> StartJobResult {
+        throw ArchiveExtractionError.unavailable
+    }
+
+    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+        throw ArchiveExtractionError.unavailable
+    }
+
+    func cancelExtractionJob(jobId: String) throws {}
 }
 
 struct GeneratedArchiveBridgeClient: ArchiveBridgeClient {
@@ -799,6 +896,54 @@ struct GeneratedArchiveBridgeClient: ArchiveBridgeClient {
                 selectedPaths: selectedPaths
             )
         )
+    }
+
+    func planExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ) throws -> PlanExtractResult {
+        try planExtract(
+            request: PlanExtractRequest(
+                archivePath: path,
+                destinationRoot: destinationRoot,
+                password: password,
+                selectedPaths: selectedPaths,
+                stripComponents: 0,
+                collisionPolicy: collisionPolicy
+            )
+        )
+    }
+
+    func startExtraction(
+        path: String,
+        destinationRoot: String,
+        selectedPaths: [String],
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy,
+        planToken: String
+    ) throws -> StartJobResult {
+        try startExtract(
+            request: StartExtractRequest(
+                archivePath: path,
+                destinationRoot: destinationRoot,
+                password: password,
+                selectedPaths: selectedPaths,
+                stripComponents: 0,
+                collisionPolicy: collisionPolicy,
+                planToken: planToken
+            )
+        )
+    }
+
+    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+        try pollJobEvents(request: PollJobEventsRequest(jobId: jobId, cursor: cursor))
+    }
+
+    func cancelExtractionJob(jobId: String) throws {
+        _ = try cancelJob(request: CancelJobRequest(jobId: jobId))
     }
 }
 
@@ -1059,12 +1204,15 @@ final class ArchiveImportModel: ObservableObject {
     @Published var selectedEntryIds = Set<String>()
     @Published var previewState: ArchivePreviewState = .idle
     @Published var testState: ArchiveTestState = .idle
+    @Published var extractionState: ArchiveExtractionState = .idle
+    @Published var extractionPasswordInput = ""
     @Published var previewDocument: PreviewDocument?
 
     private let importStore: ArchiveImportStore
     private let listingLoader: ArchiveListingLoader
     private let previewLoader: ArchivePreviewLoader
     private let testLoader: ArchiveTestLoader
+    private let extractionCoordinator: ArchiveExtractionCoordinator
     private var importGeneration = 0
     private var listingGeneration = 0
     private var previewGeneration = 0
@@ -1075,12 +1223,14 @@ final class ArchiveImportModel: ObservableObject {
         importStore: ArchiveImportStore = ArchiveImportStore(),
         listingLoader: ArchiveListingLoader = ArchiveListingLoader(),
         previewLoader: ArchivePreviewLoader = ArchivePreviewLoader(),
-        testLoader: ArchiveTestLoader = ArchiveTestLoader()
+        testLoader: ArchiveTestLoader = ArchiveTestLoader(),
+        extractionCoordinator: ArchiveExtractionCoordinator = ArchiveExtractionCoordinator()
     ) {
         self.importStore = importStore
         self.listingLoader = listingLoader
         self.previewLoader = previewLoader
         self.testLoader = testLoader
+        self.extractionCoordinator = extractionCoordinator
     }
 
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
@@ -1185,6 +1335,79 @@ final class ArchiveImportModel: ObservableObject {
         loadTest(for: archive, selectedEntries: selectedEntries, password: password)
     }
 
+    var currentSelectedEntries: [ArchiveEntrySummary] {
+        guard case .ready(let summary) = listingState else { return [] }
+        let selected = summary.selectedEntries(selectedEntryIds: selectedEntryIds)
+        return selected.isEmpty ? summary.entries : selected
+    }
+
+    func planExtraction(
+        selectedEntries: [ArchiveEntrySummary],
+        destination: ExtractionDestination? = nil,
+        password: String? = nil
+    ) {
+        guard let archive = importedArchive else { return }
+        clearExtractionState()
+        let destination = destination ?? extractionCoordinator.appStorageDestination()
+        extractionState = .planning(destination.label)
+        Task {
+            do {
+                let review = try await Task.detached(priority: .userInitiated) {
+                    try self.extractionCoordinator.plan(
+                        archive: archive,
+                        selectedPaths: selectedEntries.map(\.path),
+                        destination: destination,
+                        password: password,
+                        collisionPolicy: .refuse
+                    )
+                }.value
+                extractionState = review.plan.canStart
+                    ? .review(review)
+                    : .failed(review.plan.warnings.first?.message ?? "This extraction plan cannot be started.")
+            } catch let ZmanagerGuiError.Bridge(code, userMessage, _, _, _) where code == "password_required" || code == "invalid_password" {
+                extractionState = .passwordRequired(userMessage)
+            } catch {
+                extractionState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func retryExtractionWithPassword(selectedEntries: [ArchiveEntrySummary]) {
+        let password = extractionPasswordInput.isEmpty ? nil : extractionPasswordInput
+        extractionPasswordInput = ""
+        planExtraction(selectedEntries: selectedEntries, password: password)
+    }
+
+    func startExtraction(_ review: ExtractionReview) {
+        extractionState = .starting(review)
+        Task {
+            do {
+                let jobId = try await Task.detached(priority: .userInitiated) {
+                    try self.extractionCoordinator.start(review: review)
+                }.value
+                extractionState = .running(review, jobId, "Extracting archive")
+                let outcome = try await extractionCoordinator.awaitCompletion(review: review, jobId: jobId) { progress in
+                    Task { @MainActor in
+                        self.extractionState = .running(review, jobId, progress.message)
+                    }
+                }
+                extractionState = outcome.state
+            } catch {
+                extractionCoordinator.discard(review: review)
+                extractionState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelExtraction() {
+        guard case .running(_, let jobId, _) = extractionState else {
+            if case .review(let review) = extractionState { extractionCoordinator.discard(review: review) }
+            extractionState = .idle
+            return
+        }
+        Task.detached { try? self.extractionCoordinator.cancel(jobId: jobId) }
+    }
+
     func cleanupActivePreview() {
         guard let activePreviewCleanupRoot else {
             return
@@ -1277,8 +1500,332 @@ final class ArchiveImportModel: ObservableObject {
         testPasswordInput = ""
         testState = .idle
     }
+
+    private func clearExtractionState() {
+        if case .review(let review) = extractionState { extractionCoordinator.discard(review: review) }
+        extractionState = .idle
+        extractionPasswordInput = ""
+    }
 }
 
 #Preview {
     ContentView()
+}
+
+enum ArchiveExtractionError: LocalizedError {
+    case unavailable
+    case expiredReview
+    case unavailableStaging
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable: return "Archive extraction is unavailable in this build."
+        case .expiredReview: return "The extraction review expired. Review the archive again."
+        case .unavailableStaging: return "The staged extraction is unavailable."
+        }
+    }
+}
+
+enum ExtractionDestination: Equatable {
+    case appStorage(URL)
+    case folder(URL)
+
+    var label: String {
+        switch self {
+        case .appStorage: return "App storage"
+        case .folder: return "Selected folder"
+        }
+    }
+
+    var rootURL: URL {
+        switch self {
+        case .appStorage(let url), .folder(let url): return url
+        }
+    }
+}
+
+struct ExtractionReview {
+    let id: UUID
+    let destination: ExtractionDestination
+    let plan: PlanExtractResult
+    let collisionPolicy: ExtractionCollisionPolicy
+}
+
+struct ExtractionProgress {
+    let message: String
+}
+
+enum ArchiveExtractionState {
+    case idle
+    case planning(String)
+    case review(ExtractionReview)
+    case starting(ExtractionReview)
+    case running(ExtractionReview, String, String)
+    case completed(UInt64, String)
+    case cancelled
+    case passwordRequired(String)
+    case failed(String)
+
+    var isBusy: Bool {
+        switch self {
+        case .planning, .starting, .running: return true
+        default: return false
+        }
+    }
+}
+
+private extension ArchiveExtractionCoordinator.Outcome {
+    var state: ArchiveExtractionState {
+        switch self {
+        case .completed(let entries, let destination): return .completed(entries, destination)
+        case .cancelled: return .cancelled
+        case .failed(let message): return .failed(message)
+        }
+    }
+}
+
+final class ArchiveExtractionCoordinator: @unchecked Sendable {
+    enum Outcome {
+        case completed(UInt64, String)
+        case cancelled
+        case failed(String)
+    }
+
+    private struct Session {
+        let archive: ImportedArchive
+        let selectedPaths: [String]
+        let stagingRoot: URL
+        let destination: ExtractionDestination
+        let collisionPolicy: ExtractionCollisionPolicy
+        let stagingCollisionPolicy: ExtractionCollisionPolicy
+        var password: String?
+    }
+
+    private let bridge: ArchiveBridgeClient
+    private let fileManager: FileManager
+    private let lock = NSLock()
+    private var sessions = [UUID: Session]()
+
+    init(bridge: ArchiveBridgeClient = GeneratedArchiveBridgeClient(), fileManager: FileManager = .default) {
+        self.bridge = bridge
+        self.fileManager = fileManager
+    }
+
+    func appStorageDestination() -> ExtractionDestination {
+        let root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ZManagerMobile/Extracted", isDirectory: true)
+        return .appStorage(root)
+    }
+
+    func plan(
+        archive: ImportedArchive,
+        selectedPaths: [String],
+        destination: ExtractionDestination,
+        password: String?,
+        collisionPolicy: ExtractionCollisionPolicy
+    ) throws -> ExtractionReview {
+        let id = UUID()
+        let stagingRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/extractions/\(id.uuidString)/staging", isDirectory: true)
+        let plan = try bridge.planExtraction(
+            path: archive.localPath,
+            destinationRoot: stagingRoot.path,
+            selectedPaths: selectedPaths,
+            password: password,
+            // The stage is private and freshly created. Replace avoids Android cache
+            // filesystems rejecting AtomicOutputFile's refuse-policy hard-link commit.
+            collisionPolicy: .replace
+        )
+        lock.lock()
+        sessions[id] = Session(
+            archive: archive,
+            selectedPaths: selectedPaths,
+            stagingRoot: stagingRoot,
+            destination: destination,
+            collisionPolicy: collisionPolicy,
+            stagingCollisionPolicy: .replace,
+            password: password
+        )
+        lock.unlock()
+        return ExtractionReview(id: id, destination: destination, plan: plan, collisionPolicy: collisionPolicy)
+    }
+
+    func start(review: ExtractionReview) throws -> String {
+        guard review.plan.canStart, !review.plan.planToken.isEmpty else {
+            throw ArchiveExtractionError.expiredReview
+        }
+        lock.lock()
+        guard let session = sessions[review.id] else {
+            lock.unlock()
+            throw ArchiveExtractionError.expiredReview
+        }
+        lock.unlock()
+        let result = try bridge.startExtraction(
+            path: session.archive.localPath,
+            destinationRoot: session.stagingRoot.path,
+            selectedPaths: session.selectedPaths,
+            password: session.password,
+            collisionPolicy: session.stagingCollisionPolicy,
+            planToken: review.plan.planToken
+        )
+        lock.lock()
+        var clearedSession = session
+        clearedSession.password = nil
+        sessions[review.id] = clearedSession
+        lock.unlock()
+        return result.jobId
+    }
+
+    func awaitCompletion(
+        review: ExtractionReview,
+        jobId: String,
+        onProgress: @escaping (ExtractionProgress) -> Void
+    ) async throws -> Outcome {
+        var cursor: UInt64 = 0
+        while true {
+            let update = try bridge.pollExtractionJob(jobId: jobId, cursor: cursor)
+            cursor = update.nextCursor
+            if let event = update.events.last {
+                onProgress(ExtractionProgress(message: event.message ?? event.path ?? "Extracting archive"))
+            }
+            if update.isTerminal {
+                switch update.status {
+                case .completed:
+                    return commit(review: review)
+                case .cancelled:
+                    discard(review: review)
+                    return .cancelled
+                default:
+                    return .failed(update.events.last?.error?.message ?? update.events.last?.message ?? "Archive extraction failed.")
+                }
+            }
+            try await Task.sleep(nanoseconds: 150_000_000)
+        }
+    }
+
+    func cancel(jobId: String) throws {
+        try bridge.cancelExtractionJob(jobId: jobId)
+    }
+
+    func discard(review: ExtractionReview) {
+        lock.lock()
+        let session = sessions.removeValue(forKey: review.id)
+        lock.unlock()
+        if let session {
+            try? fileManager.removeItem(at: session.stagingRoot.deletingLastPathComponent())
+        }
+    }
+
+    private func commit(review: ExtractionReview) -> Outcome {
+        lock.lock()
+        guard let session = sessions[review.id] else {
+            lock.unlock()
+            return .failed(ArchiveExtractionError.expiredReview.localizedDescription)
+        }
+        lock.unlock()
+        do {
+            switch session.destination {
+            case .appStorage(let root):
+                try commit(stagingRoot: session.stagingRoot, to: root, policy: review.collisionPolicy)
+            case .folder(let root):
+                guard root.startAccessingSecurityScopedResource() else {
+                    return .failed("The selected folder is no longer available.")
+                }
+                defer { root.stopAccessingSecurityScopedResource() }
+                var coordinationError: NSError?
+                var commitError: Error?
+                let coordinator = NSFileCoordinator()
+                coordinator.coordinate(writingItemAt: root, options: .forReplacing, error: &coordinationError) { _ in
+                    do { try commit(stagingRoot: session.stagingRoot, to: root, policy: review.collisionPolicy) }
+                    catch { commitError = error }
+                }
+                if let coordinationError { throw coordinationError }
+                if let commitError { throw commitError }
+            }
+            let writtenEntries = review.plan.writableEntries
+            let destination = session.destination.label
+            discard(review: review)
+            return .completed(writtenEntries, destination)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    private func commit(stagingRoot: URL, to destinationRoot: URL, policy: ExtractionCollisionPolicy) throws {
+        guard fileManager.fileExists(atPath: stagingRoot.path) else { throw ArchiveExtractionError.unavailableStaging }
+        let files = try fileManager.subpathsOfDirectory(atPath: stagingRoot.path)
+        for relativePath in files {
+            let source = stagingRoot.appendingPathComponent(relativePath)
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: source.path, isDirectory: &isDirectory), !isDirectory.boolValue else { continue }
+            let target = destinationRoot.appendingPathComponent(relativePath)
+            try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let resolved = try resolveCollision(target, policy: policy)
+            try fileManager.copyItem(at: source, to: resolved)
+        }
+    }
+
+    private func resolveCollision(_ target: URL, policy: ExtractionCollisionPolicy) throws -> URL {
+        guard fileManager.fileExists(atPath: target.path) else { return target }
+        switch policy {
+        case .replace:
+            try fileManager.removeItem(at: target)
+            return target
+        case .rename:
+            let base = target.deletingPathExtension().lastPathComponent
+            let ext = target.pathExtension
+            for index in 1...10_000 {
+                let name = ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)"
+                let candidate = target.deletingLastPathComponent().appendingPathComponent(name)
+                if !fileManager.fileExists(atPath: candidate.path) { return candidate }
+            }
+            throw CocoaError(.fileWriteFileExists)
+        case .refuse:
+            throw CocoaError(.fileWriteFileExists)
+        }
+    }
+}
+
+struct ArchiveExtractionPanel: View {
+    let state: ArchiveExtractionState
+    let selectedEntries: [ArchiveEntrySummary]
+    @Binding var password: String
+    let onChooseDestination: () -> Void
+    let onStart: (ExtractionReview) -> Void
+    let onCancel: () -> Void
+    let onRetryWithPassword: ([ArchiveEntrySummary]) -> Void
+
+    var body: some View {
+        switch state {
+        case .idle: EmptyView()
+        case .planning(let destination): Text("Preparing extraction plan for \(destination)")
+        case .review(let review):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Review extraction").font(.headline)
+                Text("\(review.plan.writableEntries) files will be extracted to \(review.destination.label).")
+                if let estimated = review.plan.estimatedBytes { Text("\(estimated) bytes estimated") }
+                ForEach(review.plan.warnings, id: \.self) { Text($0.message).foregroundStyle(.red) }
+                HStack {
+                    Button("Choose folder", action: onChooseDestination)
+                    Button("Cancel", action: onCancel)
+                    Button("Start extraction") { onStart(review) }.buttonStyle(.borderedProminent)
+                }
+            }
+        case .starting: Text("Starting extraction")
+        case .running(_, _, let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(message)
+                Button("Cancel extraction", action: onCancel)
+            }
+        case .completed(let entries, let destination): Text("Extraction complete: \(entries) files saved to \(destination).")
+        case .cancelled: Text("Extraction cancelled")
+        case .passwordRequired(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(message)
+                SecureField("Password", text: $password).textFieldStyle(.roundedBorder)
+                Button("Retry extraction") { onRetryWithPassword(selectedEntries) }.disabled(password.isEmpty)
+            }
+        case .failed(let message): Text(message).foregroundStyle(.red)
+        }
+    }
 }

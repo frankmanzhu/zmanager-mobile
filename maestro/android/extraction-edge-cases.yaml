@@ -1,0 +1,26 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- tapOn: "Load Maestro fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 5 entries"
+    timeout: 15000
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*Extraction complete:.*"
+    timeout: 30000
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*already exists in the destination.*"
+    timeout: 30000

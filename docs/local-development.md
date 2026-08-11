@@ -41,17 +41,15 @@ MAESTRO_PLATFORM=ios ./scripts/check-maestro.sh
 runs. Build and install the debug app after changing fixture source files so the
 debug-only **Load Maestro fixture** action is present. The workflow suite imports
 that archive through the same app-cache import path as normal files, browses text,
-JSON, SVG, Markdown, and PDF entries, and verifies the archive through the Rust
-bridge. The landing-screen smoke flow continues to exercise the native
-`Open Archive` picker entry point.
+JSON, SVG, Markdown, and PDF entries, verifies the archive through the Rust
+bridge, and covers the complete plan-review, staged extraction, native commit,
+and completion flow in `extraction-workflow.yaml`. The landing-screen smoke flow
+continues to exercise the native `Open Archive` picker entry point.
 
-The current app does not yet expose extraction-plan approval or destination
-commit UI, so the Maestro suite deliberately does not claim end-to-end coverage
-of full extraction. The implementation and coverage plan is documented in
-[mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md). It covers
-the planned extraction state machine, Android SAF and iOS security-scoped
-destination commits, deterministic test destinations, and the full Maestro
-scenario matrix to add when the UI lands.
+The E2E destination is deterministic app storage. The UI also supports Android
+SAF tree destinations and iOS security-scoped folders; exercise those
+provider-specific commit paths manually against the providers supported by the
+release build.
 
 ## iOS
 
