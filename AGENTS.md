@@ -23,3 +23,7 @@ Android `content://` URIs and iOS security-scoped URLs are platform objects. Con
 
 Prioritize bridge-boundary tests, platform file access behavior, archive listing, extraction planning, cancellation, error normalization, and password-required flows.
 
+## Commit conventions
+
+Use short imperative commit messages. Do not mention Claude, Anthropic, or any other AI assistant name in commit messages, and do not add a `Co-Authored-By: Claude` (or any AI co-author) trailer — commits and pushes must carry only the user's authorship.
+
