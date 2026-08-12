@@ -1325,6 +1325,108 @@ public func FfiConverterTypeExtractionPlanEntry_lower(_ value: ExtractionPlanEnt
 }
 
 
+public struct FormatDescriptor {
+    public var kind: String
+    public var label: String
+    public var extensions: [String]
+    public var canList: Bool
+    public var canExtract: Bool
+    public var canCreate: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(kind: String, label: String, extensions: [String], canList: Bool, canExtract: Bool, canCreate: Bool) {
+        self.kind = kind
+        self.label = label
+        self.extensions = extensions
+        self.canList = canList
+        self.canExtract = canExtract
+        self.canCreate = canCreate
+    }
+}
+
+#if compiler(>=6)
+extension FormatDescriptor: Sendable {}
+#endif
+
+
+extension FormatDescriptor: Equatable, Hashable {
+    public static func ==(lhs: FormatDescriptor, rhs: FormatDescriptor) -> Bool {
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.label != rhs.label {
+            return false
+        }
+        if lhs.extensions != rhs.extensions {
+            return false
+        }
+        if lhs.canList != rhs.canList {
+            return false
+        }
+        if lhs.canExtract != rhs.canExtract {
+            return false
+        }
+        if lhs.canCreate != rhs.canCreate {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(kind)
+        hasher.combine(label)
+        hasher.combine(extensions)
+        hasher.combine(canList)
+        hasher.combine(canExtract)
+        hasher.combine(canCreate)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFormatDescriptor: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FormatDescriptor {
+        return
+            try FormatDescriptor(
+                kind: FfiConverterString.read(from: &buf), 
+                label: FfiConverterString.read(from: &buf), 
+                extensions: FfiConverterSequenceString.read(from: &buf), 
+                canList: FfiConverterBool.read(from: &buf), 
+                canExtract: FfiConverterBool.read(from: &buf), 
+                canCreate: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FormatDescriptor, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.kind, into: &buf)
+        FfiConverterString.write(value.label, into: &buf)
+        FfiConverterSequenceString.write(value.extensions, into: &buf)
+        FfiConverterBool.write(value.canList, into: &buf)
+        FfiConverterBool.write(value.canExtract, into: &buf)
+        FfiConverterBool.write(value.canCreate, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFormatDescriptor_lift(_ buf: RustBuffer) throws -> FormatDescriptor {
+    return try FfiConverterTypeFormatDescriptor.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFormatDescriptor_lower(_ value: FormatDescriptor) -> RustBuffer {
+    return FfiConverterTypeFormatDescriptor.lower(value)
+}
+
+
 public struct HealthcheckResult {
     public var status: String
     public var engine: String
@@ -1738,6 +1840,68 @@ public func FfiConverterTypeListArchiveResult_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeListArchiveResult_lower(_ value: ListArchiveResult) -> RustBuffer {
     return FfiConverterTypeListArchiveResult.lower(value)
+}
+
+
+public struct ListFormatsResult {
+    public var formats: [FormatDescriptor]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(formats: [FormatDescriptor]) {
+        self.formats = formats
+    }
+}
+
+#if compiler(>=6)
+extension ListFormatsResult: Sendable {}
+#endif
+
+
+extension ListFormatsResult: Equatable, Hashable {
+    public static func ==(lhs: ListFormatsResult, rhs: ListFormatsResult) -> Bool {
+        if lhs.formats != rhs.formats {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(formats)
+    }
+}
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeListFormatsResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListFormatsResult {
+        return
+            try ListFormatsResult(
+                formats: FfiConverterSequenceTypeFormatDescriptor.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ListFormatsResult, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeFormatDescriptor.write(value.formats, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListFormatsResult_lift(_ buf: RustBuffer) throws -> ListFormatsResult {
+    return try FfiConverterTypeListFormatsResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListFormatsResult_lower(_ value: ListFormatsResult) -> RustBuffer {
+    return FfiConverterTypeListFormatsResult.lower(value)
 }
 
 
@@ -4747,6 +4911,31 @@ fileprivate struct FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRust
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFormatDescriptor: FfiConverterRustBuffer {
+    typealias SwiftType = [FormatDescriptor]
+
+    public static func write(_ value: [FormatDescriptor], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFormatDescriptor.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FormatDescriptor] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FormatDescriptor]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFormatDescriptor.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer {
     typealias SwiftType = [MobileJobEvent]
 
@@ -4823,6 +5012,12 @@ public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult
     return try  FfiConverterTypeListArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
     uniffi_zmanager_ffi_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest_lower(request),$0
+    )
+})
+}
+public func listFormats() -> ListFormatsResult  {
+    return try!  FfiConverterTypeListFormatsResult_lift(try! rustCall() {
+    uniffi_zmanager_ffi_fn_func_listformats($0
     )
 })
 }
@@ -5079,6 +5274,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_listarchive() != 51788) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_zmanager_ffi_checksum_func_listformats() != 4246) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_materializepreview() != 28909) {

@@ -3135,9 +3135,13 @@ final class ArchiveSessionStack {
 }
 
 enum NestedArchiveSupport {
-    private static let archiveExtensions: Set<String> = [
+    // Nested-archive browsing is a UI capability over registry-listable
+    // formats; the set is pinned by the conformance test against the FFI
+    // format registry. XIP is intentionally absent: the FFI reports
+    // canList=false for it, so nesting into an .xip always fails.
+    static let archiveExtensions: Set<String> = [
         "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz",
-        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa", "xip"
+        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
     ]
 
     static func canOpen(_ entry: ArchiveEntrySummary) -> Bool {

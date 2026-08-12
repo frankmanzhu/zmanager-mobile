@@ -89,6 +89,32 @@ class ArchiveListingTest {
     }
 
     @Test
+    fun loadMapsUnlistableFormatToUnsupportedFormatState() {
+        val repository = ArchiveListingRepository(
+            FakeArchiveBridgeGateway(
+                detection = DetectArchiveResult(
+                    archivePath = "/cache/archive.xip",
+                    format = ArchiveFormat.XIP,
+                    formatLabel = "XIP",
+                    exists = true,
+                    isFile = true,
+                    canList = false,
+                    canExtract = false,
+                    canCreate = false,
+                    warnings = emptyList()
+                )
+            )
+        )
+
+        val state = repository.load(testImportedArchive(), password = null)
+
+        assertTrue(state is ArchiveListingState.Failed)
+        val error = (state as ArchiveListingState.Failed).error
+        assertEquals("unsupported_format", error.code)
+        assertFalse(error.retryable)
+    }
+
+    @Test
     fun visibleGroupsSearchesSortsAndGroupsEntries() {
         val summary = ArchiveListingSummary(
             formatLabel = "ZIP",

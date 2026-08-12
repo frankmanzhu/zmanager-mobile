@@ -428,6 +428,58 @@ final class ZManagerMobileTests: XCTestCase {
             return "special"
         }
     }
+
+    // MARK: - Format registry conformance
+
+    func testNestedArchiveExtensionsAreRegistrySubset() {
+        let formats = listFormats().formats
+        let registrySuffixes = Set(
+            formats
+                .flatMap { $0.extensions }
+                .map { $0.lowercased() }
+        )
+        XCTAssertGreaterThan(formats.count, 0, "listFormats returned no formats")
+        for archiveExtension in NestedArchiveSupport.archiveExtensions {
+            if archiveExtension == "tzap" { continue }
+            XCTAssertTrue(
+                registrySuffixes.contains("." + archiveExtension),
+                archiveExtension + " is nested-browsable but missing from the format registry (registry: "
+                    + registrySuffixes.sorted().joined(separator: ", ") + ")"
+            )
+        }
+    }
+
+    func testNestedArchiveSetDoesNotContainXip() {
+        // The FFI reports canList=false for XIP, so nesting into an .xip
+        // would always fail.
+        XCTAssertFalse(NestedArchiveSupport.archiveExtensions.contains("xip"))
+    }
+
+    func testListingLoaderMapsUnlistableFormatToUnsupported() {
+        let loader = ArchiveListingLoader(
+            bridge: FakeArchiveBridgeClient(
+                detection: DetectArchiveResult(
+                    archivePath: "/cache/archive.xip",
+                    format: .xip,
+                    formatLabel: "XIP",
+                    exists: true,
+                    isFile: true,
+                    canList: false,
+                    canExtract: false,
+                    canCreate: false,
+                    warnings: []
+                )
+            )
+        )
+
+        let state = loader.load(archive: testImportedArchive(), password: nil)
+
+        guard case .failed(let error) = state else {
+            return XCTFail("Expected failed listing state.")
+        }
+        XCTAssertEqual(error.code, "unsupported_format")
+        XCTAssertFalse(error.retryable)
+    }
 }
 
 private final class FakeArchiveBridgeClient: ArchiveBridgeClient {

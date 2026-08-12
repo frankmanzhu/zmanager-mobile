@@ -293,6 +293,12 @@ RustBuffer uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(RustBuffer archive_
 RustBuffer uniffi_zmanager_ffi_fn_func_listarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTFORMATS
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTFORMATS
+RustBuffer uniffi_zmanager_ffi_fn_func_listformats(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_MATERIALIZEPREVIEW
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_MATERIALIZEPREVIEW
 RustBuffer uniffi_zmanager_ffi_fn_func_materializepreview(RustBuffer request, RustCallStatus *_Nonnull out_status
@@ -768,6 +774,12 @@ uint16_t uniffi_zmanager_ffi_checksum_func_inspecttzapx509signer(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTARCHIVE
 uint16_t uniffi_zmanager_ffi_checksum_func_listarchive(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTFORMATS
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTFORMATS
+uint16_t uniffi_zmanager_ffi_checksum_func_listformats(void
     
 );
 #endif

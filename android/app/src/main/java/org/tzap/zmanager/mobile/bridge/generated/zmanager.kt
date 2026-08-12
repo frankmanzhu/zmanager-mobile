@@ -787,6 +787,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -817,6 +819,8 @@ fun uniffi_zmanager_ffi_checksum_func_inspecttzapx509publicnokeysigner(
 fun uniffi_zmanager_ffi_checksum_func_inspecttzapx509signer(
 ): Short
 fun uniffi_zmanager_ffi_checksum_func_listarchive(
+): Short
+fun uniffi_zmanager_ffi_checksum_func_listformats(
 ): Short
 fun uniffi_zmanager_ffi_checksum_func_materializepreview(
 ): Short
@@ -938,6 +942,8 @@ fun uniffi_zmanager_ffi_fn_func_inspecttzapx509publicnokeysigner(`archivePath`: 
 fun uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(`archivePath`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_zmanager_ffi_fn_func_listarchive(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_zmanager_ffi_fn_func_listformats(uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_zmanager_ffi_fn_func_materializepreview(`request`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1147,6 +1153,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_ffi_checksum_func_listarchive() != 51788.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_zmanager_ffi_checksum_func_listformats() != 4246.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_zmanager_ffi_checksum_func_materializepreview() != 28909.toShort()) {
@@ -1849,6 +1858,54 @@ public object FfiConverterTypeExtractionPlanEntry: FfiConverterRustBuffer<Extrac
 
 
 
+data class FormatDescriptor (
+    var `kind`: kotlin.String, 
+    var `label`: kotlin.String, 
+    var `extensions`: List<kotlin.String>, 
+    var `canList`: kotlin.Boolean, 
+    var `canExtract`: kotlin.Boolean, 
+    var `canCreate`: kotlin.Boolean
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeFormatDescriptor: FfiConverterRustBuffer<FormatDescriptor> {
+    override fun read(buf: ByteBuffer): FormatDescriptor {
+        return FormatDescriptor(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: FormatDescriptor) = (
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterSequenceString.allocationSize(value.`extensions`) +
+            FfiConverterBoolean.allocationSize(value.`canList`) +
+            FfiConverterBoolean.allocationSize(value.`canExtract`) +
+            FfiConverterBoolean.allocationSize(value.`canCreate`)
+    )
+
+    override fun write(value: FormatDescriptor, buf: ByteBuffer) {
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterSequenceString.write(value.`extensions`, buf)
+            FfiConverterBoolean.write(value.`canList`, buf)
+            FfiConverterBoolean.write(value.`canExtract`, buf)
+            FfiConverterBoolean.write(value.`canCreate`, buf)
+    }
+}
+
+
+
 data class HealthcheckResult (
     var `status`: kotlin.String, 
     var `engine`: kotlin.String, 
@@ -2040,6 +2097,34 @@ public object FfiConverterTypeListArchiveResult: FfiConverterRustBuffer<ListArch
             FfiConverterULong.write(value.`entryCount`, buf)
             FfiConverterOptionalULong.write(value.`totalSize`, buf)
             FfiConverterSequenceTypeBridgeError.write(value.`warnings`, buf)
+    }
+}
+
+
+
+data class ListFormatsResult (
+    var `formats`: List<FormatDescriptor>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeListFormatsResult: FfiConverterRustBuffer<ListFormatsResult> {
+    override fun read(buf: ByteBuffer): ListFormatsResult {
+        return ListFormatsResult(
+            FfiConverterSequenceTypeFormatDescriptor.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ListFormatsResult) = (
+            FfiConverterSequenceTypeFormatDescriptor.allocationSize(value.`formats`)
+    )
+
+    override fun write(value: ListFormatsResult, buf: ByteBuffer) {
+            FfiConverterSequenceTypeFormatDescriptor.write(value.`formats`, buf)
     }
 }
 
@@ -3581,6 +3666,34 @@ public object FfiConverterSequenceTypeExtractionPlanEntry: FfiConverterRustBuffe
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeFormatDescriptor: FfiConverterRustBuffer<List<FormatDescriptor>> {
+    override fun read(buf: ByteBuffer): List<FormatDescriptor> {
+        val len = buf.getInt()
+        return List<FormatDescriptor>(len) {
+            FfiConverterTypeFormatDescriptor.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<FormatDescriptor>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeFormatDescriptor.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<FormatDescriptor>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeFormatDescriptor.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<List<MobileJobEvent>> {
     override fun read(buf: ByteBuffer): List<MobileJobEvent> {
         val len = buf.getInt()
@@ -3672,6 +3785,15 @@ public object FfiConverterSequenceTypeMobileJobEvent: FfiConverterRustBuffer<Lis
     uniffiRustCallWithError(ZmanagerGuiException) { _status ->
     UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_listarchive(
         FfiConverterTypeListArchiveRequest.lower(`request`),_status)
+}
+    )
+    }
+    
+ fun `listFormats`(): ListFormatsResult {
+            return FfiConverterTypeListFormatsResult.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_zmanager_ffi_fn_func_listformats(
+        _status)
 }
     )
     }

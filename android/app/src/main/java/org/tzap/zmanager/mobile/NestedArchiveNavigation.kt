@@ -49,9 +49,13 @@ class ArchiveSessionStack {
 }
 
 object NestedArchiveSupport {
-    private val archiveExtensions = setOf(
+    // Nested-archive browsing is a UI capability over registry-listable
+    // formats. The set is pinned by FormatRegistryConformanceTest against the
+    // zmanager format contract snapshot. XIP is intentionally absent: the FFI
+    // reports canList=false for it, so nesting into an .xip always fails.
+    internal val archiveExtensions = setOf(
         "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz",
-        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa", "xip"
+        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
     )
 
     fun canOpen(entry: ArchiveEntrySummary): Boolean {
