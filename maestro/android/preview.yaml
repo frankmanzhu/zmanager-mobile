@@ -4,11 +4,20 @@ appId: org.tzap.zmanager.mobile
 
 - launchApp:
     clearState: true
+- scrollUntilVisible:
+    element: "Load Maestro fixture"
+    direction: DOWN
 - tapOn: "Load Maestro fixture"
 - extendedWaitUntil:
     visible: "ZIP - 5 entries"
     timeout: 15000
+- scrollUntilVisible:
+    element: "readme.txt"
+    direction: DOWN
 - tapOn: "Select readme.txt"
+- scrollUntilVisible:
+    element: "Preview"
+    direction: UP
 - tapOn: "Preview"
 - pressKey: BACK
 - extendedWaitUntil:

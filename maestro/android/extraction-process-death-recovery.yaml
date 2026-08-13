@@ -1,0 +1,8 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp
+- extendedWaitUntil:
+    visible: ".*interrupted.*"
+    timeout: 15000

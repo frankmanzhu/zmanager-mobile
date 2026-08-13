@@ -4,15 +4,24 @@ appId: org.tzap.zmanager.mobile
 
 - launchApp:
     clearState: true
+- scrollUntilVisible:
+    element: "Load test fixture"
+    direction: DOWN
 - tapOn: "Load test fixture"
 - tapOn: "CAB fixture"
 - extendedWaitUntil:
     visible: "Archive - 5 entries"
     timeout: 30000
+- scrollUntilVisible:
+    element: "Extract"
+    direction: DOWN
 - tapOn: "Extract"
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 30000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
 - tapOn: "Start extraction"
 - extendedWaitUntil:
     visible: ".*Extraction complete: 5 files saved to App storage.*"

@@ -1,18 +1,18 @@
 # Mobile Extraction UI and E2E Plan
 
-Status: proposed
+Status: implemented baseline; edge-case and provider gates remain
 
 This plan covers the missing extraction-plan review, destination selection, staged extraction, native destination commit, progress, cancellation, and completion UI on Android and iOS. It also defines full archive-extraction UI E2E coverage.
 
-The current app already has generated UniFFI types and functions for `plan_extract`, `start_extract`, `poll_job_events`, and `cancel_job`, but the native app only implements listing, preview, and test. The current extract request has no plan-binding token or external-destination snapshot, and the current job events do not include percent, warning totals, cancellation-requested, or pause/resume fields. Add those contract pieces in the sibling `zmanager-ffi` crate before enabling provider-backed extraction; do not hand-edit generated files or move archive behavior into Kotlin or Swift.
+The app now implements the app-private extraction vertical slice on both platforms: bridge planning, review, staged extraction, progress/cancellation state, deterministic fixtures, and operation reports. External provider commits, recovery edge cases, and large-job lifecycle coverage remain launch gates. Archive behavior continues to be Rust-owned; platform code owns destination access and commit policy.
 
-## Current gap
+## Current status and remaining gap
 
-- Android `ArchiveBridgeGateway` has no extraction methods, and `MainActivity` has no Extract action or extraction state.
-- iOS `ArchiveBridgeClient` has no extraction methods, and `ContentView` / `ArchiveImportModel` has no extraction state.
-- Neither platform has a native destination abstraction, SAF/security-scoped destination handling, staged-output commit coordinator, or recovery record.
-- Existing Maestro archive workflows verify listing and archive testing only. They intentionally do not claim full extraction coverage.
-- The bridge contract already provides `ExtractionPlan`, `ExtractionPlanEntry`, collision policies, job events, terminal summaries, and job polling. Confirm the sibling `zmanager` bridge implementation and regenerate bindings only if that contract changes.
+- Android and iOS have extraction methods, plan review, app-private destination staging, cancellation, completion, cleanup, and stable accessibility labels.
+- Android SAF and iOS security-scoped external-folder commits now retain redacted native recovery records when a commit fails, with Retry/Export/Discard actions. Provider permission instrumentation and native picker instrumentation remain to be completed.
+- Maestro happy-path extraction flows now exist at `maestro/android/extraction-happy-path.yaml` and `maestro/ios/extraction-happy-path.yaml`; they verify the user-visible completion path. Deterministic cancellation flows exist at `maestro/android/extraction-cancellation.yaml` and `maestro/ios/extraction-cancellation.yaml`; they hold a debug-only paced Rust job, cancel it through the native shell, and verify the cancelled state. Native tests remain the source of truth for bridge and commit edge cases.
+- Creation happy-path flows exist at `maestro/android/creation-happy-path.yaml` and `maestro/ios/creation-happy-path.yaml`; the iOS flow uses the platform-specific `Start creation` label and passes on the simulator alongside the native UI test.
+- The bridge contract provides `ExtractionPlan`, `ExtractionPlanEntry`, collision policies, job events, terminal summaries, and job polling. Generated bindings are pinned to the approved `.cache/zmanager` checkout and must be regenerated only from that checkout.
 
 ## Target user flow
 

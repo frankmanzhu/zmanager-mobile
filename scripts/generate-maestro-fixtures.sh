@@ -125,6 +125,18 @@ cp "$SOURCE_DIR/docs/readme.txt" "$nested_dir/inner/readme.txt"
 )
 copy_fixture "$temp_dir/maestro-nested.zip"
 
+# A password-bearing ZIP keeps the password-required and wrong-password flows
+# deterministic without putting a password in production code or diagnostics.
+# Use the pinned Rust CLI so both mobile bridges exercise the same encrypted
+# ZIP implementation instead of depending on host `zip` encryption details.
+(
+  cd "$nested_dir"
+  printf '%s\n' "v2testpassword" | cargo run --quiet --manifest-path "$CLI_MANIFEST" -p zmanager-cli --bin zm -- \
+    --no-progress --no-color create "$temp_dir/maestro-encrypted.zip" maestro-inner.zip \
+    --format zip --encrypt --password-stdin
+)
+copy_fixture "$temp_dir/maestro-encrypted.zip"
+
 create_split_fixture "maestro-split.zip" "zip" "4m" "--store"
 copy_fixture_group "$temp_dir/maestro-split.z*"
 

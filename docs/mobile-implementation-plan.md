@@ -1,6 +1,6 @@
 # ZManager Mobile Implementation Plan
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-14
 
 ## Purpose
 
@@ -13,6 +13,12 @@ This plan is intentionally implementation-facing. If a behavior is user-facing o
 The follow-up plan for nested archive browsing, archive-folder repackaging, and
 LocalSend-compatible local-network sharing is in
 [mobile-follow-up-implementation-plan.md](mobile-follow-up-implementation-plan.md).
+
+The current implementation checkpoint and remaining launch gates are tracked in
+[mobile-format-matrix.md](mobile-format-matrix.md) and
+[mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md). These
+documents distinguish verified app-private workflows from provider, format,
+and hardware evidence that is still required.
 
 ## V2 Adoption Scope
 
@@ -416,7 +422,7 @@ Goal: make all public claims, docs, in-app strings, and tested behavior agree.
 
 Deliverables:
 
-- V2 format exposure matrix at `docs/mobile-format-matrix.md`, with one row per launch-scope operation and explicit bridge/core, Android, iOS, and UI evidence.
+  - V2 format exposure matrix at `docs/mobile-format-matrix.md`, with one row per launch-scope operation and explicit bridge/core, Android, iOS, and UI evidence.
 - Supported-format help page or in-app surface.
 - Settings/about/license/help screen.
 - Android and iOS app icons generated from the ZManager Desktop icon.

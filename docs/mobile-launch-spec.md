@@ -70,18 +70,27 @@ Before release, Android and iOS device E2E must cover at minimum:
 
 Current verification status: deterministic nested browsing, native-folder
 creation, archive-folder repackaging, receive-mode lifecycle, arbitrary-file
-sharing, LocalSend registration, selected-destination export, and transient
-PIN-required retry paths pass in the Android/iOS test suites and simulator
-builds. Android unit tests (31), Android ActivityScenario instrumentation, and
-iOS XCTest coverage (25) plus iOS UI-test launch coverage pass. Controlled
-Android and iOS Maestro flows pass for nested browsing, archive repackaging,
-and receive lifecycle. A controlled LocalSend peer upload has passed against
-the Android receiver, and the iOS simulator validates the same upload protocol
-in XCTest, including checksum, traversal-safe naming, destination commit, and
-staging cleanup. The complete release gate remains open for persistent device
-trust/pinning policy, large-job cancellation cleanup,
-lifecycle/background behavior, accessibility, native picker instrumentation,
-and physical-device compatibility coverage.
+sharing, LocalSend registration, selected-destination export, transient
+PIN-required retry paths, and explicit fingerprint trust storage pass in the
+Android/iOS test suites and simulator
+builds. The encrypted nested fixture passes wrong-password retry through
+verified repackaging on both platforms. Android has 44 JVM tests plus three
+ActivityScenario/instrumentation tests; the iOS Xcode suite reports 44 passed
+unit/bridge/coordinator/UI tests. Controlled Android and iOS Maestro flows pass for
+nested browsing, archive repackaging, encrypted password retry, receive
+lifecycle, deterministic extraction completion, and deterministic extraction
+cancellation, plus Android timeout recovery. A controlled LocalSend peer upload
+has passed against the Android
+receiver, and the iOS simulator validates the same upload protocol in XCTest,
+including checksum, traversal-safe naming, destination commit, and staging
+cleanup. The complete release gate remains open for lifecycle/background behavior
+beyond the covered cleanup boundaries, real Android foreground-service
+timeout-boundary recovery, accessibility, native picker instrumentation,
+production-size large-job cancellation, and physical-device compatibility
+coverage. Simulator accessibility targets, responsive wide-screen constraints,
+and Trusted devices revocation controls are implemented but still need
+hardware-device evidence. The Android emulator process-death recovery harness
+and both-platform deterministic cancellation-cleanup harnesses now pass.
 
 ## Product Contract
 
@@ -149,6 +158,11 @@ Shared:
 - Platform gates for formats validate mobile file access, lifecycle, destination commit, UI, and error behavior; they do not transfer archive behavior into Android or iOS shells.
 
 ## Format Scope
+
+The current evidence matrix is maintained in
+[mobile-format-matrix.md](mobile-format-matrix.md). It deliberately marks
+formats as blocked when the pinned bridge or native evidence is insufficient;
+registry presence alone is not launch exposure.
 
 ZManager-Core may support more formats than the mobile app launch exposes. Mobile UI must expose every format operation listed in this section after it passes the launch quality gates on both Android and iOS. A failing format gate blocks launch until fixed, or until this spec is explicitly changed.
 
@@ -440,6 +454,10 @@ Android destination policy:
 - Do not use WorkManager at launch for archive jobs because persisted rescheduling conflicts with transient passwords, bridge process state, SAF permission lifetimes, and deterministic staging cleanup.
 - Treat WorkManager as future work only for password-free, resumable jobs with persisted manifests.
 - Handle Android 15+ foreground-service timeout behavior in long-job tests for target SDK 35.
+- Current implementation uses a non-exported `dataSync` foreground service for
+  user-started extraction and creation, keeps passwords in process memory, and
+  hands terminal results back by token. Process recreation and timeout tests
+  remain release-gate work.
 
 iOS destination policy:
 
@@ -450,6 +468,9 @@ iOS destination policy:
 - Hold security-scoped access only around native file operations.
 - Copy to app temporary storage when bridge calls require stable paths.
 - Treat long extraction as foreground-first at launch.
+- Current iOS creation supports Photos picker image/video staging and document
+  drag/drop into the creation contents path; picker instrumentation and
+  physical-device provider coverage remain release-gate work.
 
 Cleanup policy:
 

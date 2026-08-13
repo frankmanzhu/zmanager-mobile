@@ -26,12 +26,17 @@ data class ArchiveRepackagingReview(
 sealed interface ArchiveRepackagingOutcome {
     data class Completed(val outputPath: String, val verified: Boolean) : ArchiveRepackagingOutcome
     data object Cancelled : ArchiveRepackagingOutcome
+    data class PasswordRequired(val message: String) : ArchiveRepackagingOutcome
     data class Failed(val message: String) : ArchiveRepackagingOutcome
 }
 
 sealed interface ArchiveRepackagingUiState {
     data object Idle : ArchiveRepackagingUiState
     data object Planning : ArchiveRepackagingUiState
+    data class PasswordRequired(
+        val entries: List<ArchiveEntrySummary>,
+        val message: String
+    ) : ArchiveRepackagingUiState
     data class Review(val review: ArchiveRepackagingReview) : ArchiveRepackagingUiState
     data class Running(val review: ArchiveRepackagingReview, val message: String) : ArchiveRepackagingUiState
     data class Completed(val outcome: ArchiveRepackagingOutcome.Completed) : ArchiveRepackagingUiState
@@ -52,8 +57,10 @@ class ArchiveRepackagingCoordinator(
         val request: ArchiveRepackagingRequest,
         val stagingRoot: File,
         @Volatile var activeJobId: String? = null,
+        @Volatile var activePhase: ActivePhase? = null,
         @Volatile var cancelRequested: Boolean = false
     )
+    private enum class ActivePhase { EXTRACTION, CREATION }
     private val sessions = mutableMapOf<String, Session>()
 
     fun plan(request: ArchiveRepackagingRequest): ArchiveRepackagingReview {
@@ -79,10 +86,22 @@ class ArchiveRepackagingCoordinator(
         try {
             val extractJob = extraction.start(review.extractionReview)
             session.activeJobId = extractJob
+            session.activePhase = ActivePhase.EXTRACTION
             onProgress("Extracting selected archive folder")
             when (val extracted = extraction.awaitCompletion(review.extractionReview, extractJob) { onProgress(it.message) }) {
                 ExtractionOutcome.Cancelled -> return@withContext finish(review.id, ArchiveRepackagingOutcome.Cancelled)
-                is ExtractionOutcome.Failed -> return@withContext finish(review.id, ArchiveRepackagingOutcome.Failed(extracted.message))
+                is ExtractionOutcome.Failed -> return@withContext finish(
+                    review.id,
+                    if (extracted.code == "password_required" || extracted.code == "invalid_password") {
+                        ArchiveRepackagingOutcome.PasswordRequired(extracted.message)
+                    } else {
+                        ArchiveRepackagingOutcome.Failed(extracted.message)
+                    }
+                )
+                is ExtractionOutcome.RecoveryAvailable -> return@withContext finish(
+                    review.id,
+                    ArchiveRepackagingOutcome.Failed(extracted.message)
+                )
                 is ExtractionOutcome.Completed -> Unit
             }
             if (session.cancelRequested) return@withContext finish(review.id, ArchiveRepackagingOutcome.Cancelled)
@@ -106,6 +125,7 @@ class ArchiveRepackagingCoordinator(
             }
             val createJob = creation.start(createReview)
             session.activeJobId = createJob
+            session.activePhase = ActivePhase.CREATION
             onProgress("Creating output archive")
             when (val created = creation.awaitCompletion(createReview, createJob) { onProgress(it.message) }) {
                 is ArchiveCreationOutcome.Completed -> finish(
@@ -129,7 +149,12 @@ class ArchiveRepackagingCoordinator(
         val session = sessions[review.id] ?: return
         session.cancelRequested = true
         session.activeJobId?.let { jobId ->
-            runCatching { extraction.cancel(jobId) }
+            runCatching {
+                when (session.activePhase) {
+                    ActivePhase.CREATION -> creation.cancel(jobId)
+                    ActivePhase.EXTRACTION, null -> extraction.cancel(jobId)
+                }
+            }
         }
     }
 

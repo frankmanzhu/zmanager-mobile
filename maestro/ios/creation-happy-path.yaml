@@ -1,0 +1,16 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Create debug folder archive"
+- extendedWaitUntil:
+    visible: ".*entries.*bytes.*"
+    timeout: 15000
+- tapOn: "Start creation"
+- extendedWaitUntil:
+    visible: "Created .*"
+    timeout: 30000
+- assertVisible: "Verified"

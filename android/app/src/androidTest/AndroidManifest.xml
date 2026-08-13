@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name=".TestDocumentsProvider"
+            android:authorities="org.tzap.zmanager.mobile.test.documents"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

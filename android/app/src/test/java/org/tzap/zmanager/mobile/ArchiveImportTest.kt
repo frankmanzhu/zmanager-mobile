@@ -55,4 +55,21 @@ class ArchiveImportTest {
             ArchiveImportNames.primaryArchiveName(listOf("payload.z01", "payload.zip"))
         )
     }
+
+    @Test
+    fun automationParserAcceptsExplicitLocalOpenWithoutCredentials() {
+        val request = ArchiveAutomationIntents.parse(
+            Uri.parse("zmanager://open?archive=content%3A%2F%2Fprovider%2Farchive.zip")
+        )!!
+
+        assertEquals(ArchiveAutomationAction.OPEN, request.action)
+        assertEquals(Uri.parse("content://provider/archive.zip"), request.archiveUri)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun automationParserRejectsPasswords() {
+        ArchiveAutomationIntents.parse(
+            Uri.parse("zmanager://open?archive=file%3A%2F%2F%2Ftmp%2Fa.zip&password=secret")
+        )
+    }
 }

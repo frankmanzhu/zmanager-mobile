@@ -11,6 +11,30 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 
+/**
+ * Converts a staged file to a safe relative path. The bridge remains the
+ * authority for archive path policy; this second boundary protects the
+ * platform-owned commit from symlinks or malformed staged paths.
+ */
+object ExtractionPathSafety {
+    fun relativePath(file: File, root: File): String {
+        val canonicalRoot = root.canonicalFile
+        val canonicalFile = file.canonicalFile
+        val rootPath = canonicalRoot.path.trimEnd(File.separatorChar) + File.separator
+        require(canonicalFile.path.startsWith(rootPath)) {
+            "Staged output escaped its private root."
+        }
+        val relative = canonicalFile.relativeTo(canonicalRoot).invariantSeparatorsPath
+        require(relative.isNotBlank() && relative != ".") {
+            "Staged output must be a descendant of its private root."
+        }
+        require(relative.split('/').none { it.isEmpty() || it == "." || it == ".." }) {
+            "Staged output contains an unsafe relative path."
+        }
+        return relative
+    }
+}
+
 sealed interface ExtractionDestination {
     val label: String
 
@@ -28,7 +52,21 @@ data class ExtractionReview(
     val id: String,
     val destination: ExtractionDestination,
     val plan: PlanExtractResult,
-    val collisionPolicy: ExtractionCollisionPolicy
+    val collisionPolicy: ExtractionCollisionPolicy,
+    /** Original request data used by the foreground-service handoff. */
+    val request: ArchiveExtractionRequest? = null
+)
+
+data class ArchiveExtractionRequest(
+    val archive: ImportedArchive,
+    val selectedPaths: List<String>,
+    val destination: ExtractionDestination,
+    val password: String?,
+    val collisionPolicy: ExtractionCollisionPolicy,
+    /** Debug/device-E2E pacing only; archive work remains Rust-owned. */
+    val debugDelayMillis: Long = 0L,
+    /** Debug/device-E2E timeout only; production uses the service budget. */
+    val debugTimeoutMillis: Long? = null
 )
 
 data class ExtractionProgress(
@@ -42,7 +80,8 @@ data class ExtractionProgress(
 sealed interface ExtractionOutcome {
     data class Completed(val writtenEntries: ULong, val destination: String) : ExtractionOutcome
     data object Cancelled : ExtractionOutcome
-    data class Failed(val message: String) : ExtractionOutcome
+    data class Failed(val message: String, val code: String? = null) : ExtractionOutcome
+    data class RecoveryAvailable(val recoveryId: String, val message: String) : ExtractionOutcome
 }
 
 /**
@@ -64,6 +103,13 @@ class ArchiveExtractionCoordinator(
     )
 
     private val sessions = mutableMapOf<String, Session>()
+    private val recoveryStore = ArchiveRecoveryStore(context)
+
+    fun recoveries(): List<ArchiveRecoveryRecord> = recoveryStore.records()
+
+    fun discardRecovery(id: String) = recoveryStore.discard(id)
+
+    fun recoveryFiles(id: String): List<File> = recoveryStore.files(id)
 
     fun appStorageDestination(): ExtractionDestination.AppStorage {
         return ExtractionDestination.AppStorage(File(context.filesDir, "Extracted"))
@@ -74,7 +120,9 @@ class ArchiveExtractionCoordinator(
         selectedPaths: List<String>,
         destination: ExtractionDestination,
         password: String?,
-        collisionPolicy: ExtractionCollisionPolicy = ExtractionCollisionPolicy.REFUSE
+        collisionPolicy: ExtractionCollisionPolicy = ExtractionCollisionPolicy.REFUSE,
+        debugDelayMillis: Long = 0L,
+        debugTimeoutMillis: Long? = null
     ): ExtractionReview {
         val id = UUID.randomUUID().toString()
         val stagingRoot = File(context.cacheDir, "extractions/$id/staging")
@@ -82,6 +130,15 @@ class ArchiveExtractionCoordinator(
             "Unable to prepare private extraction staging."
         }
         val stagingPath = stagingRoot.canonicalPath
+        val request = ArchiveExtractionRequest(
+            archive = archive,
+            selectedPaths = selectedPaths,
+            destination = destination,
+            password = password,
+            collisionPolicy = collisionPolicy,
+            debugDelayMillis = debugDelayMillis.coerceIn(0L, 30_000L),
+            debugTimeoutMillis = debugTimeoutMillis?.coerceIn(1L, 30_000L)
+        )
         val plan = bridge.planExtract(
             archivePath = archive.localPath,
             destinationRoot = stagingPath,
@@ -101,7 +158,7 @@ class ArchiveExtractionCoordinator(
             password = password
         )
         sessions[id] = session
-        return ExtractionReview(id, destination, plan, collisionPolicy)
+        return ExtractionReview(id, destination, plan, collisionPolicy, request)
     }
 
     fun start(review: ExtractionReview): String {
@@ -124,6 +181,7 @@ class ArchiveExtractionCoordinator(
     suspend fun awaitCompletion(
         review: ExtractionReview,
         jobId: String,
+        debugDelayMillis: Long = review.request?.debugDelayMillis ?: 0L,
         onProgress: (ExtractionProgress) -> Unit
     ): ExtractionOutcome {
         val session = sessions[review.id] ?: return ExtractionOutcome.Failed("The extraction session expired.")
@@ -142,6 +200,9 @@ class ArchiveExtractionCoordinator(
                     )
                 )
             }
+            if (!update.isTerminal && debugDelayMillis > 0L) {
+                delay(debugDelayMillis.coerceIn(0L, 30_000L))
+            }
             if (update.isTerminal) {
                 return when (update.status) {
                     MobileJobStatus.COMPLETED -> commitCompletedSession(review, session)
@@ -149,11 +210,16 @@ class ArchiveExtractionCoordinator(
                         discard(review)
                         ExtractionOutcome.Cancelled
                     }
-                    else -> ExtractionOutcome.Failed(
-                        update.events.lastOrNull()?.error?.message
-                            ?: update.events.lastOrNull()?.message
-                            ?: "Archive extraction failed."
-                    )
+                    else -> {
+                        val outcome = update.events.lastOrNull()?.let { event ->
+                            ExtractionOutcome.Failed(
+                                event.error?.message ?: event.message ?: "Archive extraction failed.",
+                                event.error?.code
+                            )
+                        } ?: ExtractionOutcome.Failed("Archive extraction failed.")
+                        discard(review)
+                        outcome
+                    }
                 }
             }
             delay(150)
@@ -190,7 +256,26 @@ class ArchiveExtractionCoordinator(
             discard(review)
             ExtractionOutcome.Completed(writtenEntries, label)
         } catch (error: IOException) {
-            ExtractionOutcome.Failed(error.message ?: "Unable to save extracted files.")
+            val message = error.message ?: "Unable to save extracted files."
+            val recovery = runCatching {
+                recoveryStore.save(
+                    archive = session.archive,
+                    selectedPaths = session.selectedPaths,
+                    stagingRoot = session.stagingRoot,
+                    destinationLabel = session.destination.label,
+                    message = message
+                )
+            }.getOrNull()
+            sessions.remove(review.id)
+            if (recovery != null) {
+                ExtractionOutcome.RecoveryAvailable(
+                    recovery.id,
+                    "$message Partial output was retained for recovery."
+                )
+            } else {
+                session.stagingRoot.parentFile?.deleteRecursively()
+                ExtractionOutcome.Failed(message)
+            }
         }
     }
 
@@ -198,7 +283,7 @@ class ArchiveExtractionCoordinator(
         require(sourceRoot.isDirectory) { "The staged extraction is unavailable." }
         sourceRoot.walkTopDown().forEach { source ->
             if (source == sourceRoot) return@forEach
-            val relative = source.relativeTo(sourceRoot).path
+            val relative = ExtractionPathSafety.relativePath(source, sourceRoot)
             val target = File(targetRoot, relative)
             if (source.isDirectory) {
                 if (target.exists() && !target.isDirectory) resolveFileCollision(target, policy).mkdirs()
@@ -220,7 +305,8 @@ class ArchiveExtractionCoordinator(
         val root = DocumentFile.fromTreeUri(context, treeUri)
             ?: throw IOException("The selected folder is no longer available.")
         sourceRoot.walkTopDown().filter { it.isFile }.forEach { source ->
-            val pieces = source.relativeTo(sourceRoot).invariantSeparatorsPath.split('/').filter(String::isNotEmpty)
+            val pieces = ExtractionPathSafety.relativePath(source, sourceRoot)
+                .split('/')
             var parent = root
             for (name in pieces.dropLast(1)) {
                 parent = parent.findFile(name)?.takeIf { it.isDirectory } ?: parent.createDirectory(name)

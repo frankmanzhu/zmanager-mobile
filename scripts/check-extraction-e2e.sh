@@ -9,6 +9,9 @@ fi
 platform="${MAESTRO_PLATFORM:-android}"
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_id="org.tzap.zmanager.mobile"
+# iOS launches a fresh XCTest driver for every matrix case. Allow Xcode and
+# the simulator enough time to start that driver after a previous case.
+export MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-120000}"
 
 "$root_dir/scripts/generate-maestro-fixtures.sh"
 
@@ -86,6 +89,12 @@ for flow_case in "${platform_flows[@]}"; do
   flow_name="${flow_case%%:*}"
   expected_count="${flow_case##*:}"
   reset_destination
+  if [[ "$platform" == "ios" ]]; then
+    # SwiftUI can preserve the outer ScrollView/Menu presentation across a
+    # simulator relaunch. Terminate the app so every matrix case starts with
+    # the same landing-screen process state.
+    xcrun simctl terminate booted "$app_id" >/dev/null 2>&1 || true
+  fi
   maestro --platform "$platform" test "$root_dir/maestro/$platform/$flow_name"
   verify_destination "$expected_count"
 done

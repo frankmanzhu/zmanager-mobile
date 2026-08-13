@@ -613,652 +613,6 @@ public func FfiConverterTypeArchiveEntry_lower(_ value: ArchiveEntry) -> RustBuf
 }
 
 
-public struct ArchiveSessionCloseRequest {
-    public var sessionId: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String) {
-        self.sessionId = sessionId
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionCloseRequest: Sendable {}
-#endif
-
-
-extension ArchiveSessionCloseRequest: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionCloseRequest, rhs: ArchiveSessionCloseRequest) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionCloseRequest: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionCloseRequest {
-        return
-            try ArchiveSessionCloseRequest(
-                sessionId: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionCloseRequest, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionCloseRequest_lift(_ buf: RustBuffer) throws -> ArchiveSessionCloseRequest {
-    return try FfiConverterTypeArchiveSessionCloseRequest.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionCloseRequest_lower(_ value: ArchiveSessionCloseRequest) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionCloseRequest.lower(value)
-}
-
-
-public struct ArchiveSessionCloseResult {
-    public var sessionId: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String) {
-        self.sessionId = sessionId
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionCloseResult: Sendable {}
-#endif
-
-
-extension ArchiveSessionCloseResult: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionCloseResult, rhs: ArchiveSessionCloseResult) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionCloseResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionCloseResult {
-        return
-            try ArchiveSessionCloseResult(
-                sessionId: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionCloseResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionCloseResult_lift(_ buf: RustBuffer) throws -> ArchiveSessionCloseResult {
-    return try FfiConverterTypeArchiveSessionCloseResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionCloseResult_lower(_ value: ArchiveSessionCloseResult) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionCloseResult.lower(value)
-}
-
-
-public struct ArchiveSessionEntry {
-    public var entryId: UInt64
-    public var path: String
-    public var kind: ArchiveEntryKind
-    public var size: UInt64?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(entryId: UInt64, path: String, kind: ArchiveEntryKind, size: UInt64?) {
-        self.entryId = entryId
-        self.path = path
-        self.kind = kind
-        self.size = size
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionEntry: Sendable {}
-#endif
-
-
-extension ArchiveSessionEntry: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionEntry, rhs: ArchiveSessionEntry) -> Bool {
-        if lhs.entryId != rhs.entryId {
-            return false
-        }
-        if lhs.path != rhs.path {
-            return false
-        }
-        if lhs.kind != rhs.kind {
-            return false
-        }
-        if lhs.size != rhs.size {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(entryId)
-        hasher.combine(path)
-        hasher.combine(kind)
-        hasher.combine(size)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionEntry: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionEntry {
-        return
-            try ArchiveSessionEntry(
-                entryId: FfiConverterUInt64.read(from: &buf), 
-                path: FfiConverterString.read(from: &buf), 
-                kind: FfiConverterTypeArchiveEntryKind.read(from: &buf), 
-                size: FfiConverterOptionUInt64.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionEntry, into buf: inout [UInt8]) {
-        FfiConverterUInt64.write(value.entryId, into: &buf)
-        FfiConverterString.write(value.path, into: &buf)
-        FfiConverterTypeArchiveEntryKind.write(value.kind, into: &buf)
-        FfiConverterOptionUInt64.write(value.size, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionEntry_lift(_ buf: RustBuffer) throws -> ArchiveSessionEntry {
-    return try FfiConverterTypeArchiveSessionEntry.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionEntry_lower(_ value: ArchiveSessionEntry) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionEntry.lower(value)
-}
-
-
-public struct ArchiveSessionExtractRequest {
-    public var sessionId: String
-    public var entryId: UInt64
-    public var destinationRoot: String
-    public var collisionPolicy: ExtractionCollisionPolicy
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String, entryId: UInt64, destinationRoot: String, collisionPolicy: ExtractionCollisionPolicy) {
-        self.sessionId = sessionId
-        self.entryId = entryId
-        self.destinationRoot = destinationRoot
-        self.collisionPolicy = collisionPolicy
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionExtractRequest: Sendable {}
-#endif
-
-
-extension ArchiveSessionExtractRequest: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionExtractRequest, rhs: ArchiveSessionExtractRequest) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        if lhs.entryId != rhs.entryId {
-            return false
-        }
-        if lhs.destinationRoot != rhs.destinationRoot {
-            return false
-        }
-        if lhs.collisionPolicy != rhs.collisionPolicy {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-        hasher.combine(entryId)
-        hasher.combine(destinationRoot)
-        hasher.combine(collisionPolicy)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionExtractRequest: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionExtractRequest {
-        return
-            try ArchiveSessionExtractRequest(
-                sessionId: FfiConverterString.read(from: &buf), 
-                entryId: FfiConverterUInt64.read(from: &buf), 
-                destinationRoot: FfiConverterString.read(from: &buf), 
-                collisionPolicy: FfiConverterTypeExtractionCollisionPolicy.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionExtractRequest, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-        FfiConverterUInt64.write(value.entryId, into: &buf)
-        FfiConverterString.write(value.destinationRoot, into: &buf)
-        FfiConverterTypeExtractionCollisionPolicy.write(value.collisionPolicy, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionExtractRequest_lift(_ buf: RustBuffer) throws -> ArchiveSessionExtractRequest {
-    return try FfiConverterTypeArchiveSessionExtractRequest.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionExtractRequest_lower(_ value: ArchiveSessionExtractRequest) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionExtractRequest.lower(value)
-}
-
-
-public struct ArchiveSessionExtractResult {
-    public var sessionId: String
-    public var entryId: UInt64
-    public var writtenBytes: UInt64
-    public var warnings: [BridgeError]
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String, entryId: UInt64, writtenBytes: UInt64, warnings: [BridgeError]) {
-        self.sessionId = sessionId
-        self.entryId = entryId
-        self.writtenBytes = writtenBytes
-        self.warnings = warnings
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionExtractResult: Sendable {}
-#endif
-
-
-extension ArchiveSessionExtractResult: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionExtractResult, rhs: ArchiveSessionExtractResult) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        if lhs.entryId != rhs.entryId {
-            return false
-        }
-        if lhs.writtenBytes != rhs.writtenBytes {
-            return false
-        }
-        if lhs.warnings != rhs.warnings {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-        hasher.combine(entryId)
-        hasher.combine(writtenBytes)
-        hasher.combine(warnings)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionExtractResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionExtractResult {
-        return
-            try ArchiveSessionExtractResult(
-                sessionId: FfiConverterString.read(from: &buf), 
-                entryId: FfiConverterUInt64.read(from: &buf), 
-                writtenBytes: FfiConverterUInt64.read(from: &buf), 
-                warnings: FfiConverterSequenceTypeBridgeError.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionExtractResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-        FfiConverterUInt64.write(value.entryId, into: &buf)
-        FfiConverterUInt64.write(value.writtenBytes, into: &buf)
-        FfiConverterSequenceTypeBridgeError.write(value.warnings, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionExtractResult_lift(_ buf: RustBuffer) throws -> ArchiveSessionExtractResult {
-    return try FfiConverterTypeArchiveSessionExtractResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionExtractResult_lower(_ value: ArchiveSessionExtractResult) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionExtractResult.lower(value)
-}
-
-
-public struct ArchiveSessionListRequest {
-    public var sessionId: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String) {
-        self.sessionId = sessionId
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionListRequest: Sendable {}
-#endif
-
-
-extension ArchiveSessionListRequest: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionListRequest, rhs: ArchiveSessionListRequest) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionListRequest: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionListRequest {
-        return
-            try ArchiveSessionListRequest(
-                sessionId: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionListRequest, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionListRequest_lift(_ buf: RustBuffer) throws -> ArchiveSessionListRequest {
-    return try FfiConverterTypeArchiveSessionListRequest.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionListRequest_lower(_ value: ArchiveSessionListRequest) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionListRequest.lower(value)
-}
-
-
-public struct ArchiveSessionListResult {
-    public var sessionId: String
-    public var entries: [ArchiveSessionEntry]
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String, entries: [ArchiveSessionEntry]) {
-        self.sessionId = sessionId
-        self.entries = entries
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionListResult: Sendable {}
-#endif
-
-
-extension ArchiveSessionListResult: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionListResult, rhs: ArchiveSessionListResult) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        if lhs.entries != rhs.entries {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-        hasher.combine(entries)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionListResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionListResult {
-        return
-            try ArchiveSessionListResult(
-                sessionId: FfiConverterString.read(from: &buf), 
-                entries: FfiConverterSequenceTypeArchiveSessionEntry.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionListResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-        FfiConverterSequenceTypeArchiveSessionEntry.write(value.entries, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionListResult_lift(_ buf: RustBuffer) throws -> ArchiveSessionListResult {
-    return try FfiConverterTypeArchiveSessionListResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionListResult_lower(_ value: ArchiveSessionListResult) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionListResult.lower(value)
-}
-
-
-public struct ArchiveSessionOpenRequest {
-    public var archivePath: String
-    public var password: String?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(archivePath: String, password: String?) {
-        self.archivePath = archivePath
-        self.password = password
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionOpenRequest: Sendable {}
-#endif
-
-
-extension ArchiveSessionOpenRequest: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionOpenRequest, rhs: ArchiveSessionOpenRequest) -> Bool {
-        if lhs.archivePath != rhs.archivePath {
-            return false
-        }
-        if lhs.password != rhs.password {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(archivePath)
-        hasher.combine(password)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionOpenRequest: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionOpenRequest {
-        return
-            try ArchiveSessionOpenRequest(
-                archivePath: FfiConverterString.read(from: &buf), 
-                password: FfiConverterOptionString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionOpenRequest, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.archivePath, into: &buf)
-        FfiConverterOptionString.write(value.password, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionOpenRequest_lift(_ buf: RustBuffer) throws -> ArchiveSessionOpenRequest {
-    return try FfiConverterTypeArchiveSessionOpenRequest.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionOpenRequest_lower(_ value: ArchiveSessionOpenRequest) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionOpenRequest.lower(value)
-}
-
-
-public struct ArchiveSessionOpenResult {
-    public var sessionId: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(sessionId: String) {
-        self.sessionId = sessionId
-    }
-}
-
-#if compiler(>=6)
-extension ArchiveSessionOpenResult: Sendable {}
-#endif
-
-
-extension ArchiveSessionOpenResult: Equatable, Hashable {
-    public static func ==(lhs: ArchiveSessionOpenResult, rhs: ArchiveSessionOpenResult) -> Bool {
-        if lhs.sessionId != rhs.sessionId {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(sessionId)
-    }
-}
-
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeArchiveSessionOpenResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArchiveSessionOpenResult {
-        return
-            try ArchiveSessionOpenResult(
-                sessionId: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ArchiveSessionOpenResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sessionId, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionOpenResult_lift(_ buf: RustBuffer) throws -> ArchiveSessionOpenResult {
-    return try FfiConverterTypeArchiveSessionOpenResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeArchiveSessionOpenResult_lower(_ value: ArchiveSessionOpenResult) -> RustBuffer {
-    return FfiConverterTypeArchiveSessionOpenResult.lower(value)
-}
-
-
 public struct BridgeError {
     public var code: String
     public var message: String
@@ -1978,26 +1332,16 @@ public struct FormatDescriptor {
     public var canList: Bool
     public var canExtract: Bool
     public var canCreate: Bool
-    public var recognized: Bool
-    public var platformAvailable: Bool
-    public var unavailableReason: String?
-    public var sourceAccess: String?
-    public var encryptionSupported: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(kind: String, label: String, extensions: [String], canList: Bool, canExtract: Bool, canCreate: Bool, recognized: Bool, platformAvailable: Bool, unavailableReason: String?, sourceAccess: String?, encryptionSupported: Bool) {
+    public init(kind: String, label: String, extensions: [String], canList: Bool, canExtract: Bool, canCreate: Bool) {
         self.kind = kind
         self.label = label
         self.extensions = extensions
         self.canList = canList
         self.canExtract = canExtract
         self.canCreate = canCreate
-        self.recognized = recognized
-        self.platformAvailable = platformAvailable
-        self.unavailableReason = unavailableReason
-        self.sourceAccess = sourceAccess
-        self.encryptionSupported = encryptionSupported
     }
 }
 
@@ -2026,21 +1370,6 @@ extension FormatDescriptor: Equatable, Hashable {
         if lhs.canCreate != rhs.canCreate {
             return false
         }
-        if lhs.recognized != rhs.recognized {
-            return false
-        }
-        if lhs.platformAvailable != rhs.platformAvailable {
-            return false
-        }
-        if lhs.unavailableReason != rhs.unavailableReason {
-            return false
-        }
-        if lhs.sourceAccess != rhs.sourceAccess {
-            return false
-        }
-        if lhs.encryptionSupported != rhs.encryptionSupported {
-            return false
-        }
         return true
     }
 
@@ -2051,11 +1380,6 @@ extension FormatDescriptor: Equatable, Hashable {
         hasher.combine(canList)
         hasher.combine(canExtract)
         hasher.combine(canCreate)
-        hasher.combine(recognized)
-        hasher.combine(platformAvailable)
-        hasher.combine(unavailableReason)
-        hasher.combine(sourceAccess)
-        hasher.combine(encryptionSupported)
     }
 }
 
@@ -2073,12 +1397,7 @@ public struct FfiConverterTypeFormatDescriptor: FfiConverterRustBuffer {
                 extensions: FfiConverterSequenceString.read(from: &buf), 
                 canList: FfiConverterBool.read(from: &buf), 
                 canExtract: FfiConverterBool.read(from: &buf), 
-                canCreate: FfiConverterBool.read(from: &buf), 
-                recognized: FfiConverterBool.read(from: &buf), 
-                platformAvailable: FfiConverterBool.read(from: &buf), 
-                unavailableReason: FfiConverterOptionString.read(from: &buf), 
-                sourceAccess: FfiConverterOptionString.read(from: &buf), 
-                encryptionSupported: FfiConverterBool.read(from: &buf)
+                canCreate: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -2089,11 +1408,6 @@ public struct FfiConverterTypeFormatDescriptor: FfiConverterRustBuffer {
         FfiConverterBool.write(value.canList, into: &buf)
         FfiConverterBool.write(value.canExtract, into: &buf)
         FfiConverterBool.write(value.canCreate, into: &buf)
-        FfiConverterBool.write(value.recognized, into: &buf)
-        FfiConverterBool.write(value.platformAvailable, into: &buf)
-        FfiConverterOptionString.write(value.unavailableReason, into: &buf)
-        FfiConverterOptionString.write(value.sourceAccess, into: &buf)
-        FfiConverterBool.write(value.encryptionSupported, into: &buf)
     }
 }
 
@@ -5522,31 +4836,6 @@ fileprivate struct FfiConverterSequenceTypeArchiveEntry: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeArchiveSessionEntry: FfiConverterRustBuffer {
-    typealias SwiftType = [ArchiveSessionEntry]
-
-    public static func write(_ value: [ArchiveSessionEntry], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeArchiveSessionEntry.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ArchiveSessionEntry] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [ArchiveSessionEntry]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeArchiveSessionEntry.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypeBridgeError: FfiConverterRustBuffer {
     typealias SwiftType = [BridgeError]
 
@@ -5681,13 +4970,6 @@ public func clearSensitiveState() -> ClearSensitiveStateResult  {
     )
 })
 }
-public func closeArchiveSession(request: ArchiveSessionCloseRequest)throws  -> ArchiveSessionCloseResult  {
-    return try  FfiConverterTypeArchiveSessionCloseResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
-    uniffi_zmanager_ffi_fn_func_closearchivesession(
-        FfiConverterTypeArchiveSessionCloseRequest_lower(request),$0
-    )
-})
-}
 public func createTzapSelfSignedIdentity(identityPath: String, publicCertificatePath: String, commonName: String, password: String) -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(
@@ -5702,13 +4984,6 @@ public func detectArchive(request: DetectArchiveRequest)throws  -> DetectArchive
     return try  FfiConverterTypeDetectArchiveResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
     uniffi_zmanager_ffi_fn_func_detectarchive(
         FfiConverterTypeDetectArchiveRequest_lower(request),$0
-    )
-})
-}
-public func extractArchiveSessionEntry(request: ArchiveSessionExtractRequest)throws  -> ArchiveSessionExtractResult  {
-    return try  FfiConverterTypeArchiveSessionExtractResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
-    uniffi_zmanager_ffi_fn_func_extractarchivesessionentry(
-        FfiConverterTypeArchiveSessionExtractRequest_lower(request),$0
     )
 })
 }
@@ -5740,13 +5015,6 @@ public func listArchive(request: ListArchiveRequest)throws  -> ListArchiveResult
     )
 })
 }
-public func listArchiveSession(request: ArchiveSessionListRequest)throws  -> ArchiveSessionListResult  {
-    return try  FfiConverterTypeArchiveSessionListResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
-    uniffi_zmanager_ffi_fn_func_listarchivesession(
-        FfiConverterTypeArchiveSessionListRequest_lower(request),$0
-    )
-})
-}
 public func listFormats() -> ListFormatsResult  {
     return try!  FfiConverterTypeListFormatsResult_lift(try! rustCall() {
     uniffi_zmanager_ffi_fn_func_listformats($0
@@ -5757,13 +5025,6 @@ public func materializePreview(request: MaterializePreviewRequest)throws  -> Mat
     return try  FfiConverterTypeMaterializePreviewResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
     uniffi_zmanager_ffi_fn_func_materializepreview(
         FfiConverterTypeMaterializePreviewRequest_lower(request),$0
-    )
-})
-}
-public func openArchiveSession(request: ArchiveSessionOpenRequest)throws  -> ArchiveSessionOpenResult  {
-    return try  FfiConverterTypeArchiveSessionOpenResult_lift(try rustCallWithError(FfiConverterTypeZmanagerGuiError_lift) {
-    uniffi_zmanager_ffi_fn_func_openarchivesession(
-        FfiConverterTypeArchiveSessionOpenRequest_lower(request),$0
     )
 })
 }
@@ -5997,16 +5258,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_zmanager_ffi_checksum_func_clearsensitivestate() != 62689) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_ffi_checksum_func_closearchivesession() != 49129) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity() != 32200) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_detectarchive() != 9520) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_zmanager_ffi_checksum_func_extractarchivesessionentry() != 53568) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_healthcheck() != 6081) {
@@ -6021,16 +5276,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_zmanager_ffi_checksum_func_listarchive() != 51788) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_zmanager_ffi_checksum_func_listarchivesession() != 24799) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_zmanager_ffi_checksum_func_listformats() != 4246) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_materializepreview() != 28909) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_zmanager_ffi_checksum_func_openarchivesession() != 27088) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_zmanager_ffi_checksum_func_plancreate() != 56403) {

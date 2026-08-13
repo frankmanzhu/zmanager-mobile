@@ -36,6 +36,7 @@
 		01A00000000000000000001B /* maestro-split.z01 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000120 /* maestro-split.z01 */; };
 		01A00000000000000000001C /* maestro-split.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000121 /* maestro-split.zip */; };
 		01A00000000000000000001D /* maestro-nested.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000122 /* maestro-nested.zip */; };
+		01A00000000000000000001F /* maestro-encrypted.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000125 /* maestro-encrypted.zip */; };
 		01A00000000000000000001E /* ZManagerMobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000123 /* ZManagerMobileUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -84,6 +85,7 @@
 		01A000000000000000000120 /* maestro-split.z01 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.z01; sourceTree = "<group>"; };
 		01A000000000000000000121 /* maestro-split.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-split.zip; sourceTree = "<group>"; };
 		01A000000000000000000122 /* maestro-nested.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-nested.zip; sourceTree = "<group>"; };
+		01A000000000000000000125 /* maestro-encrypted.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-encrypted.zip; sourceTree = "<group>"; };
 		01A000000000000000000123 /* ZManagerMobileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileUITests.swift; sourceTree = "<group>"; };
 		01A000000000000000000124 /* ZManagerMobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -154,6 +156,7 @@
 				01A000000000000000000120 /* maestro-split.z01 */,
 				01A000000000000000000121 /* maestro-split.zip */,
 				01A000000000000000000122 /* maestro-nested.zip */,
+				01A000000000000000000125 /* maestro-encrypted.zip */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -333,6 +336,7 @@
 				01A00000000000000000001B /* maestro-split.z01 in Resources */,
 				01A00000000000000000001C /* maestro-split.zip in Resources */,
 				01A00000000000000000001D /* maestro-nested.zip in Resources */,
+				01A00000000000000000001F /* maestro-encrypted.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,6 +14,32 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class LocalSendProtocolTest {
     @Test
+    fun trustStorePersistsOnlyExplicitFingerprints() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = LocalSendTrustStore(context)
+        val device = LocalSendDevice(
+            address = "192.0.2.1",
+            port = 53317,
+            protocol = "http",
+            alias = "Receiver",
+            version = "2.0",
+            deviceModel = "test",
+            deviceType = "mobile",
+            fingerprint = "trusted-fingerprint",
+            download = false
+        )
+        store.forget(device)
+        assertTrue(!store.isTrusted(device))
+        store.remember(device)
+        assertTrue(store.isTrusted(device))
+        assertEquals(listOf("trusted-fingerprint"), store.fingerprints())
+        store.forgetFingerprint("trusted-fingerprint")
+        assertTrue(store.fingerprints().isEmpty())
+        store.forget(device)
+        assertTrue(!store.isTrusted(device))
+    }
+
+    @Test
     fun selectedProviderFilesAreStagedForSharingAndCleanedUp() {
         val context = RuntimeEnvironment.getApplication()
         val source = File.createTempFile("localsend-source", ".txt")
@@ -58,6 +84,12 @@ class LocalSendProtocolTest {
         assertEquals(LocalSendProtocol.defaultPort, json.getInt("port"))
         assertEquals(LocalSendProtocol.multicastAddress, "224.0.0.167")
         assertTrue(json.getBoolean("announce"))
+    }
+
+    @Test
+    fun pinRequiredUsesLocalSendUnauthorizedStatus() {
+        assertTrue(LocalSendProtocol.isPinRequiredStatus(401))
+        assertTrue(!LocalSendProtocol.isPinRequiredStatus(403))
     }
 
     @Test
@@ -134,6 +166,40 @@ class LocalSendProtocolTest {
             )
             assertEquals(200, uploaded.code)
             assertEquals(payload.toList(), root.resolve("large.bin").readBytes().toList())
+            assertTrue(root.resolve(".localsend").walkTopDown().none { it.isFile })
+        } finally {
+            receiver.stop()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun receiverReturnsChecksumMismatchAndCleansPartialUpload() {
+        val root = createTempDir(prefix = "localsend-checksum")
+        val receiver = LocalSendReceiver(requestedPort = 0)
+        try {
+            val session = receiver.start(root)
+            val fileId = "checksum-file"
+            val payload = "actual".toByteArray()
+            val prepare = postJson(
+                session.port,
+                "/api/localsend/v2/prepare-upload",
+                JSONObject().put("files", JSONObject().put(fileId, JSONObject()
+                    .put("id", fileId)
+                    .put("fileName", "checksum.bin")
+                    .put("size", payload.size)
+                    .put("sha256", "00".repeat(32))))
+            )
+            val prepareJson = JSONObject(prepare.body)
+            val token = prepareJson.getJSONObject("files").getString(fileId)
+            val response = postBytes(
+                session.port,
+                "/api/localsend/v2/upload?sessionId=${prepareJson.getString("sessionId")}&fileId=$fileId&token=$token",
+                payload
+            )
+
+            assertEquals(422, response.code)
+            assertTrue(!root.resolve("checksum.bin").exists())
             assertTrue(root.resolve(".localsend").walkTopDown().none { it.isFile })
         } finally {
             receiver.stop()

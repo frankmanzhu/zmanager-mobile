@@ -1,8 +1,11 @@
 package org.tzap.zmanager.mobile
 
+import org.json.JSONObject
+import android.net.Uri
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +30,62 @@ import org.tzap.zmanager.mobile.bridge.generated.TestArchiveResult
 
 @RunWith(RobolectricTestRunner::class)
 class ArchiveExtractionTest {
+
+    @Test
+    fun stagedRelativePathsRejectTraversalAndAcceptOnlyDescendants() {
+        val root = java.io.File("/tmp/zmanager-staging-root")
+        assertEquals("docs/readme.txt", ExtractionPathSafety.relativePath(
+            java.io.File(root, "docs/readme.txt"),
+            root
+        ))
+        assertThrows(IllegalArgumentException::class.java) {
+            ExtractionPathSafety.relativePath(java.io.File(root, "../outside.txt"), root)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ExtractionPathSafety.relativePath(java.io.File("/tmp/outside.txt"), root)
+        }
+    }
+    @Test
+    fun failedCommitRecoveryIsRedactedAndDiscardable() {
+        val context = RuntimeEnvironment.getApplication()
+        val root = File(context.cacheDir, "recovery-test-${System.nanoTime()}")
+        root.mkdirs()
+        File(root, "docs/readme.txt").apply {
+            parentFile!!.mkdirs()
+            writeText("retained")
+        }
+        val store = ArchiveRecoveryStore(context)
+        val record = store.save(
+            archive = ImportedArchive("archive", "archive.zip", "/cache/archive.zip", 1L, "application/zip", 0L),
+            selectedPaths = listOf("docs/readme.txt"),
+            stagingRoot = root,
+            destinationLabel = "Selected folder",
+            message = "Provider failed"
+        )
+
+        assertEquals(1, store.files(record.id).size)
+        val json = File(context.filesDir, "ArchiveRecovery/${record.id}.json").readText()
+        assertTrue(json.contains("never included"))
+        val fields = JSONObject(json)
+        assertTrue(!fields.has("password"))
+        assertTrue(!fields.has("token"))
+
+        store.discard(record.id)
+        assertTrue(!root.exists())
+    }
+
+    @Test
+    fun defaultExtractionDestinationFallsBackToPrivateAppStorage() {
+        val context = RuntimeEnvironment.getApplication()
+        val preferences = ArchiveDestinationPreferences(context)
+        preferences.resetExtractionDestination()
+
+        val destination = preferences.defaultExtractionDestination()
+
+        assertEquals("App storage", destination.label)
+        assertTrue((destination as ExtractionDestination.AppStorage).root().path.startsWith(context.filesDir.path))
+    }
+
     @Test
     fun completedExtractionCommitsStagedFilesToAppStorage() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
@@ -53,6 +112,54 @@ class ArchiveExtractionTest {
         assertTrue(outcome is ExtractionOutcome.Completed)
         assertEquals("extracted", File(destinationRoot, "docs/readme.txt").readText())
         destinationRoot.deleteRecursively()
+        Unit
+    }
+
+    @Test
+    fun failedDocumentTreeCommitRetainsRecoveryRecord() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val coordinator = ArchiveExtractionCoordinator(context, ExtractionGateway())
+        val review = coordinator.plan(
+            archive = ImportedArchive("recovery-archive", "archive.zip", "/cache/archive.zip", 9L, "application/zip", 0L),
+            selectedPaths = listOf("docs/readme.txt"),
+            destination = ExtractionDestination.DocumentTree(Uri.parse("content://missing.provider/tree/output")),
+            password = null
+        )
+
+        val outcome = coordinator.awaitCompletion(review, coordinator.start(review)) {}
+
+        assertTrue(outcome is ExtractionOutcome.RecoveryAvailable)
+        val recoveryId = (outcome as ExtractionOutcome.RecoveryAvailable).recoveryId
+        assertEquals(1, coordinator.recoveryFiles(recoveryId).size)
+        coordinator.discardRecovery(recoveryId)
+        Unit
+    }
+
+    @Test
+    fun batchExtractionRunsEachArchiveAndCleansReviews() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val root = File(context.cacheDir, "batch-extraction-test-output")
+        root.deleteRecursively()
+        val extraction = ArchiveExtractionCoordinator(context, ExtractionGateway())
+        val batch = BatchExtractionCoordinator(extraction)
+        val first = ImportedArchive("first", "first.zip", "/cache/first.zip", 9L, "application/zip", 0L)
+        val second = ImportedArchive("second", "second.zip", "/cache/second.zip", 9L, "application/zip", 0L)
+        val review = batch.plan(
+            listOf(
+                BatchExtractionItem(first, listOf("docs/readme.txt"), ExtractionDestination.AppStorage(File(root, "first"))),
+                BatchExtractionItem(second, listOf("docs/readme.txt"), ExtractionDestination.AppStorage(File(root, "second")))
+            )
+        )
+
+        val outcome = batch.run(review)
+
+        assertTrue(outcome is BatchExtractionOutcome.Completed)
+        val results = (outcome as BatchExtractionOutcome.Completed).results
+        assertEquals(2, results.size)
+        assertTrue(results.all { it.status == BatchExtractionItemResult.Status.COMPLETED })
+        assertEquals("extracted", File(root, "second/docs/readme.txt").readText())
+        batch.discard(review)
+        root.deleteRecursively()
         Unit
     }
 

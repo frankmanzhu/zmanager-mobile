@@ -6,4 +6,10 @@ appId: org.tzap.zmanager.mobile
     clearState: true
 - assertVisible: "ZManager"
 - assertVisible: "Open an archive, inspect its contents, then extract safely."
-- tapOn: "Open Archive"
+- scrollUntilVisible:
+    element: "Load Maestro fixture"
+    direction: DOWN
+- tapOn: "Load Maestro fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 5 entries"
+    timeout: 15000

@@ -1,0 +1,16 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Run debug batch extraction"
+- extendedWaitUntil:
+    visible: "Review batch extraction"
+    timeout: 15000
+- assertVisible: "2 archives will be extracted to separate app-storage folders."
+- tapOn: "Start batch extraction"
+- extendedWaitUntil:
+    visible: "Batch extraction complete: 2 completed, 0 failed."
+    timeout: 30000

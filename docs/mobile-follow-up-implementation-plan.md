@@ -41,9 +41,16 @@ The repository already has:
 - existing Maestro workflows for archive import/listing/testing and extraction
   fixtures.
 
-The remaining work is concentrated in persistent LocalSend trust/pinning policy
-and reverse-transfer compatibility, lifecycle/background behavior, and broader
-device/E2E coverage.
+The implemented baseline now also includes nested archive navigation with back
+navigation, Rust-composed archive-folder repackaging, LocalSend-compatible
+send/receive sessions with checksum and traversal-safe receiver commits,
+explicit trusted-device revocation, deterministic archive creation/extraction
+Maestro flows, and redacted operation reports. The remaining work is
+concentrated in reverse-transfer compatibility, lifecycle/background behavior,
+provider permission instrumentation, format promotion beyond the pinned create
+DTO, accessibility/device evidence, and broader edge-case E2E coverage. Failed
+native extraction commits now retain redacted recovery records and expose
+Retry/Export/Discard actions on both shells.
 
 Implementation status for the current workstream:
 
@@ -59,31 +66,69 @@ Implementation status for the current workstream:
   multicast discovery, HTTP registration fallback, upload preparation,
   SHA-256 metadata, upload, cancellation, visible transfer cancellation, and
   transient PIN-required retry UX. Each send now requires an explicit
-  device/address/fingerprint confirmation; no persistent trust decision is
-  stored yet.
+  device/address/fingerprint confirmation. Stable per-installation fingerprints
+  can be explicitly remembered, listed in a Trusted devices section, and
+  revoked with Forget; addresses and transfer credentials are never persisted.
   Both shells can share the active archive or arbitrary selected files, expose
   validated upload receivers with registration responses, and export validated
   incoming files to an Android SAF or iOS security-scoped destination while
-  keeping receiver writes app-staged.
+  keeping receiver writes app-staged. LocalSend device fingerprints are now
+  stable per app installation, and the user may persist an explicit fingerprint
+  approval; every transfer still presents the device identity before sending.
 - Multipart nested entries are explicitly rejected as single-file nested
   archives until volume grouping is implemented.
+- Android long extraction and creation jobs now hand off to a non-exported
+  `dataSync` foreground service with a notification cancel action, tokenized
+  result broadcast, in-process password ownership, and terminal-result
+  recovery records for the next Activity launch. The service now records only
+  a non-secret active token/kind marker, converts a killed process into an
+  `INTERRUPTED` result on the next service/Activity lifecycle, cancels on task
+  removal, and stops before the Android 15 data-sync timeout boundary. The
+  Android emulator process-death harness now force-stops the app during a paced
+  extraction and verifies recovery on the next launch. The deterministic timeout
+  flow remains separate from validation of the real Android 15 platform boundary.
+- iOS creation now accepts Photos picker image/video selections and iPad
+  document drag/drop into the creation staging path. Provider data remains
+  app-staged before Rust creation.
 - Deterministic nested and create/repackage fixtures are bundled in both
   shells. Nested browsing, native-folder creation, archive-folder
   repackaging, and receive-mode lifecycle Maestro flows pass on Android and
-  iOS simulators.
-- Android unit tests (31 tests) and iOS XCTest coverage (25 tests) pass for the
-  current bridge/coordinator/protocol coverage. Android ActivityScenario
-  instrumentation and iOS UI-test launch coverage also pass on their
-  respective simulators. Controlled Android and iOS Maestro flows pass for
-  nested browsing, archive repackaging, and receive lifecycle. A controlled
-  LocalSend peer upload passes against Android through an adb-forwarded socket,
-  and the iOS simulator runs the same validated upload path in XCTest.
+  iOS simulators. The encrypted nested fixture now exercises wrong-password
+  retry through successful verified repackaging on both platforms. The pinned
+  iOS bridge, coordinator handoff, native XCUITest, and iOS Maestro flow all
+  pass for the same recovery path.
+- Deterministic cancellation flows now exist at
+  `maestro/android/extraction-cancellation.yaml` and
+  `maestro/ios/extraction-cancellation.yaml`. They use debug-only pacing to
+  hold a Rust job in the cancellable window, then assert the native cancelled
+  state and cleanup path. Production operations do not use this pacing.
+- Android also has a deterministic foreground-service timeout flow at
+  `maestro/android/extraction-timeout.yaml`; the timed-out coordinator discards
+  its staging and the UI exposes a retryable timeout message. iOS LocalSend
+  uploads now report byte progress through `URLSession` delegate callbacks.
+- Android and iOS native extraction commits now reject traversal and symlink-like
+  paths outside the private staging root before writing platform destinations.
+  Both shells also stop active LocalSend/repackaging work when entering the
+  background, release selected-destination access, discard staged share files,
+  and remove receive staging roots, with iOS lifecycle coverage in XCTest.
+- Deterministic cancellation-cleanup harnesses now pass on the Android emulator
+  and iOS simulator, leaving no committed final extraction files after a paced
+  cancellation. This verifies the app-controlled cleanup path, not every
+  production-size or OS-suspended job shape.
+- Android has 44 JVM tests plus three ActivityScenario/instrumentation tests, and
+  the iOS Xcode suite reports 44 passed unit/bridge/coordinator/UI tests.
+  Controlled Android and iOS Maestro flows pass for nested browsing, archive repackaging,
+  encrypted password retry, and receive lifecycle. A controlled LocalSend peer
+  upload passes against Android through an adb-forwarded socket, and the iOS
+  simulator runs the same validated upload path in XCTest.
 
-Remaining launch work is persistent device trust/pinning policy,
-reverse-download support if required, lifecycle/background hardening,
-repackaging password-retry UX, native SAF/security-scoped picker coverage,
-accessibility/device-matrix coverage, and cancellation-cleanup E2E for large
-transfers and archive jobs.
+Remaining launch work is reverse-download support if required, real Android 15
+foreground-service timeout-boundary validation, deeper iOS interruption and
+background-suspension hardening, native SAF/security-scoped and Photos picker
+instrumentation, physical-device/device-matrix coverage, and production-size
+large-job cancellation evidence. Simulator accessibility targets and responsive
+wide-screen constraints are now wired; hardware TalkBack/VoiceOver and real
+picker behavior still require device evidence.
 
 ## Track 1: Nested archive browsing
 

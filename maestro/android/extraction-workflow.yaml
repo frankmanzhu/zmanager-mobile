@@ -4,14 +4,23 @@ appId: org.tzap.zmanager.mobile
 
 - launchApp:
     clearState: true
+- scrollUntilVisible:
+    element: "Load Maestro fixture"
+    direction: DOWN
 - tapOn: "Load Maestro fixture"
 - extendedWaitUntil:
     visible: "ZIP - 5 entries"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Extract"
+    direction: DOWN
 - tapOn: "Extract"
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
 - tapOn: "Start extraction"
 - extendedWaitUntil:
     visible: ".*Extraction complete: 5 files saved to App storage.*"

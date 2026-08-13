@@ -1,0 +1,29 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- scrollUntilVisible:
+    element: "Run cancellable extraction"
+    direction: DOWN
+- tapOn: "Run cancellable extraction"
+- scrollUntilVisible:
+    element: "Review extraction"
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- assertVisible: "Start extraction"
+- tapOn: "Start extraction"
+- scrollUntilVisible:
+    element: "Extracting archive"
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "Extracting archive"
+    timeout: 15000
+- tapOn: "Cancel extraction"
+- extendedWaitUntil:
+    visible: "Extraction cancelled"
+    timeout: 15000

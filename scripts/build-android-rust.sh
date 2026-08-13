@@ -12,7 +12,7 @@ ABI="arm64-v8a"
 TZAP_PROFILE_ARGS=()
 case "${ZMANAGER_TZAP_PROFILE:-offline}" in
   full)
-    TZAP_PROFILE_ARGS=(--no-default-features --features tzap-online)
+    TZAP_PROFILE_ARGS=(--no-default-features --features auth)
     ;;
   offline)
     TZAP_PROFILE_ARGS=(--no-default-features)

@@ -1,18 +1,162 @@
 import QuickLook
 import CryptoKit
 import Network
+import PhotosUI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
+
+/// A UIKit-backed secure field keeps its responder identity stable while the
+/// transient password binding changes. This matters for automation and for
+/// hardware-keyboard input: recreating a SwiftUI SecureField after the first
+/// character can drop focus and silently truncate the password.
+struct StableSecureInputField: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let contentType: UITextContentType?
+    let onSubmit: (String) -> Void
+    let onTextChanged: (String) -> Void
+    let onFieldReady: (UITextField) -> Void
+
+    init(
+        _ placeholder: String,
+        text: Binding<String>,
+        contentType: UITextContentType? = nil,
+        onSubmit: @escaping (String) -> Void = { _ in },
+        onTextChanged: @escaping (String) -> Void = { _ in },
+        onFieldReady: @escaping (UITextField) -> Void = { _ in }
+    ) {
+        self._text = text
+        self.placeholder = placeholder
+        self.contentType = contentType
+        self.onSubmit = onSubmit
+        self.onTextChanged = onTextChanged
+        self.onFieldReady = onFieldReady
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onSubmit: onSubmit, onTextChanged: onTextChanged)
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField(frame: .zero)
+        field.borderStyle = .roundedRect
+        field.placeholder = placeholder
+        field.isSecureTextEntry = true
+        field.textContentType = contentType
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.returnKeyType = .done
+        field.delegate = context.coordinator
+        field.addTarget(context.coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .editingChanged)
+        field.accessibilityLabel = placeholder
+        field.text = text
+        context.coordinator.inputValue = text
+        onFieldReady(field)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.text = $text
+        context.coordinator.onSubmit = onSubmit
+        context.coordinator.onTextChanged = onTextChanged
+        // UIKit remains the source of truth after makeUIView. SwiftUI may
+        // render a frame behind the latest editingChanged event; copying the
+        // stale binding back would truncate automation and hardware-keyboard
+        // input after the first character.
+        field.placeholder = placeholder
+        field.accessibilityLabel = placeholder
+        onFieldReady(field)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var text: Binding<String>
+        var onSubmit: (String) -> Void
+        var onTextChanged: (String) -> Void
+        var inputValue = ""
+
+        init(
+            text: Binding<String>,
+            onSubmit: @escaping (String) -> Void,
+            onTextChanged: @escaping (String) -> Void
+        ) {
+            self.text = text
+            self.onSubmit = onSubmit
+            self.onTextChanged = onTextChanged
+        }
+
+        @objc func valueChanged(_ sender: UITextField) {
+            let value = sender.text ?? ""
+            inputValue = value
+            text.wrappedValue = value
+            onTextChanged(value)
+        }
+
+        func textField(
+            _ textField: UITextField,
+            shouldChangeCharactersIn range: NSRange,
+            replacementString string: String
+        ) -> Bool {
+            let current = inputValue as NSString
+            guard range.location <= current.length,
+                  range.location + range.length <= current.length else {
+                return false
+            }
+            inputValue = current.replacingCharacters(in: range, with: string)
+            textField.text = inputValue
+            text.wrappedValue = inputValue
+            onTextChanged(inputValue)
+            return false
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            text.wrappedValue = textField.text ?? ""
+            onSubmit(textField.text ?? "")
+            return true
+        }
+    }
+}
+
+final class StableInputBuffer: ObservableObject {
+    @Published var value = ""
+    weak var field: UITextField?
+}
+
+@available(iOS 16.0, *)
+private struct PhotoCreationPicker: View {
+    @State private var selectedItems = [PhotosPickerItem]()
+    let onSelection: ([PhotosPickerItem]) -> Void
+
+    var body: some View {
+        PhotosPicker(
+            selection: $selectedItems,
+            maxSelectionCount: 50,
+            matching: .any(of: [.images, .videos]),
+            preferredItemEncoding: .current
+        ) {
+            Label("Choose photos or videos", systemImage: "photo.on.rectangle")
+        }
+        .buttonStyle(.bordered)
+        .onChange(of: selectedItems) { items in
+            onSelection(items)
+            selectedItems = []
+        }
+    }
+}
 
 struct ContentView: View {
     @StateObject private var importModel = ArchiveImportModel()
+    private let localSendTrustStore = LocalSendTrustStore()
     @Environment(\.scenePhase) private var scenePhase
     @State private var isFileImporterPresented = false
     @State private var isDestinationPickerPresented = false
     @State private var isCreationFilesImporterPresented = false
     @State private var isCreationFolderImporterPresented = false
+    @State private var isBatchArchiveImporterPresented = false
     @State private var isLocalSendFilesImporterPresented = false
     @State private var isLocalSendReceiveDestinationPickerPresented = false
+    @State private var localSendTrustVersion = 0
+    @State private var recoveryShareURLs = [URL]()
 
     var body: some View {
         ScrollView {
@@ -24,12 +168,33 @@ struct ContentView: View {
                 Text("Open an archive, inspect its contents, then extract safely.")
                     .font(.body)
                     .foregroundStyle(.secondary)
+                Text("Default extraction destination: \(importModel.defaultExtractionDestinationLabel)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Reset default destination") {
+                    importModel.resetDefaultExtractionDestination()
+                }
 #if DEBUG
                 Button("Load nested fixture") {
                     importModel.importMaestroFixture(named: "maestro-nested.zip")
                 }
+                Button("Load encrypted fixture") {
+                    importModel.importMaestroFixture(named: "maestro-encrypted.zip")
+                }
                 Button("Create debug folder archive") {
                     importModel.createDebugFixture()
+                }
+                Button("Run debug batch extraction") {
+                    importModel.startDebugBatchFixture()
+                }
+                Button("Run cancellable extraction") {
+                    importModel.startDebugCancellableExtraction()
+                }
+                Button("Load DEB fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.deb")
+                }
+                Button("Load CAB fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.cab")
                 }
 #endif
             }
@@ -59,6 +224,29 @@ struct ContentView: View {
                     .font(.subheadline)
                     .foregroundStyle(.red)
             }
+            if let message = importModel.operationReportMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(importModel.recoveryRecords) { record in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recovery available for \(record.archiveDisplayName)")
+                        .font(.headline)
+                    Text(record.message)
+                        .foregroundStyle(.red)
+                    Text("Retained output: \(record.destinationLabel)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button("Retry") { importModel.retryRecovery(record) }
+                        Button("Export") {
+                            recoveryShareURLs = importModel.exportRecovery(record)
+                        }
+                        Button("Discard") { importModel.discardRecovery(record) }
+                    }
+                }
+            }
 
             ArchiveListingPanel(
                 state: importModel.listingState,
@@ -79,16 +267,28 @@ struct ContentView: View {
                 onSubmitTestPassword: { importModel.retryTestWithPassword(selectedEntries: $0) },
                 extractionState: importModel.extractionState,
                 extractionPassword: $importModel.extractionPasswordInput,
-                onExtractEntries: { importModel.planExtraction(selectedEntries: $0) },
+                onExtractEntries: { importModel.planExtraction(
+                    selectedEntries: $0,
+                    destination: importModel.defaultExtractionDestination()
+                ) },
                 onChooseDestination: { isDestinationPickerPresented = true },
                 onStartExtraction: importModel.startExtraction,
                 onCancelExtraction: importModel.cancelExtraction,
                 onRetryExtractionPassword: { importModel.retryExtractionWithPassword(selectedEntries: $0) },
                 repackagingState: importModel.repackagingState,
-                onRepackageEntries: importModel.startRepackaging,
+                repackagingPassword: $importModel.repackagingPasswordInput,
+                onRepackageEntries: { importModel.startRepackaging(selectedEntries: $0) },
+                onRetryRepackagingWithPassword: { entries, password in
+                    importModel.retryRepackagingWithPassword(selectedEntries: entries, password: password)
+                },
                 onStartRepackaging: importModel.runRepackaging,
                 onCancelRepackaging: importModel.cancelRepackaging
             )
+            if case .completed(let entries, let destination) = importModel.extractionState {
+                Button("Save operation report") {
+                    importModel.saveExtractionReport(entries: entries, destination: destination)
+                }
+            }
             if let message = importModel.nestedOpenError {
                 Text(message).foregroundStyle(.red)
             }
@@ -101,9 +301,26 @@ struct ContentView: View {
                 onFormatChanged: { importModel.creationFormat = $0 },
                 onChooseFiles: { isCreationFilesImporterPresented = true },
                 onChooseFolder: { isCreationFolderImporterPresented = true },
+                onDropFiles: importModel.handleDroppedCreationFiles,
                 onStart: importModel.startCreation,
                 onCancel: importModel.cancelCreation
             )
+            if case .completed(let outcome) = importModel.creationState,
+               case .completed(let outputPath, let verified) = outcome {
+                Button("Save operation report") {
+                    importModel.saveCreationReport(outputPath: outputPath, verified: verified)
+                }
+            }
+            ArchiveBatchExtractionPanel(
+                state: importModel.batchExtractionState,
+                onStart: importModel.startBatchExtraction,
+                onCancel: importModel.cancelBatchExtraction
+            )
+#if !os(macOS)
+            if #available(iOS 16.0, *) {
+                PhotoCreationPicker { items in importModel.handlePhotosPickerItems(items) }
+            }
+#endif
             LocalSendPanel(
                 archive: importModel.importedArchive,
                 selectedFileCount: importModel.localSendSelectedFileCount,
@@ -118,8 +335,14 @@ struct ContentView: View {
                 receiveDestinationLabel: importModel.localSendReceiveDestinationLabel,
                 onChooseReceiveDestination: { isLocalSendReceiveDestinationPickerPresented = true },
                 onStartReceive: importModel.startLocalReceive,
-                onStopReceive: importModel.stopLocalReceive
+                onStopReceive: importModel.stopLocalReceive,
+                trustedFingerprints: localSendTrustStore.fingerprints(),
+                onForgetTrustedFingerprint: { fingerprint in
+                    localSendTrustStore.forget(fingerprint: fingerprint)
+                    localSendTrustVersion += 1
+                }
             )
+            .id(localSendTrustVersion)
 
             Spacer()
 
@@ -148,6 +371,9 @@ struct ContentView: View {
                     }
                     Button("Nested ZIP fixture") {
                         importModel.importMaestroFixture(named: "maestro-nested.zip")
+                    }
+                    Button("Encrypted ZIP fixture") {
+                        importModel.importMaestroFixture(named: "maestro-encrypted.zip")
                     }
                     Button("Apple Archive fixture") {
                         importModel.importMaestroFixture(named: "maestro-files.aar")
@@ -201,9 +427,15 @@ struct ContentView: View {
                 }
                 .disabled(importModel.isImporting)
                 .buttonStyle(.borderedProminent)
+                Button("Batch extract") {
+                    isBatchArchiveImporterPresented = true
+                }
+                .disabled(importModel.batchExtractionState.isBusy)
+                .buttonStyle(.bordered)
             }
         }
     }
+        .frame(maxWidth: 1100)
         .padding(24)
         .fileImporter(
             isPresented: $isFileImporterPresented,
@@ -218,7 +450,9 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                importModel.planExtraction(selectedEntries: importModel.currentSelectedEntries, destination: .folder(url))
+                let destination = ExtractionDestination.folder(url)
+                importModel.setDefaultExtractionDestination(destination)
+                importModel.planExtraction(selectedEntries: importModel.currentSelectedEntries, destination: destination)
             }
         }
         .fileImporter(
@@ -236,6 +470,13 @@ struct ContentView: View {
             importModel.handleCreationFolderResult(result)
         }
         .fileImporter(
+            isPresented: $isBatchArchiveImporterPresented,
+            allowedContentTypes: ArchiveImportStore.allowedContentTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            importModel.handleBatchArchiveResult(result)
+        }
+        .fileImporter(
             isPresented: $isLocalSendFilesImporterPresented,
             allowedContentTypes: [.item],
             allowsMultipleSelection: true
@@ -250,7 +491,7 @@ struct ContentView: View {
             importModel.handleLocalSendReceiveDestinationResult(result)
         }
         .onOpenURL { url in
-            importModel.importExternalURL(url)
+            importModel.handleAutomationURL(url)
         }
         .alert(
             "Confirm local transfer",
@@ -264,23 +505,37 @@ struct ContentView: View {
                 importModel.pendingLocalSendDevice = nil
                 importModel.sendSelectedFiles(to: device)
             }
+            Button("Trust and Send") {
+                guard let device = importModel.pendingLocalSendDevice else { return }
+                localSendTrustStore.remember(device)
+                localSendTrustVersion += 1
+                importModel.pendingLocalSendDevice = nil
+                importModel.sendSelectedFiles(to: device)
+            }
             Button("Cancel", role: .cancel) {
                 importModel.pendingLocalSendDevice = nil
             }
         } message: {
             if let device = importModel.pendingLocalSendDevice {
-                Text(
-                    "Send the selected archive or files to \(device.alias)?\n" +
+                let fingerprint = device.fingerprint ?? "Unavailable"
+                let message = "Send the selected archive or files to \(device.alias)?\n" +
                     "Address: \(device.address)\n" +
-                    "Fingerprint: \(device.fingerprint ?? "Unavailable")\n" +
+                    "Fingerprint: \(fingerprint)\n" +
+                    (localSendTrustStore.isTrusted(device)
+                        ? "This fingerprint is already trusted.\n"
+                        : "") +
                     "Only continue if you recognize this device and fingerprint."
-                )
+                Text(message)
             } else {
                 Text("")
             }
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .background || phase == .inactive {
+            // `.inactive` is also emitted while iOS presents the keyboard or
+            // password/autofill UI. Keep transient credentials available for
+            // the active retry flow; clear them once the app actually enters
+            // the background.
+            if phase == .background {
                 importModel.handleSceneBackground()
             }
         }
@@ -289,6 +544,12 @@ struct ContentView: View {
             onDismiss: importModel.cleanupActivePreview
         ) { document in
             QuickLookPreview(url: document.url)
+        }
+        .sheet(isPresented: Binding(
+            get: { !recoveryShareURLs.isEmpty },
+            set: { if !$0 { recoveryShareURLs = [] } }
+        )) {
+            RecoveryShareSheet(urls: recoveryShareURLs)
         }
     }
 }
@@ -336,12 +597,93 @@ struct QuickLookPreview: UIViewControllerRepresentable {
     }
 }
 
+struct RecoveryShareSheet: UIViewControllerRepresentable {
+    let urls: [URL]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: urls, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
 struct ImportedArchive: Identifiable, Equatable {
     let id: UUID
     let displayName: String
     let localPath: String
     let byteSize: Int64?
     let importedAt: Date
+}
+
+enum ArchiveAutomationAction: Equatable {
+    case open
+    case extract
+    case create
+    case verify
+}
+
+struct ArchiveAutomationRequest: Equatable {
+    let action: ArchiveAutomationAction
+    let archiveURL: URL?
+    let sourceURLs: [URL]
+}
+
+enum ArchiveAutomationError: LocalizedError, Equatable {
+    case unsupportedScheme
+    case unsupportedAction
+    case credentialQuery
+    case missingArchive
+    case missingFiles
+    case nonLocalURL
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedScheme: return "Unsupported automation scheme."
+        case .unsupportedAction: return "Unsupported automation action."
+        case .credentialQuery: return "Passwords and credentials are not accepted by automation."
+        case .missingArchive: return "Automation requires a local archive URL."
+        case .missingFiles: return "Create automation requires local files."
+        case .nonLocalURL: return "Automation accepts only local file URLs."
+        }
+    }
+}
+
+enum ArchiveAutomationParser {
+    static func parse(_ url: URL) throws -> ArchiveAutomationRequest {
+        guard url.scheme?.lowercased() == "zmanager" else {
+            throw ArchiveAutomationError.unsupportedScheme
+        }
+        let action: ArchiveAutomationAction
+        switch url.host?.lowercased() {
+        case "open": action = .open
+        case "extract": action = .extract
+        case "create": action = .create
+        case "verify": action = .verify
+        default: throw ArchiveAutomationError.unsupportedAction
+        }
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if queryItems.contains(where: { ["password", "pass", "secret", "token", "pin"].contains($0.name.lowercased()) }) {
+            throw ArchiveAutomationError.credentialQuery
+        }
+        switch action {
+        case .create:
+            let sources = queryItems.first(where: { $0.name == "files" })?.value?
+                .split(separator: "|")
+                .compactMap { URL(string: String($0)) }
+                .filter { $0.isFileURL } ?? []
+            guard !sources.isEmpty else { throw ArchiveAutomationError.missingFiles }
+            guard sources.count == queryItems.first(where: { $0.name == "files" })?.value?.split(separator: "|").count else {
+                throw ArchiveAutomationError.nonLocalURL
+            }
+            return ArchiveAutomationRequest(action: action, archiveURL: nil, sourceURLs: sources)
+        case .open, .extract, .verify:
+            guard let archiveValue = queryItems.first(where: { $0.name == "archive" })?.value,
+                  let archive = URL(string: archiveValue), archive.isFileURL else {
+                throw ArchiveAutomationError.missingArchive
+            }
+            return ArchiveAutomationRequest(action: action, archiveURL: archive, sourceURLs: [])
+        }
+    }
 }
 
 enum ArchiveImportError: LocalizedError {
@@ -390,6 +732,25 @@ struct ArchiveCreationSourceStager {
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
                 try fileManager.copyItem(at: url, to: target)
+                paths.append(target.path)
+            }
+            return StagedCreationSources(root: root, sourcePaths: paths)
+        } catch {
+            try? fileManager.removeItem(at: root)
+            throw error
+        }
+    }
+
+    func stageData(_ items: [(name: String, data: Data)]) throws -> StagedCreationSources {
+        guard !items.isEmpty else { throw ArchiveImportError.emptySelection }
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        do {
+            var paths: [String] = []
+            for item in items {
+                let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(item.name))
+                try item.data.write(to: target, options: .atomic)
                 paths.append(target.path)
             }
             return StagedCreationSources(root: root, sourcePaths: paths)
@@ -526,7 +887,9 @@ struct ArchiveListingPanel: View {
     let onCancelExtraction: () -> Void
     let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
     let repackagingState: ArchiveRepackagingState
+    @Binding var repackagingPassword: String
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
+    let onRetryRepackagingWithPassword: ([ArchiveEntrySummary], String) -> Void
     let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
@@ -562,7 +925,9 @@ struct ArchiveListingPanel: View {
                 onCancelExtraction: onCancelExtraction,
                 onRetryExtractionPassword: onRetryExtractionPassword,
                 repackagingState: repackagingState,
+                repackagingPassword: $repackagingPassword,
                 onRepackageEntries: onRepackageEntries,
+                onRetryRepackagingWithPassword: onRetryRepackagingWithPassword,
                 onStartRepackaging: onStartRepackaging,
                 onCancelRepackaging: onCancelRepackaging
             )
@@ -575,8 +940,7 @@ struct ArchiveListingPanel: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                SecureField("Password", text: $password)
-                    .textFieldStyle(.roundedBorder)
+                StableSecureInputField("Password", text: $password)
                 Button("Retry") {
                     onSubmitPassword()
                 }
@@ -620,7 +984,9 @@ struct ArchiveListingReadyPanel: View {
     let onCancelExtraction: () -> Void
     let onRetryExtractionPassword: ([ArchiveEntrySummary]) -> Void
     let repackagingState: ArchiveRepackagingState
+    @Binding var repackagingPassword: String
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
+    let onRetryRepackagingWithPassword: ([ArchiveEntrySummary], String) -> Void
     let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
@@ -663,11 +1029,10 @@ struct ArchiveListingReadyPanel: View {
                 Text("Folders").tag(ArchiveEntryViewMode.folders)
             }
             .pickerStyle(.segmented)
-            HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("\(selectedEntries.count) selected")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Spacer()
                 Button("Select Visible") {
                     selectedEntryIds.formUnion(groups.flatMap { $0.entries }.map { $0.id })
                 }
@@ -695,6 +1060,7 @@ struct ArchiveListingReadyPanel: View {
                 }
                 .disabled(selectedEntries.isEmpty || repackagingState.isBusy)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             ArchivePreviewPanel(
                 state: previewState,
                 password: $previewPassword,
@@ -717,6 +1083,8 @@ struct ArchiveListingReadyPanel: View {
             )
             ArchiveRepackagingPanel(
                 state: repackagingState,
+                password: $repackagingPassword,
+                onRetryWithPassword: onRetryRepackagingWithPassword,
                 onStart: onStartRepackaging,
                 onCancel: onCancelRepackaging
             )
@@ -767,16 +1135,50 @@ struct ArchiveListingReadyPanel: View {
 
 struct ArchiveRepackagingPanel: View {
     let state: ArchiveRepackagingState
+    @Binding var password: String
+    let onRetryWithPassword: ([ArchiveEntrySummary], String) -> Void
     let onStart: () -> Void
     let onCancel: () -> Void
+    @State private var draftPassword = ""
+    @StateObject private var passwordBuffer = StableInputBuffer()
 
     var body: some View {
-        switch state {
-        case .idle:
+        Group {
+            switch state {
+    case .idle:
             EmptyView()
         case .planning:
             Text("Preparing repackaging plan")
                 .font(.subheadline)
+        case .passwordRequired(let message, let selectedEntries, _):
+            VStack(alignment: .leading, spacing: 8) {
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+                HStack {
+                    Button("Retry") {
+                        submitPassword(
+                            selectedEntries,
+                            password: passwordBuffer.value
+                        )
+                    }
+                    .disabled(passwordBuffer.value.isEmpty)
+                    Button("Cancel", action: onCancel)
+                }
+                StableSecureInputField(
+                    "Archive password",
+                    text: $draftPassword,
+                    onSubmit: { submittedPassword in
+                        submitPassword(selectedEntries, password: submittedPassword)
+                    },
+                    onTextChanged: { value in
+                        passwordBuffer.value = value
+                    },
+                    onFieldReady: { field in
+                        passwordBuffer.field = field
+                    }
+                )
+            }
         case .review(let review):
             VStack(alignment: .leading, spacing: 4) {
                 Text("Ready to repackage \(review.request.selectedPaths.count) selected path(s)")
@@ -815,6 +1217,37 @@ struct ArchiveRepackagingPanel: View {
         case .failed(let message):
             Text(message).font(.subheadline).foregroundStyle(.red)
         }
+            }
+        .onChange(of: stateIdentity) { _ in
+        if case .passwordRequired = state {
+            draftPassword = password
+        } else {
+            draftPassword = ""
+        }
+    }
+        .onAppear {
+        if case .passwordRequired = state {
+            draftPassword = password
+        }
+    }
+    }
+
+    private var stateIdentity: String {
+        switch state {
+        case .passwordRequired: return "password-required"
+        case .idle: return "idle"
+        case .planning: return "planning"
+        case .review: return "review"
+        case .running: return "running"
+        case .completed: return "completed"
+        case .cancelled: return "cancelled"
+        case .failed: return "failed"
+        }
+    }
+
+    private func submitPassword(_ selectedEntries: [ArchiveEntrySummary], password submittedPassword: String) {
+        password = submittedPassword
+        onRetryWithPassword(selectedEntries, submittedPassword)
     }
 }
 
@@ -850,8 +1283,7 @@ struct ArchivePreviewPanel: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                SecureField("Password", text: $password)
-                    .textFieldStyle(.roundedBorder)
+                StableSecureInputField("Password", text: $password)
                 Button("Retry Preview") {
                     onSubmitPassword(entry)
                 }
@@ -908,8 +1340,7 @@ struct ArchiveTestPanel: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                SecureField("Password", text: $password)
-                    .textFieldStyle(.roundedBorder)
+                StableSecureInputField("Password", text: $password)
                 Button("Retry Test") {
                     onSubmitPassword(selectedEntries)
                 }
@@ -1132,6 +1563,7 @@ enum ArchiveTestState: Equatable {
 enum ArchiveRepackagingState {
     case idle
     case planning
+    case passwordRequired(String, [ArchiveEntrySummary], ArchiveRepackagingReview?)
     case review(ArchiveRepackagingReview)
     case running(ArchiveRepackagingReview, String)
     case completed(outputPath: String, verified: Bool)
@@ -1677,7 +2109,11 @@ final class ArchiveImportModel: ObservableObject {
     @Published var testState: ArchiveTestState = .idle
     @Published var extractionState: ArchiveExtractionState = .idle
     @Published var extractionPasswordInput = ""
+    @Published var batchExtractionState: BatchExtractionUIState = .idle
     @Published var repackagingState: ArchiveRepackagingState = .idle
+    @Published var repackagingPasswordInput = ""
+    private var repackagingSelectedEntries = [ArchiveEntrySummary]()
+    private var repackagingPasswordRetryReview: ArchiveRepackagingReview?
     @Published var previewDocument: PreviewDocument?
     @Published var creationState: ArchiveCreationState = .idle
     @Published var creationFormat: CreateArchiveFormat = .zip
@@ -1685,18 +2121,25 @@ final class ArchiveImportModel: ObservableObject {
     @Published var localSendState: LocalSendUIState = .idle
     @Published var localSendPinInput = ""
     @Published var pendingLocalSendDevice: LocalSendDevice?
+    @Published var operationReportMessage: String?
+    @Published var defaultExtractionDestinationLabel = "App storage"
+    @Published var recoveryRecords = [ArchiveRecoveryRecord]()
+    private var debugExtractionDelayNanoseconds: UInt64 = 0
+    private var cancellationRequestedExtractionJobIDs = Set<String>()
 
     private let importStore: ArchiveImportStore
     private let listingLoader: ArchiveListingLoader
     private let previewLoader: ArchivePreviewLoader
     private let testLoader: ArchiveTestLoader
     private let extractionCoordinator: ArchiveExtractionCoordinator
+    private let batchExtractionCoordinator: BatchExtractionCoordinator
     private let creationCoordinator: ArchiveCreationCoordinator
     private let creationSourceStager: ArchiveCreationSourceStager
     private let localSendSourceStager: LocalSendSourceStager
     private let repackagingCoordinator: ArchiveRepackagingCoordinator
     private let localSendClient: LocalSendClient
     private let localSendReceiver: LocalSendReceiver
+    private let destinationPreferences: ArchiveDestinationPreferences
     private var activeLocalSendDevice: LocalSendDevice?
     private var activeLocalSendSessionID: String?
     private var stagedCreationSources: StagedCreationSources?
@@ -1704,6 +2147,7 @@ final class ArchiveImportModel: ObservableObject {
     private var localSendReceiveDestination: URL?
     private var localSendReceiveDestinationAccess = false
     private var localSendReceiveStagingRoot: URL?
+    private var pendingAutomationAction: ArchiveAutomationAction?
     private var importGeneration = 0
     private var listingGeneration = 0
     private var previewGeneration = 0
@@ -1722,13 +2166,15 @@ final class ArchiveImportModel: ObservableObject {
         localSendSourceStager: LocalSendSourceStager = LocalSendSourceStager(),
         repackagingCoordinator: ArchiveRepackagingCoordinator? = nil,
         localSendClient: LocalSendClient = LocalSendClient(),
-        localSendReceiver: LocalSendReceiver = LocalSendReceiver()
+        localSendReceiver: LocalSendReceiver = LocalSendReceiver(),
+        destinationPreferences: ArchiveDestinationPreferences = ArchiveDestinationPreferences()
     ) {
         self.importStore = importStore
         self.listingLoader = listingLoader
         self.previewLoader = previewLoader
         self.testLoader = testLoader
         self.extractionCoordinator = extractionCoordinator
+        self.batchExtractionCoordinator = BatchExtractionCoordinator(extraction: extractionCoordinator)
         self.creationCoordinator = creationCoordinator
         self.creationSourceStager = creationSourceStager
         self.localSendSourceStager = localSendSourceStager
@@ -1738,6 +2184,9 @@ final class ArchiveImportModel: ObservableObject {
         )
         self.localSendClient = localSendClient
         self.localSendReceiver = localSendReceiver
+        self.destinationPreferences = destinationPreferences
+        self.defaultExtractionDestinationLabel = defaultExtractionDestination().label
+        self.recoveryRecords = extractionCoordinator.recoveries()
         self.localSendReceiver.onFileCommitted = { [weak self] file, displayName in
             Task { @MainActor in
                 self?.exportReceivedLocalSendFile(file, displayName: displayName)
@@ -1766,6 +2215,52 @@ final class ArchiveImportModel: ObservableObject {
         localSendReceiveDestination?.lastPathComponent ?? "App storage"
     }
 
+    func defaultExtractionDestination() -> ExtractionDestination {
+        destinationPreferences.defaultExtractionDestination(
+            appStorage: extractionCoordinator.appStorageDestination().rootURL
+        )
+    }
+
+    func setDefaultExtractionDestination(_ destination: ExtractionDestination) {
+        destinationPreferences.setExtractionDestination(destination)
+        defaultExtractionDestinationLabel = defaultExtractionDestination().label
+    }
+
+    func resetDefaultExtractionDestination() {
+        destinationPreferences.resetExtractionDestination()
+        defaultExtractionDestinationLabel = defaultExtractionDestination().label
+    }
+
+    func refreshRecoveryRecords() {
+        recoveryRecords = extractionCoordinator.recoveries()
+    }
+
+    func discardRecovery(_ record: ArchiveRecoveryRecord) {
+        extractionCoordinator.discardRecovery(record)
+        refreshRecoveryRecords()
+        if case .recoveryAvailable(let id, _) = extractionState, id == record.id {
+            extractionState = .idle
+        }
+    }
+
+    func retryRecovery(_ record: ArchiveRecoveryRecord) {
+        guard let archive = importedArchive,
+              archive.localPath == record.archivePath,
+              case .ready(let summary) = listingState else {
+            errorMessage = "Import (record.archiveDisplayName) again to retry the retained extraction."
+            return
+        }
+        let selectedEntries = record.selectedPaths.isEmpty
+            ? summary.entries
+            : summary.entries.filter { record.selectedPaths.contains($0.path) }
+        discardRecovery(record)
+        planExtraction(selectedEntries: selectedEntries, destination: defaultExtractionDestination())
+    }
+
+    func exportRecovery(_ record: ArchiveRecoveryRecord) -> [URL] {
+        extractionCoordinator.recoveryFiles(record)
+    }
+
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -1783,9 +2278,40 @@ final class ArchiveImportModel: ObservableObject {
         importExternalURLs([url])
     }
 
-    func importExternalURLs(_ urls: [URL]) {
+    func handleAutomationURL(_ url: URL) {
+        guard url.scheme?.lowercased() == "zmanager" else {
+            importExternalURL(url)
+            return
+        }
+        do {
+            let request = try ArchiveAutomationParser.parse(url)
+            switch request.action {
+            case .create:
+                handleCreationFilesResult(.success(request.sourceURLs))
+            case .open, .extract, .verify:
+                if let archiveURL = request.archiveURL {
+                    importExternalURLs(
+                        [archiveURL],
+                        pendingAction: request.action == .open ? nil : request.action
+                    )
+                }
+            }
+        } catch {
+            // Do not surface the URL or any rejected credential value.
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func importExternalURLs(
+        _ urls: [URL],
+        pendingAction: ArchiveAutomationAction? = nil
+    ) {
+        if pendingAction != .extract {
+            debugExtractionDelayNanoseconds = 0
+        }
         importGeneration += 1
         listingGeneration += 1
+        pendingAutomationAction = pendingAction
         archiveSessions.clear()
         _nestedOpenError = nil
         clearPreviewState()
@@ -1827,7 +2353,14 @@ final class ArchiveImportModel: ObservableObject {
         importMaestroFixture(named: "maestro-files.zip")
     }
 
-    func importMaestroFixture(named fixtureName: String, companionNames: [String] = []) {
+    func importMaestroFixture(
+        named fixtureName: String,
+        companionNames: [String] = [],
+        pendingAction: ArchiveAutomationAction? = nil
+    ) {
+        if pendingAction != .extract {
+            debugExtractionDelayNanoseconds = 0
+        }
         let fixtureURLs = ([fixtureName] + companionNames).compactMap {
             Bundle.main.url(forResource: $0, withExtension: nil)
         }
@@ -1835,7 +2368,20 @@ final class ArchiveImportModel: ObservableObject {
             errorMessage = "The Maestro fixture is not available in this build."
             return
         }
-        importExternalURLs(fixtureURLs)
+        importExternalURLs(fixtureURLs, pendingAction: pendingAction)
+    }
+
+    func startDebugCancellableExtraction() {
+#if DEBUG
+        // Keep the simulator job alive long enough for Maestro and manual
+        // cancellation to observe the running state after a cold launch.
+        debugExtractionDelayNanoseconds = 60_000_000_000
+        importMaestroFixture(
+            named: "maestro-split.zip",
+            companionNames: ["maestro-split.z01"],
+            pendingAction: .extract
+        )
+#endif
     }
 
     func retryListingWithPassword() {
@@ -1885,7 +2431,7 @@ final class ArchiveImportModel: ObservableObject {
         return selected.isEmpty ? summary.entries : selected
     }
 
-    func startRepackaging(selectedEntries: [ArchiveEntrySummary]) {
+    func startRepackaging(selectedEntries: [ArchiveEntrySummary], sourcePassword: String? = nil) {
         guard let archive = importedArchive else { return }
         // Repackaging requires an explicit source selection. An empty list is
         // reserved by extraction for "the whole archive".
@@ -1902,20 +2448,42 @@ final class ArchiveImportModel: ObservableObject {
             selectedPaths: selectedPaths,
             destinationArchivePath: creationCoordinator.appStorageOutput(displayName: "repackaged\(suffix)").path,
             format: creationFormat,
-            sourcePassword: passwordInput.isEmpty ? nil : passwordInput,
+            sourcePassword: sourcePassword ?? (repackagingPasswordInput.isEmpty ? nil : repackagingPasswordInput),
             destinationPassword: creationPasswordInput.isEmpty ? nil : creationPasswordInput
         )
+        repackagingSelectedEntries = selectedEntries
         repackagingState = .planning
         Task {
             do {
                 let review = try await Task.detached(priority: .userInitiated) {
-                    try self.repackagingCoordinator.plan(request: request)
+                    return try self.repackagingCoordinator.plan(request: request)
                 }.value
+                repackagingPasswordRetryReview = review
                 repackagingState = .review(review)
+            } catch let ZmanagerGuiError.Bridge(code, userMessage, _, _, _)
+                where code == "password_required" || code == "invalid_password" {
+                repackagingState = .passwordRequired(userMessage, selectedEntries, nil)
             } catch {
                 repackagingState = .failed(error.localizedDescription)
             }
         }
+    }
+
+    func retryRepackagingWithPassword(selectedEntries: [ArchiveEntrySummary], password: String) {
+        let password = password.isEmpty ? nil : password
+        repackagingState = .planning
+        repackagingPasswordInput = ""
+        if let review = repackagingPasswordRetryReview {
+            // Re-plan with the new transient password. A failed Rust job may
+            // retain a completed/failed extraction handle, and re-planning
+            // guarantees the retry starts a fresh Rust operation with the
+            // updated request rather than mutating a stale job session.
+            repackagingCoordinator.discard(review: review)
+            repackagingPasswordRetryReview = nil
+            startRepackaging(selectedEntries: selectedEntries, sourcePassword: password)
+            return
+        }
+        startRepackaging(selectedEntries: selectedEntries, sourcePassword: password)
     }
 
     func runRepackaging() {
@@ -1930,11 +2498,15 @@ final class ArchiveImportModel: ObservableObject {
                 repackagingState = .completed(outputPath: outputPath, verified: verified)
             case .cancelled:
                 repackagingState = .cancelled
+            case .passwordRequired(let message):
+                repackagingPasswordRetryReview = review
+                repackagingState = .passwordRequired(message, repackagingSelectedEntries, review)
             case .failed(let message):
                 repackagingState = .failed(message)
             }
             passwordInput = ""
             creationPasswordInput = ""
+            repackagingPasswordInput = ""
         }
     }
 
@@ -1944,6 +2516,10 @@ final class ArchiveImportModel: ObservableObject {
             repackagingState = .idle
         } else if case .running(let review, _) = repackagingState {
             repackagingCoordinator.cancel(review: review)
+        } else if case .passwordRequired(_, _, let review?) = repackagingState {
+            repackagingCoordinator.discard(review: review)
+            repackagingPasswordRetryReview = nil
+            repackagingState = .idle
         }
     }
 
@@ -1959,12 +2535,14 @@ final class ArchiveImportModel: ObservableObject {
     func planExtraction(
         selectedEntries: [ArchiveEntrySummary],
         destination: ExtractionDestination? = nil,
-        password: String? = nil
+        password: String? = nil,
+        debugDelayNanoseconds: UInt64? = nil
     ) {
         guard let archive = importedArchive else { return }
         clearExtractionState()
         let destination = destination ?? extractionCoordinator.appStorageDestination()
         let selectedPaths = extractionSelectedPaths(for: selectedEntries)
+        let extractionDebugDelay = debugDelayNanoseconds ?? self.debugExtractionDelayNanoseconds
         extractionState = .planning(destination.label)
         Task {
             do {
@@ -1977,7 +2555,8 @@ final class ArchiveImportModel: ObservableObject {
                         selectedPaths: selectedPaths,
                         destination: destination,
                         password: password,
-                        collisionPolicy: .refuse
+                        collisionPolicy: .refuse,
+                        debugDelayNanoseconds: extractionDebugDelay
                     )
                 }.value
                 extractionState = review.plan.canStart
@@ -2007,6 +2586,33 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
+    func handleDroppedCreationFiles(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        do { try planCreation(staged: creationSourceStager.stageFiles(urls)) }
+        catch { creationState = .failed(error.localizedDescription) }
+    }
+
+    @available(iOS 16.0, *)
+    func handlePhotosPickerItems(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        creationState = .planning
+        Task {
+            do {
+                var stagedItems: [(name: String, data: Data)] = []
+                for (index, item) in items.enumerated() {
+                    guard let data = try await item.loadTransferable(type: Data.self) else {
+                        throw ArchiveImportError.cacheUnavailable
+                    }
+                    let extensionName = item.supportedContentTypes.first?.preferredFilenameExtension ?? "dat"
+                    stagedItems.append(("photo-\(index + 1).\(extensionName)", data))
+                }
+                try planCreation(staged: creationSourceStager.stageData(stagedItems))
+            } catch {
+                creationState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     func handleCreationFolderResult(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -2015,6 +2621,102 @@ final class ArchiveImportModel: ObservableObject {
             catch { creationState = .failed(error.localizedDescription) }
         case .failure(let error):
             creationState = .failed(error.localizedDescription)
+        }
+    }
+
+    func handleBatchArchiveResult(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result, !urls.isEmpty else {
+            if case .failure(let error) = result { batchExtractionState = .failed(error.localizedDescription) }
+            return
+        }
+        batchExtractionState = .planning
+        let importStore = self.importStore
+        Task {
+            do {
+                let items = try await Task.detached(priority: .userInitiated) {
+                    let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("ZManagerMobile/BatchExtracted", isDirectory: true)
+                    return try urls.enumerated().map { index, url in
+                        let archive = try importStore.importArchive(from: url)
+                        let displayName = ArchiveImportStore.sanitizedDisplayName(archive.displayName)
+                        let baseName = URL(fileURLWithPath: displayName)
+                            .deletingPathExtension()
+                            .lastPathComponent
+                        return BatchExtractionItem(
+                            archive: archive,
+                            selectedPaths: [],
+                            destination: .appStorage(
+                                root.appendingPathComponent("\(baseName.isEmpty ? "archive" : baseName)-\(index)", isDirectory: true)
+                            )
+                        )
+                    }
+                }.value
+                let review = try batchExtractionCoordinator.plan(items: items)
+                batchExtractionState = .review(review)
+            } catch {
+                batchExtractionState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func startDebugBatchFixture() {
+        guard let fixtureURL = Bundle.main.url(forResource: "maestro-nested.zip", withExtension: nil) else {
+            batchExtractionState = .failed("The batch fixture is not available in this build.")
+            return
+        }
+        batchExtractionState = .planning
+        let importStore = self.importStore
+        Task {
+            do {
+                let items = try await Task.detached(priority: .userInitiated) {
+                    let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("ZManagerMobile/BatchExtracted", isDirectory: true)
+                    return try (0..<2).map { index in
+                        let archive = try importStore.importArchive(from: fixtureURL)
+                        return BatchExtractionItem(
+                            archive: archive,
+                            selectedPaths: [],
+                            destination: .appStorage(root.appendingPathComponent("fixture-\(index)", isDirectory: true))
+                        )
+                    }
+                }.value
+                batchExtractionState = .review(try batchExtractionCoordinator.plan(items: items))
+            } catch {
+                batchExtractionState = .failed("Unable to prepare batch fixture.")
+            }
+        }
+    }
+
+    func startBatchExtraction() {
+        guard case .review(let review) = batchExtractionState else { return }
+        batchExtractionState = .running
+        Task {
+            let outcome = await batchExtractionCoordinator.run(review: review) { archive, message in
+                _ = archive
+                _ = message
+            }
+            switch outcome {
+            case .completed(let results):
+                let completed = results.filter { $0.status == .completed }.count
+                let failed = results.filter { $0.status == .failed }.count
+                batchExtractionState = .completed(
+                    "Batch extraction complete: \(completed) completed, \(failed) failed."
+                )
+            case .cancelled:
+                batchExtractionState = .cancelled
+            }
+        }
+    }
+
+    func cancelBatchExtraction() {
+        switch batchExtractionState {
+        case .review(let review):
+            batchExtractionCoordinator.discard(review: review)
+            batchExtractionState = .idle
+        case .running:
+            batchExtractionCoordinator.cancel()
+        default:
+            break
         }
     }
 
@@ -2045,9 +2747,7 @@ final class ArchiveImportModel: ObservableObject {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            if localSendReceiveDestinationAccess, let localSendReceiveDestination {
-                localSendReceiveDestination.stopAccessingSecurityScopedResource()
-            }
+            stopLocalSendReceiveDestinationAccess()
             localSendReceiveDestinationAccess = url.startAccessingSecurityScopedResource()
             localSendReceiveDestination = url
             localSendState = .idle
@@ -2065,14 +2765,88 @@ final class ArchiveImportModel: ObservableObject {
         testPasswordInput = ""
         extractionPasswordInput = ""
         creationPasswordInput = ""
+        repackagingPasswordInput = ""
         localSendPinInput = ""
         pendingLocalSendDevice = nil
+        let activeDevice = activeLocalSendDevice
+        let activeSessionID = activeLocalSendSessionID
+        localSendClient.cancelActiveUpload()
+        activeLocalSendDevice = nil
+        activeLocalSendSessionID = nil
+        localSendReceiver.stop()
+        if let localSendReceiveStagingRoot {
+            try? FileManager.default.removeItem(at: localSendReceiveStagingRoot)
+            self.localSendReceiveStagingRoot = nil
+        }
+        stopLocalSendReceiveDestinationAccess()
         if case .sending = localSendState {
-            cancelLocalSend()
+            localSendState = .failed("LocalSend transfer cancelled while the app entered the background.")
+        } else if case .receiving = localSendState {
+            localSendState = .idle
         }
-        if case .receiving = localSendState {
-            stopLocalReceive()
+        switch extractionState {
+        case .running(_, let jobID, _):
+            Task.detached { try? self.extractionCoordinator.cancel(jobId: jobID) }
+        case .review(let review):
+            extractionCoordinator.discard(review: review)
+            extractionState = .idle
+        default:
+            break
         }
+        switch creationState {
+        case .running(_, let jobID, _):
+            Task.detached { try? self.creationCoordinator.cancel(jobId: jobID) }
+        case .review(let review):
+            creationCoordinator.discard(review: review)
+            discardCreationSources()
+            creationState = .idle
+        default:
+            break
+        }
+        switch repackagingState {
+        case .running(let review, _):
+            repackagingCoordinator.cancel(review: review)
+        case .review(let review):
+            repackagingCoordinator.discard(review: review)
+            repackagingState = .idle
+        default:
+            break
+        }
+        if case .running = batchExtractionState {
+            batchExtractionCoordinator.cancel()
+        }
+        if let activeDevice, let activeSessionID {
+            Task {
+                try? await localSendClient.cancel(to: activeDevice, sessionID: activeSessionID)
+            }
+        }
+        clearLocalSendSelection()
+    }
+
+    func saveExtractionReport(entries: UInt64, destination: String) {
+        let file = ArchiveOperationReportStore.save(
+            operation: "extract",
+            subject: importedArchive?.displayName ?? "archive",
+            status: "completed",
+            message: "Extraction complete",
+            destination: destination,
+            entries: entries,
+            verified: nil
+        )
+        operationReportMessage = "Saved operation report: \(file.lastPathComponent)"
+    }
+
+    func saveCreationReport(outputPath: String, verified: Bool) {
+        let file = ArchiveOperationReportStore.save(
+            operation: "create",
+            subject: URL(fileURLWithPath: outputPath).lastPathComponent,
+            status: "completed",
+            message: "Archive creation complete",
+            destination: outputPath,
+            entries: nil,
+            verified: verified
+        )
+        operationReportMessage = "Saved operation report: \(file.lastPathComponent)"
     }
 
     #if DEBUG
@@ -2121,6 +2895,15 @@ final class ArchiveImportModel: ObservableObject {
         default:
             break
         }
+        switch repackagingState {
+        case .running(let review, _):
+            repackagingCoordinator.cancel(review: review)
+        case .review(let review):
+            repackagingCoordinator.discard(review: review)
+            repackagingState = .idle
+        default:
+            break
+        }
     }
 
     func discoverLocalSendDevices() {
@@ -2152,7 +2935,14 @@ final class ArchiveImportModel: ObservableObject {
                 activeLocalSendDevice = device
                 activeLocalSendSessionID = session.sessionID
                 localSendState = .sending(device, "Uploading \(files.count) file(s)")
-                try await localSendClient.upload(to: device, session: session, files: files)
+                try await localSendClient.upload(to: device, session: session, files: files) { file, sent, total in
+                    Task { @MainActor in
+                        self.localSendState = .sending(
+                            device,
+                            "Uploading \(file.displayName): \(sent)/\(total) bytes"
+                        )
+                    }
+                }
                 activeLocalSendDevice = nil
                 activeLocalSendSessionID = nil
                 localSendPinInput = ""
@@ -2192,6 +2982,9 @@ final class ArchiveImportModel: ObservableObject {
 
     func startLocalReceive() {
         guard case .idle = localSendState else { return }
+        if let destination = localSendReceiveDestination, !localSendReceiveDestinationAccess {
+            localSendReceiveDestinationAccess = destination.startAccessingSecurityScopedResource()
+        }
         let root: URL
         if localSendReceiveDestination == nil {
             root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -2217,7 +3010,15 @@ final class ArchiveImportModel: ObservableObject {
             try? FileManager.default.removeItem(at: localSendReceiveStagingRoot)
             self.localSendReceiveStagingRoot = nil
         }
+        stopLocalSendReceiveDestinationAccess()
         localSendState = .idle
+    }
+
+    private func stopLocalSendReceiveDestinationAccess() {
+        if localSendReceiveDestinationAccess, let localSendReceiveDestination {
+            localSendReceiveDestination.stopAccessingSecurityScopedResource()
+        }
+        localSendReceiveDestinationAccess = false
     }
 
     private func exportReceivedLocalSendFile(_ source: URL, displayName: String) {
@@ -2284,6 +3085,7 @@ final class ArchiveImportModel: ObservableObject {
 
     func startExtraction(_ review: ExtractionReview) {
         extractionState = .starting(review)
+        debugExtractionDelayNanoseconds = 0
         Task {
             do {
                 let jobId = try await Task.detached(priority: .userInitiated) {
@@ -2292,10 +3094,19 @@ final class ArchiveImportModel: ObservableObject {
                 extractionState = .running(review, jobId, "Extracting archive")
                 let outcome = try await extractionCoordinator.awaitCompletion(review: review, jobId: jobId) { progress in
                     Task { @MainActor in
+                        guard !self.cancellationRequestedExtractionJobIDs.contains(jobId) else {
+                            return
+                        }
                         self.extractionState = .running(review, jobId, progress.message)
                     }
                 }
-                extractionState = outcome.state
+                if cancellationRequestedExtractionJobIDs.remove(jobId) != nil {
+                    extractionCoordinator.discard(review: review)
+                    extractionState = .cancelled
+                } else {
+                    extractionState = outcome.state
+                }
+                refreshRecoveryRecords()
             } catch {
                 extractionCoordinator.discard(review: review)
                 extractionState = .failed(error.localizedDescription)
@@ -2309,6 +3120,8 @@ final class ArchiveImportModel: ObservableObject {
             extractionState = .idle
             return
         }
+        cancellationRequestedExtractionJobIDs.insert(jobId)
+        extractionState = .cancelled
         Task.detached { try? self.extractionCoordinator.cancel(jobId: jobId) }
     }
 
@@ -2340,6 +3153,21 @@ final class ArchiveImportModel: ObservableObject {
                 return
             }
             listingState = state
+            if case .ready(let summary) = state {
+                let action = pendingAutomationAction
+                pendingAutomationAction = nil
+                switch action {
+                case .extract:
+                    planExtraction(
+                        selectedEntries: summary.entries,
+                        destination: defaultExtractionDestination()
+                    )
+                case .verify:
+                    startTest(selectedEntries: summary.entries)
+                default:
+                    break
+                }
+            }
         }
     }
 
@@ -2510,6 +3338,7 @@ struct ArchiveCreationPanel: View {
     let onFormatChanged: (CreateArchiveFormat) -> Void
     let onChooseFiles: () -> Void
     let onChooseFolder: () -> Void
+    let onDropFiles: ([URL]) -> Void
     let onStart: (ArchiveCreationReview) -> Void
     let onCancel: () -> Void
 
@@ -2526,11 +3355,10 @@ struct ArchiveCreationPanel: View {
                 Text("TZAP").tag(CreateArchiveFormat.tzap)
             }
             .pickerStyle(.segmented)
-            SecureField("Optional password", text: Binding(
+            StableSecureInputField("Optional password", text: Binding(
                 get: { password },
                 set: onPasswordChanged
             ))
-            .textFieldStyle(.roundedBorder)
             switch state {
             case .idle, .failed, .completed, .cancelled:
                 HStack {
@@ -2565,6 +3393,37 @@ struct ArchiveCreationPanel: View {
                 Button("Cancel creation", action: onCancel)
             }
         }
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: nil) { providers in
+            let group = DispatchGroup()
+            let lock = NSLock()
+            var urls = [URL]()
+            for provider in providers {
+                group.enter()
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                    defer { group.leave() }
+                    let url: URL?
+                    if let data = item as? Data {
+                        url = URL(dataRepresentation: data, relativeTo: nil)
+                    } else if let nsURL = item as? NSURL {
+                        url = nsURL as URL
+                    } else {
+                        url = nil
+                    }
+                    if let url {
+                        lock.lock()
+                        urls.append(url)
+                        lock.unlock()
+                    }
+                }
+            }
+            group.notify(queue: .main) {
+                lock.lock()
+                let dropped = urls
+                lock.unlock()
+                onDropFiles(dropped)
+            }
+            return true
+        }
     }
 }
 
@@ -2583,10 +3442,14 @@ struct LocalSendPanel: View {
     let onChooseReceiveDestination: () -> Void
     let onStartReceive: () -> Void
     let onStopReceive: () -> Void
+    let trustedFingerprints: [String]
+    let onForgetTrustedFingerprint: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Share on local network").font(.headline)
+            Text("Share on local network")
+                .font(.headline)
+                .accessibilityIdentifier("localSendPanel")
             Text("Only send to devices you recognize on this local network.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2601,7 +3464,26 @@ struct LocalSendPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if !trustedFingerprints.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Trusted devices").font(.subheadline.weight(.semibold))
+                    ForEach(trustedFingerprints, id: \.self) { fingerprint in
+                        HStack {
+                            Text(fingerprint)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .textSelection(.enabled)
+                            Spacer()
+                            Button("Forget") { onForgetTrustedFingerprint(fingerprint) }
+                                .accessibilityLabel("Forget trusted device \(fingerprint)")
+                        }
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Trusted devices")
+            }
             Button(state.isDiscovering ? "Discovering" : "Find LocalSend devices", action: onDiscover)
+                .accessibilityIdentifier("localSendDiscover")
                 .disabled((archive == nil && selectedFileCount == 0) || state.isDiscovering)
             if case .receiving(let port) = state {
                 Button("Stop receiving", action: onStopReceive)
@@ -2639,8 +3521,7 @@ struct LocalSendPanel: View {
                 }
             case .pinRequired(let device):
                 Text("\(device.alias) requires a PIN before receiving this transfer.")
-                SecureField("LocalSend PIN", text: $pinInput)
-                    .textContentType(.oneTimeCode)
+                StableSecureInputField("LocalSend PIN", text: $pinInput, contentType: .oneTimeCode)
                 HStack {
                     Button("Retry with PIN") {
                         let pin = pinInput
@@ -2666,17 +3547,174 @@ private extension LocalSendUIState {
     }
 }
 
+struct ArchiveRecoveryRecord: Codable, Identifiable, Equatable {
+    let id: UUID
+    let archivePath: String
+    let archiveDisplayName: String
+    let selectedPaths: [String]
+    let stagingRoot: String
+    let destinationLabel: String
+    let message: String
+    let createdAt: Date
+}
+
+final class ArchiveRecoveryStore {
+    private let fileManager: FileManager
+    private let root: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        self.root = support.appendingPathComponent("ZManagerMobile/ArchiveRecovery", isDirectory: true)
+    }
+
+    @discardableResult
+    func save(
+        archive: ImportedArchive,
+        selectedPaths: [String],
+        stagingRoot: URL,
+        destinationLabel: String,
+        message: String
+    ) throws -> ArchiveRecoveryRecord {
+        guard isInside(fileManager.temporaryDirectory, stagingRoot) else {
+            throw ArchiveExtractionError.unavailableStaging
+        }
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        let record = ArchiveRecoveryRecord(
+            id: UUID(),
+            archivePath: archive.localPath,
+            archiveDisplayName: archive.displayName,
+            selectedPaths: selectedPaths,
+            stagingRoot: stagingRoot.standardizedFileURL.path,
+            destinationLabel: destinationLabel,
+            message: message,
+            createdAt: Date()
+        )
+        try encoder.encode(record).write(to: fileURL(record.id), options: .atomic)
+        return record
+    }
+
+    func records(now: Date = Date()) -> [ArchiveRecoveryRecord] {
+        cleanupExpired(now: now)
+        return (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil))?
+            .filter { $0.pathExtension == "json" }
+            .compactMap(read)
+            .sorted { $0.createdAt > $1.createdAt } ?? []
+    }
+
+    func files(for record: ArchiveRecoveryRecord) -> [URL] {
+        let rootURL = URL(fileURLWithPath: record.stagingRoot, isDirectory: true)
+        guard isInside(fileManager.temporaryDirectory, rootURL),
+              let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: [.isRegularFileKey])
+        else { return [] }
+        return enumerator.compactMap { item in
+            guard let url = item as? URL,
+                  (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { return nil }
+            return url
+        }
+    }
+
+    func discard(_ record: ArchiveRecoveryRecord) {
+        let staging = URL(fileURLWithPath: record.stagingRoot, isDirectory: true)
+        if isInside(fileManager.temporaryDirectory, staging) {
+            try? fileManager.removeItem(at: staging.deletingLastPathComponent())
+        }
+        try? fileManager.removeItem(at: fileURL(record.id))
+    }
+
+    private func cleanupExpired(now: Date) {
+        recordsWithoutCleanup().filter { now.timeIntervalSince($0.createdAt) > 7 * 24 * 60 * 60 }
+            .forEach(discard)
+    }
+
+    private func recordsWithoutCleanup() -> [ArchiveRecoveryRecord] {
+        (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil))?
+            .filter { $0.pathExtension == "json" }
+            .compactMap(read) ?? []
+    }
+
+    private func read(_ url: URL) -> ArchiveRecoveryRecord? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decoder.decode(ArchiveRecoveryRecord.self, from: data)
+    }
+
+    private func fileURL(_ id: UUID) -> URL {
+        root.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    private func isInside(_ parent: URL, _ child: URL) -> Bool {
+        let parentPath = parent.standardizedFileURL.path.hasSuffix("/")
+            ? parent.standardizedFileURL.path
+            : parent.standardizedFileURL.path + "/"
+        return child.standardizedFileURL.path == parent.standardizedFileURL.path
+            || child.standardizedFileURL.path.hasPrefix(parentPath)
+    }
+}
+
 enum ArchiveExtractionError: LocalizedError {
     case unavailable
     case expiredReview
     case unavailableStaging
+    case unavailableDestination
+    case unsafePath
 
     var errorDescription: String? {
         switch self {
         case .unavailable: return "Archive extraction is unavailable in this build."
         case .expiredReview: return "The extraction review expired. Review the archive again."
         case .unavailableStaging: return "The staged extraction is unavailable."
+        case .unavailableDestination: return "The selected extraction folder is no longer available."
+        case .unsafePath: return "The staged extraction contains an unsafe path."
         }
+    }
+}
+
+final class ArchiveDestinationPreferences {
+    private static let extractionBookmarkKey = "defaultExtractionDestinationBookmark"
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func defaultExtractionDestination(appStorage: URL) -> ExtractionDestination {
+        guard let data = defaults.data(forKey: Self.extractionBookmarkKey) else {
+            return .appStorage(appStorage)
+        }
+        var isStale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: data,
+            // iOS does not expose the macOS security-scope bookmark option;
+            // access is started explicitly around each native commit.
+            options: [],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ), !isStale else {
+            resetExtractionDestination()
+            return .appStorage(appStorage)
+        }
+        return .folder(url)
+    }
+
+    func setExtractionDestination(_ destination: ExtractionDestination) {
+        switch destination {
+        case .appStorage:
+            resetExtractionDestination()
+        case .folder(let url):
+            if let bookmark = try? url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            ) {
+                defaults.set(bookmark, forKey: Self.extractionBookmarkKey)
+            }
+        }
+    }
+
+    func resetExtractionDestination() {
+        defaults.removeObject(forKey: Self.extractionBookmarkKey)
     }
 }
 
@@ -2703,6 +3741,29 @@ struct ExtractionReview {
     let destination: ExtractionDestination
     let plan: PlanExtractResult
     let collisionPolicy: ExtractionCollisionPolicy
+    let debugDelayNanoseconds: UInt64
+}
+
+/// Converts a staged file to a safe relative path before native commit. Rust
+/// owns archive path policy; this boundary also rejects symlinks or malformed
+/// staged paths that escape the private staging root.
+enum ExtractionPathSafety {
+    static func relativePath(for file: URL, under root: URL) throws -> String {
+        let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
+        let resolvedFile = file.resolvingSymlinksInPath().standardizedFileURL
+        let rootPath = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
+        guard resolvedFile.path.hasPrefix(rootPath) else {
+            throw ArchiveExtractionError.unsafePath
+        }
+        let relative = String(resolvedFile.path.dropFirst(rootPath.count))
+        guard !relative.isEmpty,
+              relative != ".",
+              relative.split(separator: "/", omittingEmptySubsequences: false)
+                .allSatisfy({ $0 != "." && $0 != ".." }) else {
+            throw ArchiveExtractionError.unsafePath
+        }
+        return relative
+    }
 }
 
 struct ExtractionProgress {
@@ -2719,6 +3780,7 @@ enum ArchiveExtractionState {
     case cancelled
     case passwordRequired(String)
     case failed(String)
+    case recoveryAvailable(UUID, String)
 
     var isBusy: Bool {
         switch self {
@@ -2733,7 +3795,8 @@ private extension ArchiveExtractionCoordinator.Outcome {
         switch self {
         case .completed(let entries, let destination): return .completed(entries, destination)
         case .cancelled: return .cancelled
-        case .failed(let message): return .failed(message)
+        case .failed(let message, _): return .failed(message)
+        case .recoveryAvailable(let id, let message): return .recoveryAvailable(id, message)
         }
     }
 }
@@ -2742,7 +3805,8 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
     enum Outcome {
         case completed(UInt64, String)
         case cancelled
-        case failed(String)
+        case failed(String, code: String? = nil)
+        case recoveryAvailable(UUID, String)
     }
 
     private struct Session {
@@ -2759,11 +3823,23 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
     private let fileManager: FileManager
     private let lock = NSLock()
     private var sessions = [UUID: Session]()
+    private let recoveryStore: ArchiveRecoveryStore
 
-    init(bridge: ArchiveBridgeClient = GeneratedArchiveBridgeClient(), fileManager: FileManager = .default) {
+    init(
+        bridge: ArchiveBridgeClient = GeneratedArchiveBridgeClient(),
+        fileManager: FileManager = .default,
+        recoveryStore: ArchiveRecoveryStore = ArchiveRecoveryStore()
+    ) {
         self.bridge = bridge
         self.fileManager = fileManager
+        self.recoveryStore = recoveryStore
     }
+
+    func recoveries() -> [ArchiveRecoveryRecord] { recoveryStore.records() }
+
+    func discardRecovery(_ record: ArchiveRecoveryRecord) { recoveryStore.discard(record) }
+
+    func recoveryFiles(_ record: ArchiveRecoveryRecord) -> [URL] { recoveryStore.files(for: record) }
 
     func appStorageDestination() -> ExtractionDestination {
         let root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -2776,7 +3852,8 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
         selectedPaths: [String],
         destination: ExtractionDestination,
         password: String?,
-        collisionPolicy: ExtractionCollisionPolicy
+        collisionPolicy: ExtractionCollisionPolicy,
+        debugDelayNanoseconds: UInt64 = 0
     ) throws -> ExtractionReview {
         let id = UUID()
         let stagingRoot = fileManager.temporaryDirectory
@@ -2801,7 +3878,13 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
             password: password
         )
         lock.unlock()
-        return ExtractionReview(id: id, destination: destination, plan: plan, collisionPolicy: collisionPolicy)
+        return ExtractionReview(
+            id: id,
+            destination: destination,
+            plan: plan,
+            collisionPolicy: collisionPolicy,
+            debugDelayNanoseconds: debugDelayNanoseconds
+        )
     }
 
     func start(review: ExtractionReview) throws -> String {
@@ -2836,11 +3919,17 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
         onProgress: @escaping (ExtractionProgress) -> Void
     ) async throws -> Outcome {
         var cursor: UInt64 = 0
+        if review.debugDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: min(review.debugDelayNanoseconds, 30_000_000_000))
+        }
         while true {
             let update = try bridge.pollExtractionJob(jobId: jobId, cursor: cursor)
             cursor = update.nextCursor
             if let event = update.events.last {
                 onProgress(ExtractionProgress(message: event.message ?? event.path ?? "Extracting archive"))
+            }
+            if !update.isTerminal && review.debugDelayNanoseconds > 0 {
+                try await Task.sleep(nanoseconds: min(review.debugDelayNanoseconds, 30_000_000_000))
             }
             if update.isTerminal {
                 switch update.status {
@@ -2850,7 +3939,17 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
                     discard(review: review)
                     return .cancelled
                 default:
-                    return .failed(update.events.last?.error?.message ?? update.events.last?.message ?? "Archive extraction failed.")
+                    let code = update.events.last?.error?.code
+                    let outcome = Outcome.failed(
+                        update.events.last?.error?.message ?? update.events.last?.message ?? "Archive extraction failed.",
+                        code: code
+                    )
+                    // Keep the staged session only for password recovery. All
+                    // other terminal failures must release staging immediately.
+                    if code != "password_required" && code != "invalid_password" {
+                        discard(review: review)
+                    }
+                    return outcome
                 }
             }
             try await Task.sleep(nanoseconds: 150_000_000)
@@ -2859,6 +3958,16 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
 
     func cancel(jobId: String) throws {
         try bridge.cancelExtractionJob(jobId: jobId)
+    }
+
+    func setPassword(review: ExtractionReview, password: String?) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard var session = sessions[review.id] else {
+            throw ArchiveExtractionError.expiredReview
+        }
+        session.password = password
+        sessions[review.id] = session
     }
 
     func discard(review: ExtractionReview) {
@@ -2883,7 +3992,7 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
                 try commit(stagingRoot: session.stagingRoot, to: root, policy: review.collisionPolicy)
             case .folder(let root):
                 guard root.startAccessingSecurityScopedResource() else {
-                    return .failed("The selected folder is no longer available.")
+                    throw ArchiveExtractionError.unavailableDestination
                 }
                 defer { root.stopAccessingSecurityScopedResource() }
                 var coordinationError: NSError?
@@ -2901,7 +4010,24 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
             discard(review: review)
             return .completed(writtenEntries, destination)
         } catch {
-            return .failed(error.localizedDescription)
+            let message = error.localizedDescription
+            if let recovery = try? recoveryStore.save(
+                archive: session.archive,
+                selectedPaths: session.selectedPaths,
+                stagingRoot: session.stagingRoot,
+                destinationLabel: session.destination.label,
+                message: message
+            ) {
+                lock.lock()
+                sessions.removeValue(forKey: review.id)
+                lock.unlock()
+                return .recoveryAvailable(
+                    recovery.id,
+                    "\(message) Partial output was retained for recovery."
+                )
+            }
+            discard(review: review)
+            return .failed(message)
         }
     }
 
@@ -2912,7 +4038,8 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
             let source = stagingRoot.appendingPathComponent(relativePath)
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: source.path, isDirectory: &isDirectory), !isDirectory.boolValue else { continue }
-            let target = destinationRoot.appendingPathComponent(relativePath)
+            let safeRelativePath = try ExtractionPathSafety.relativePath(for: source, under: stagingRoot)
+            let target = destinationRoot.appendingPathComponent(safeRelativePath)
             try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             let resolved = try resolveCollision(target, policy: policy)
             try fileManager.copyItem(at: source, to: resolved)
@@ -2940,6 +4067,179 @@ final class ArchiveExtractionCoordinator: @unchecked Sendable {
     }
 }
 
+struct BatchExtractionItem {
+    let archive: ImportedArchive
+    let selectedPaths: [String]
+    let destination: ExtractionDestination
+    let password: String?
+
+    init(
+        archive: ImportedArchive,
+        selectedPaths: [String],
+        destination: ExtractionDestination,
+        password: String? = nil
+    ) {
+        self.archive = archive
+        self.selectedPaths = selectedPaths
+        self.destination = destination
+        self.password = password
+    }
+}
+
+struct BatchExtractionReview {
+    let items: [BatchExtractionItem]
+    let reviews: [ExtractionReview]
+}
+
+struct BatchExtractionItemResult {
+    enum Status { case completed, failed, cancelled }
+    let archive: ImportedArchive
+    let status: Status
+    let writtenEntries: UInt64
+    let message: String?
+}
+
+enum BatchExtractionOutcome {
+    case completed([BatchExtractionItemResult])
+    case cancelled([BatchExtractionItemResult])
+}
+
+enum BatchExtractionUIState {
+    case idle
+    case planning
+    case review(BatchExtractionReview)
+    case running
+    case completed(String)
+    case cancelled
+    case failed(String)
+
+    var isBusy: Bool {
+        switch self {
+        case .planning, .running: return true
+        default: return false
+        }
+    }
+}
+
+/// Runs a batch as independent Rust extraction jobs so one damaged archive
+/// does not invalidate successful outputs from the rest of the queue.
+final class BatchExtractionCoordinator: @unchecked Sendable {
+    private let extraction: ArchiveExtractionCoordinator
+    private let lock = NSLock()
+    private var activeJob: (ExtractionReview, String)?
+    private var cancelRequested = false
+
+    init(extraction: ArchiveExtractionCoordinator) {
+        self.extraction = extraction
+    }
+
+    func plan(items: [BatchExtractionItem]) throws -> BatchExtractionReview {
+        guard !items.isEmpty else { throw ArchiveExtractionError.expiredReview }
+        var reviews = [ExtractionReview]()
+        do {
+            for item in items {
+                reviews.append(try extraction.plan(
+                    archive: item.archive,
+                    selectedPaths: item.selectedPaths,
+                    destination: item.destination,
+                    password: item.password,
+                    collisionPolicy: .refuse
+                ))
+            }
+            return BatchExtractionReview(items: items, reviews: reviews)
+        } catch {
+            reviews.forEach(extraction.discard)
+            throw error
+        }
+    }
+
+    func run(
+        review: BatchExtractionReview,
+        onProgress: @escaping (ImportedArchive, String) -> Void = { _, _ in }
+    ) async -> BatchExtractionOutcome {
+        lock.lock()
+        cancelRequested = false
+        lock.unlock()
+        var results = [BatchExtractionItemResult]()
+        for index in review.reviews.indices {
+            lock.lock()
+            let shouldCancel = cancelRequested
+            lock.unlock()
+            if shouldCancel {
+                review.reviews[index...].forEach(extraction.discard)
+                return .cancelled(results)
+            }
+            let extractionReview = review.reviews[index]
+            let item = review.items[index]
+            do {
+                let jobID = try extraction.start(review: extractionReview)
+                lock.lock()
+                activeJob = (extractionReview, jobID)
+                lock.unlock()
+                let outcome = try await extraction.awaitCompletion(review: extractionReview, jobId: jobID) { progress in
+                    onProgress(item.archive, progress.message)
+                }
+                switch outcome {
+                case .completed(let entries, _):
+                    results.append(BatchExtractionItemResult(
+                        archive: item.archive,
+                        status: .completed,
+                        writtenEntries: entries,
+                        message: nil
+                    ))
+                case .failed(let message, _):
+                    results.append(BatchExtractionItemResult(
+                        archive: item.archive,
+                        status: .failed,
+                        writtenEntries: 0,
+                        message: message
+                    ))
+                case .recoveryAvailable(_, let message):
+                    results.append(BatchExtractionItemResult(
+                        archive: item.archive,
+                        status: .failed,
+                        writtenEntries: 0,
+                        message: message
+                    ))
+                case .cancelled:
+                    results.append(BatchExtractionItemResult(
+                        archive: item.archive,
+                        status: .cancelled,
+                        writtenEntries: 0,
+                        message: nil
+                    ))
+                    review.reviews.dropFirst(index + 1).forEach(extraction.discard)
+                    return .cancelled(results)
+                }
+            } catch {
+                extraction.discard(review: extractionReview)
+                results.append(BatchExtractionItemResult(
+                    archive: item.archive,
+                    status: .failed,
+                    writtenEntries: 0,
+                    message: error.localizedDescription
+                ))
+            }
+            lock.lock()
+            activeJob = nil
+            lock.unlock()
+        }
+        return .completed(results)
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelRequested = true
+        let activeJob = activeJob
+        lock.unlock()
+        if let activeJob { try? extraction.cancel(jobId: activeJob.1) }
+    }
+
+    func discard(review: BatchExtractionReview) {
+        review.reviews.forEach(extraction.discard)
+    }
+}
+
 struct ArchiveExtractionPanel: View {
     let state: ArchiveExtractionState
     let selectedEntries: [ArchiveEntrySummary]
@@ -2959,10 +4259,12 @@ struct ArchiveExtractionPanel: View {
                 Text("\(review.plan.writableEntries) files will be extracted to \(review.destination.label).")
                 if let estimated = review.plan.estimatedBytes { Text("\(estimated) bytes estimated") }
                 ForEach(review.plan.warnings, id: \.self) { Text($0.message).foregroundStyle(.red) }
-                HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button("Start extraction") { onStart(review) }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Button("Choose folder", action: onChooseDestination)
                     Button("Cancel", action: onCancel)
-                    Button("Start extraction") { onStart(review) }.buttonStyle(.borderedProminent)
                 }
             }
         case .starting: Text("Starting extraction")
@@ -2976,10 +4278,48 @@ struct ArchiveExtractionPanel: View {
         case .passwordRequired(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message)
-                SecureField("Password", text: $password).textFieldStyle(.roundedBorder)
+                StableSecureInputField("Password", text: $password)
                 Button("Retry extraction") { onRetryWithPassword(selectedEntries) }.disabled(password.isEmpty)
             }
         case .failed(let message): Text(message).foregroundStyle(.red)
+        case .recoveryAvailable(_, let message): Text(message).foregroundStyle(.red)
+        }
+    }
+}
+
+struct ArchiveBatchExtractionPanel: View {
+    let state: BatchExtractionUIState
+    let onStart: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        switch state {
+        case .idle:
+            EmptyView()
+        case .planning:
+            Text("Preparing batch extraction plans")
+                .font(.subheadline)
+        case .review(let review):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Review batch extraction").font(.headline)
+                Text("\(review.items.count) archives will be extracted to separate app-storage folders.")
+                HStack {
+                    Button("Start batch extraction", action: onStart)
+                    Button("Cancel", action: onCancel)
+                }
+            }
+        case .running:
+            HStack {
+                Text("Batch extraction running").font(.subheadline)
+                Spacer()
+                Button("Cancel", action: onCancel)
+            }
+        case .completed(let message):
+            Text(message).font(.subheadline)
+        case .cancelled:
+            Text("Batch extraction cancelled").font(.subheadline)
+        case .failed(let message):
+            Text(message).font(.subheadline).foregroundStyle(.red)
         }
     }
 }
@@ -3245,6 +4585,7 @@ struct ArchiveRepackagingReview {
 enum ArchiveRepackagingOutcome: Equatable {
     case completed(outputPath: String, verified: Bool)
     case cancelled
+    case passwordRequired(String)
     case failed(String)
 }
 
@@ -3253,13 +4594,16 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
         let request: ArchiveRepackagingRequest
         let stagingRoot: URL
         var activeJobID: String?
+        var activePhase: ActivePhase?
         var cancelRequested = false
 
         init(request: ArchiveRepackagingRequest, stagingRoot: URL) {
             self.request = request
             self.stagingRoot = stagingRoot
+            self.activePhase = nil
         }
     }
+    private enum ActivePhase { case extraction, creation }
 
     private let extraction: ArchiveExtractionCoordinator
     private let creation: ArchiveCreationCoordinator
@@ -3305,6 +4649,9 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
         guard let session else { return .failed("The repackaging review expired.") }
         do {
             let extractionJob = try extraction.start(review: review.extractionReview)
+            lock.lock()
+            session.activePhase = .extraction
+            lock.unlock()
             session.activeJobID = extractionJob
             onProgress("Extracting selected archive folder")
             switch try await extraction.awaitCompletion(review: review.extractionReview, jobId: extractionJob) { progress in
@@ -3312,7 +4659,12 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
             } {
             case .cancelled:
                 return finish(review.id, outcome: .cancelled)
-            case .failed(let message):
+            case .failed(let message, let code):
+                if code == "password_required" || code == "invalid_password" {
+                    return .passwordRequired(message)
+                }
+                return finish(review.id, outcome: .failed(message))
+            case .recoveryAvailable(_, let message):
                 return finish(review.id, outcome: .failed(message))
             case .completed:
                 break
@@ -3331,6 +4683,9 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
                 return finish(review.id, outcome: .failed(createReview.plan.warnings.first?.message ?? "The output archive cannot be created."))
             }
             let creationJob = try creation.start(review: createReview)
+            lock.lock()
+            session.activePhase = .creation
+            lock.unlock()
             session.activeJobID = creationJob
             onProgress("Creating output archive")
             switch try await creation.awaitCompletion(review: createReview, jobId: creationJob) { progress in
@@ -3359,7 +4714,16 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
         session?.cancelRequested = true
         let activeJobID = session?.activeJobID
         lock.unlock()
-        if let activeJobID { try? extraction.cancel(jobId: activeJobID) }
+        if let activeJobID {
+            switch session?.activePhase {
+            case .creation: try? creation.cancel(jobId: activeJobID)
+            case .extraction, .none: try? extraction.cancel(jobId: activeJobID)
+            }
+        }
+    }
+
+    func setSourcePassword(review: ArchiveRepackagingReview, password: String) throws {
+        try extraction.setPassword(review: review.extractionReview, password: password)
     }
 
     private func finish(_ id: UUID, outcome: ArchiveRepackagingOutcome) -> ArchiveRepackagingOutcome {
@@ -3497,20 +4861,119 @@ struct LocalSendAnnouncement: Codable {
     let announce: Bool?
 }
 
+struct ArchiveOperationReport {
+    let operation: String
+    let subject: String
+    let status: String
+    let message: String
+    let destination: String?
+    let entries: UInt64?
+    let verified: Bool?
+}
+
+enum ArchiveOperationReportStore {
+    static func save(
+        operation: String,
+        subject: String,
+        status: String,
+        message: String,
+        destination: String?,
+        entries: UInt64?,
+        verified: Bool?
+    ) -> URL {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ZManagerMobile/OperationReports", isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let formatter = ISO8601DateFormatter()
+        let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let file = root.appendingPathComponent("\(stamp)-\(safe(operation)).json")
+        var object: [String: Any] = [
+            "operation": operation,
+            "subject": subject,
+            "status": status,
+            "message": message,
+            "redaction": "Passwords, transfer tokens, and provider credentials are never included."
+        ]
+        if let destination { object["destination"] = destination }
+        if let entries { object["entries"] = entries }
+        if let verified { object["verified"] = verified }
+        let data = (try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: file, options: .atomic)
+        return file
+    }
+
+    private static func safe(_ value: String) -> String {
+        let allowed = value.map { character in
+            character.isLetter || character.isNumber || character == "." || character == "_" || character == "-"
+                ? character : "_"
+        }
+        let result = String(allowed).trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return result.isEmpty ? "operation" : result
+    }
+}
+
+/// Persists only explicit device fingerprint approvals. The fingerprint is
+/// shown to the user and is never used as a password or transfer credential.
+final class LocalSendTrustStore {
+    private let defaults: UserDefaults
+    private let prefix = "org.tzap.zmanager.localsend.trusted."
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func isTrusted(_ device: LocalSendDevice) -> Bool {
+        guard let fingerprint = device.fingerprint else { return false }
+        return defaults.bool(forKey: prefix + fingerprint)
+    }
+
+    func remember(_ device: LocalSendDevice) {
+        guard let fingerprint = device.fingerprint else { return }
+        defaults.set(true, forKey: prefix + fingerprint)
+    }
+
+    func forget(_ device: LocalSendDevice) {
+        guard let fingerprint = device.fingerprint else { return }
+        forget(fingerprint: fingerprint)
+    }
+
+    func forget(fingerprint: String) {
+        defaults.removeObject(forKey: prefix + fingerprint)
+    }
+
+    func fingerprints() -> [String] {
+        defaults.dictionaryRepresentation().keys
+            .filter { $0.hasPrefix(prefix) && defaults.bool(forKey: $0) }
+            .map { String($0.dropFirst(prefix.count)) }
+            .sorted()
+    }
+}
+
 /// LocalSend v2.2 outbound HTTP transfer subsystem. It intentionally has no
 /// dependency on archive parsing or creation.
 final class LocalSendClient: @unchecked Sendable {
     static let multicastAddress = "224.0.0.167"
     static let defaultPort = 53317
 
+    static func isPinRequiredStatus(_ statusCode: Int) -> Bool { statusCode == 401 }
+
     private let alias: String
     private let fingerprint: String
     private let port: Int
     private var activeTask: URLSessionTask?
 
-    init(alias: String = "ZManager Mobile", fingerprint: String = UUID().uuidString, port: Int = LocalSendClient.defaultPort) {
+    init(alias: String = "ZManager Mobile", fingerprint: String? = nil, port: Int = LocalSendClient.defaultPort) {
         self.alias = alias
-        self.fingerprint = fingerprint
+        let identityKey = "org.tzap.zmanager.localsend.fingerprint"
+        if let fingerprint {
+            self.fingerprint = fingerprint
+        } else if let stored = UserDefaults.standard.string(forKey: identityKey) {
+            self.fingerprint = stored
+        } else {
+            let generated = UUID().uuidString
+            UserDefaults.standard.set(generated, forKey: identityKey)
+            self.fingerprint = generated
+        }
         self.port = port
     }
 
@@ -3655,7 +5118,8 @@ final class LocalSendClient: @unchecked Sendable {
     func upload(
         to device: LocalSendDevice,
         session: LocalSendUploadSession,
-        files: [LocalSendTransferFile]
+        files: [LocalSendTransferFile],
+        onProgress: @escaping (_ file: LocalSendTransferFile, _ sent: Int64, _ total: Int64) -> Void = { _, _, _ in }
     ) async throws {
         guard let baseURL = device.baseURL else { throw URLError(.badURL) }
         for file in files {
@@ -3669,11 +5133,16 @@ final class LocalSendClient: @unchecked Sendable {
             guard let url = components?.url else { throw URLError(.badURL) }
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            activeTask = URLSession.shared.uploadTask(with: request, fromFile: file.url)
-            guard let activeTask else { throw URLError(.cannotCreateFile) }
-            activeTask.resume()
-            try await activeTask.value()
-            self.activeTask = nil
+            let delegate = LocalSendUploadDelegate(file: file, onProgress: onProgress)
+            let sessionConfiguration = URLSessionConfiguration.default
+            let delegateSession = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
+            let uploadTask = delegateSession.uploadTask(with: request, fromFile: file.url)
+            self.activeTask = uploadTask
+            defer {
+                delegateSession.invalidateAndCancel()
+                self.activeTask = nil
+            }
+            try await delegate.start(task: uploadTask)
         }
     }
 
@@ -3717,7 +5186,7 @@ final class LocalSendClient: @unchecked Sendable {
         guard let http = response as? HTTPURLResponse else {
             throw LocalSendTransferError.rejected
         }
-        if http.statusCode == 403 { throw LocalSendTransferError.pinRequired }
+        if Self.isPinRequiredStatus(http.statusCode) { throw LocalSendTransferError.pinRequired }
         guard (200..<300).contains(http.statusCode) else {
             throw LocalSendTransferError.rejected
         }
@@ -3726,6 +5195,57 @@ final class LocalSendClient: @unchecked Sendable {
     private func string(_ json: [String: Any], key: String) throws -> String {
         guard let value = json[key] as? String else { throw LocalSendTransferError.invalidResponse }
         return value
+    }
+}
+
+private final class LocalSendUploadDelegate: NSObject, URLSessionTaskDelegate {
+    private let file: LocalSendTransferFile
+    private let onProgress: (LocalSendTransferFile, Int64, Int64) -> Void
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(
+        file: LocalSendTransferFile,
+        onProgress: @escaping (LocalSendTransferFile, Int64, Int64) -> Void
+    ) {
+        self.file = file
+        self.onProgress = onProgress
+    }
+
+    func start(task: URLSessionTask) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            task.resume()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        onProgress(file, totalBytesSent, totalBytesExpectedToSend)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error {
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                continuation?.resume(throwing: CancellationError())
+            } else {
+                continuation?.resume(throwing: error)
+            }
+            continuation = nil
+            return
+        }
+        guard let response = task.response as? HTTPURLResponse,
+              (200..<300).contains(response.statusCode) else {
+            continuation?.resume(throwing: LocalSendTransferError.rejected)
+            continuation = nil
+            return
+        }
+        continuation?.resume()
+        continuation = nil
     }
 }
 
@@ -3939,7 +5459,12 @@ final class LocalSendReceiver: @unchecked Sendable {
         } catch {
             try? request.fileHandle?.close()
             try? request.temporaryFile.map { try fileManager.removeItem(at: $0) }
-            respond(connection, status: 400, body: error.localizedDescription)
+            if let session = request.session, let sessionID = request.sessionID {
+                sessions.removeValue(forKey: sessionID)
+                try? fileManager.removeItem(at: session.root)
+            }
+            let status = (error as? LocalSendTransferError)?.localSendHTTPStatus ?? 400
+            respond(connection, status: status, body: error.localizedDescription)
         }
     }
 
@@ -4001,7 +5526,9 @@ final class LocalSendReceiver: @unchecked Sendable {
         guard expected.expectedBytes < 0 || expected.expectedBytes == bytes else { throw LocalSendTransferError.rejected }
         if let sha256 = expected.sha256 {
             let actual = request.digest.finalize().map { String(format: "%02x", $0) }.joined()
-            guard actual.caseInsensitiveCompare(sha256) == .orderedSame else { throw LocalSendTransferError.rejected }
+            guard actual.caseInsensitiveCompare(sha256) == .orderedSame else {
+                throw LocalSendTransferError.checksumMismatch
+            }
         }
         let target = Self.uniqueTarget(root: session.destinationRoot, name: expected.displayName, fileManager: fileManager)
         try fileManager.moveItem(at: temporary, to: target)
@@ -4098,14 +5625,23 @@ enum LocalSendTransferError: LocalizedError {
     case missingToken
     case pinRequired
     case rejected
+    case checksumMismatch
     case invalidResponse
     case receiverAlreadyRunning
+
+    var localSendHTTPStatus: Int {
+        switch self {
+        case .checksumMismatch: return 422
+        default: return 400
+        }
+    }
 
     var errorDescription: String? {
         switch self {
         case .missingToken: return "The LocalSend device did not provide an upload token."
         case .pinRequired: return "The LocalSend device requires a PIN."
         case .rejected: return "The LocalSend device rejected the transfer."
+        case .checksumMismatch: return "Received checksum does not match the request."
         case .invalidResponse: return "The LocalSend device returned an invalid response."
         case .receiverAlreadyRunning: return "LocalSend receiving is already enabled."
         }

@@ -9,7 +9,7 @@ ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 for profile in full offline; do
   profile_args=()
   if [[ "$profile" == "full" ]]; then
-    profile_args=(--no-default-features --features tzap-online)
+    profile_args=(--no-default-features --features auth)
   else
     profile_args=(--no-default-features)
   fi

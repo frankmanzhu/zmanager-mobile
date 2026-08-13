@@ -1,0 +1,20 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Load nested fixture"
+- extendedWaitUntil:
+    visible: "ZIP - 1 entries"
+    timeout: 15000
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- assertVisible: "Start extraction"
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: "Extraction complete: .* files saved to App storage."
+    timeout: 30000

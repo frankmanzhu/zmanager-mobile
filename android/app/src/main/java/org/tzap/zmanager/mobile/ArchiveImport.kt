@@ -139,6 +139,56 @@ object ArchiveImportIntents {
     private fun Intent.firstClipUri(): Uri? = clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
 }
 
+enum class ArchiveAutomationAction { OPEN, EXTRACT, CREATE, VERIFY }
+
+data class ArchiveAutomationRequest(
+    val action: ArchiveAutomationAction,
+    val archiveUri: Uri? = null,
+    val sourceUris: List<Uri> = emptyList()
+)
+
+/** Parses only explicit, password-free automation requests. */
+object ArchiveAutomationIntents {
+    fun parse(intent: Intent): ArchiveAutomationRequest? = intent.data?.let(::parse)
+
+    fun parse(uri: Uri): ArchiveAutomationRequest {
+        require(uri.scheme.equals("zmanager", ignoreCase = true)) { "Unsupported automation scheme." }
+        val action = when (uri.host?.lowercase()) {
+            "open" -> ArchiveAutomationAction.OPEN
+            "extract" -> ArchiveAutomationAction.EXTRACT
+            "create" -> ArchiveAutomationAction.CREATE
+            "verify" -> ArchiveAutomationAction.VERIFY
+            else -> throw IllegalArgumentException("Unsupported automation action.")
+        }
+        uri.queryParameterNames.forEach { key ->
+            require(key.lowercase() !in setOf("password", "pass", "secret", "token", "pin")) {
+                "Passwords and credentials are not accepted by automation."
+            }
+        }
+        return when (action) {
+            ArchiveAutomationAction.CREATE -> {
+                val files = uri.getQueryParameter("files")
+                    ?.split('|')
+                    ?.filter(String::isNotBlank)
+                    ?.map(Uri::parse)
+                    .orEmpty()
+                require(files.isNotEmpty()) { "Create automation requires files." }
+                require(files.all { it.scheme in setOf("content", "file") }) {
+                    "Create automation accepts only local provider URIs."
+                }
+                ArchiveAutomationRequest(action, sourceUris = files)
+            }
+            else -> {
+                val archive = uri.getQueryParameter("archive")?.let(Uri::parse)
+                require(archive != null && archive.scheme in setOf("content", "file")) {
+                    "Archive automation requires a local archive URI."
+                }
+                ArchiveAutomationRequest(action, archiveUri = archive)
+            }
+        }
+    }
+}
+
 object ArchiveImportNames {
     private val unsafeCharacters = Regex("""[\\/:*?"<>|]""")
     private val whitespace = Regex("""\s+""")

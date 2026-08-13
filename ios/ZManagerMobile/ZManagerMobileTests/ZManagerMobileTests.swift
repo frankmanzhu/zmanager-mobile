@@ -4,6 +4,118 @@ import CryptoKit
 @testable import ZManagerMobile
 
 final class ZManagerMobileTests: XCTestCase {
+    func testOperationReportStoreRedactsCredentials() throws {
+        let report = ArchiveOperationReportStore.save(
+            operation: "extract",
+            subject: "archive.zip",
+            status: "completed",
+            message: "Extraction complete",
+            destination: "App storage",
+            entries: 3,
+            verified: nil
+        )
+        defer { try? FileManager.default.removeItem(at: report) }
+        let text = try String(contentsOf: report)
+        XCTAssertTrue(text.contains("Extraction complete"))
+        XCTAssertTrue(text.contains("never included"))
+        XCTAssertFalse(text.contains("password"))
+        XCTAssertFalse(text.contains("transferToken"))
+    }
+
+    func testDefaultExtractionDestinationResetsToAppStorage() {
+        let suiteName = "ZManagerMobileTests.destination-default"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let preferences = ArchiveDestinationPreferences(defaults: defaults)
+        let appStorage = URL(fileURLWithPath: "/tmp/zmanager-mobile-tests/Extracted", isDirectory: true)
+
+        XCTAssertEqual(preferences.defaultExtractionDestination(appStorage: appStorage), .appStorage(appStorage))
+        preferences.setExtractionDestination(.appStorage(appStorage))
+        XCTAssertEqual(preferences.defaultExtractionDestination(appStorage: appStorage), .appStorage(appStorage))
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    func testFailedCommitRecoveryIsRedactedAndDiscardable() throws {
+        let fileManager = FileManager.default
+        let staging = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobileTests-Recovery-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        let output = staging.appendingPathComponent("docs/readme.txt")
+        try fileManager.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("retained".utf8).write(to: output)
+        let store = ArchiveRecoveryStore(fileManager: fileManager)
+        let record = try store.save(
+            archive: ImportedArchive(
+                id: UUID(),
+                displayName: "archive.zip",
+                localPath: "/cache/archive.zip",
+                byteSize: 1,
+                importedAt: Date()
+            ),
+            selectedPaths: ["docs/readme.txt"],
+            stagingRoot: staging,
+            destinationLabel: "Selected folder",
+            message: "Provider failed"
+        )
+        let recordURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ZManagerMobile/ArchiveRecovery/\(record.id.uuidString).json")
+        let text = try String(contentsOf: recordURL)
+        XCTAssertTrue(text.contains("archive.zip"))
+        XCTAssertFalse(text.lowercased().contains("password"))
+        XCTAssertFalse(text.lowercased().contains("token"))
+        XCTAssertEqual(store.files(for: record).count, 1)
+
+        store.discard(record)
+        XCTAssertFalse(fileManager.fileExists(atPath: staging.path))
+    }
+
+    func testStagedRelativePathsRejectTraversalAndAcceptOnlyDescendants() throws {
+        let root = URL(fileURLWithPath: "/tmp/zmanager-staging-root", isDirectory: true)
+        XCTAssertEqual(
+            try ExtractionPathSafety.relativePath(
+                for: root.appendingPathComponent("docs/readme.txt"),
+                under: root
+            ),
+            "docs/readme.txt"
+        )
+        XCTAssertThrowsError(try ExtractionPathSafety.relativePath(
+            for: root.appendingPathComponent("../outside.txt"),
+            under: root
+        ))
+        XCTAssertThrowsError(try ExtractionPathSafety.relativePath(
+            for: URL(fileURLWithPath: "/tmp/outside.txt"),
+            under: root
+        ))
+    }
+
+    func testLocalSendTrustStorePersistsExplicitFingerprintOnly() {
+        let suiteName = "ZManagerMobileTests.localsend-trust"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let store = LocalSendTrustStore(defaults: defaults)
+        let device = LocalSendDevice(
+            id: "192.0.2.1:53317",
+            address: "192.0.2.1",
+            port: 53317,
+            protocolName: "http",
+            alias: "Receiver",
+            version: "2.0",
+            deviceModel: "test",
+            deviceType: "mobile",
+            fingerprint: "trusted-fingerprint",
+            download: false
+        )
+        XCTAssertFalse(store.isTrusted(device))
+        store.remember(device)
+        XCTAssertTrue(store.isTrusted(device))
+        XCTAssertEqual(store.fingerprints(), ["trusted-fingerprint"])
+        store.forget(fingerprint: "trusted-fingerprint")
+        XCTAssertTrue(store.fingerprints().isEmpty)
+        store.forget(device)
+        XCTAssertFalse(store.isTrusted(device))
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
     func testArchiveImportSanitizesDisplayName() {
         XCTAssertEqual(
             ArchiveImportStore.sanitizedDisplayName("../nested/evil:archive.zip"),
@@ -306,6 +418,11 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(json["announce"] as? Bool, true)
     }
 
+    func testLocalSendPinRequiredUsesUnauthorizedStatus() {
+        XCTAssertTrue(LocalSendClient.isPinRequiredStatus(401))
+        XCTAssertFalse(LocalSendClient.isPinRequiredStatus(403))
+    }
+
     func testLocalSendSourceStagerCopiesAndCleansSelectedFiles() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -325,6 +442,21 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: staged.root.path))
     }
 
+    func testCreationSourceStagerWritesPhotoDataAndCleansIt() throws {
+        let stager = ArchiveCreationSourceStager()
+        let staged = try stager.stageData([
+            (name: "photo.jpg", data: Data([1, 2, 3]))
+        ])
+        defer { stager.discard(staged) }
+
+        XCTAssertEqual(staged.sourcePaths.count, 1)
+        XCTAssertEqual(
+            try Data(contentsOf: URL(fileURLWithPath: staged.sourcePaths[0])),
+            Data([1, 2, 3])
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.root.path))
+    }
+
     @MainActor
     func testSceneBackgroundClearsTransientPasswords() {
         let model = ArchiveImportModel()
@@ -333,6 +465,8 @@ final class ZManagerMobileTests: XCTestCase {
         model.testPasswordInput = "test-password"
         model.extractionPasswordInput = "extract-password"
         model.creationPasswordInput = "create-password"
+        model.repackagingPasswordInput = "repackage-password"
+        model.localSendPinInput = "1234"
 
         model.handleSceneBackground()
 
@@ -341,6 +475,59 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertTrue(model.testPasswordInput.isEmpty)
         XCTAssertTrue(model.extractionPasswordInput.isEmpty)
         XCTAssertTrue(model.creationPasswordInput.isEmpty)
+        XCTAssertTrue(model.repackagingPasswordInput.isEmpty)
+        XCTAssertTrue(model.localSendPinInput.isEmpty)
+    }
+
+    @MainActor
+    func testSceneBackgroundStopsLocalSendReceiver() {
+        let model = ArchiveImportModel(
+            localSendReceiver: LocalSendReceiver(port: 53318)
+        )
+        model.startLocalReceive()
+        guard case .receiving = model.localSendState else {
+            return XCTFail("Expected LocalSend receiver to be active")
+        }
+
+        model.handleSceneBackground()
+
+        if case .receiving = model.localSendState {
+            XCTFail("Backgrounding must stop the LocalSend receiver")
+        }
+    }
+
+    @MainActor
+    func testSceneBackgroundDiscardsStagedLocalSendFiles() throws {
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent("localsend-background-(UUID().uuidString).txt")
+        try Data("temporary transfer".utf8).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let model = ArchiveImportModel()
+        model.handleLocalSendFilesResult(.success([source]))
+        XCTAssertEqual(model.localSendSelectedFileCount, 1)
+
+        model.handleSceneBackground()
+
+        XCTAssertEqual(model.localSendSelectedFileCount, 0)
+    }
+
+    func testAutomationParserAcceptsExplicitLocalOpen() throws {
+        let request = try ArchiveAutomationParser.parse(
+            URL(string: "zmanager://open?archive=file:///tmp/archive.zip")!
+        )
+
+        XCTAssertEqual(request.action, .open)
+        XCTAssertEqual(request.archiveURL, URL(fileURLWithPath: "/tmp/archive.zip"))
+        XCTAssertTrue(request.sourceURLs.isEmpty)
+    }
+
+    func testAutomationParserRejectsCredentialQuery() {
+        XCTAssertThrowsError(try ArchiveAutomationParser.parse(
+            URL(string: "zmanager://open?archive=file:///tmp/archive.zip&password=secret")!
+        )) { error in
+            XCTAssertEqual((error as? ArchiveAutomationError), .credentialQuery)
+        }
     }
 
     func testLocalSendReceiverSanitizesIncomingNames() {
@@ -444,6 +631,74 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent(".localsend").appendingPathComponent(sessionID).path))
     }
 
+    func testLocalSendReceiverReturnsChecksumMismatchAndCleansPartialUpload() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let receiver = LocalSendReceiver(port: 53316, fileManager: fileManager)
+        try receiver.start(destinationRoot: root)
+        defer { receiver.stop() }
+
+        let payload = Data("actual".utf8)
+        let fileID = "checksum-file"
+        let prepareBody: [String: Any] = ["files": [fileID: [
+            "id": fileID, "fileName": "checksum.bin", "size": payload.count,
+            "sha256": String(repeating: "0", count: 64)
+        ]]]
+        var prepare = URLRequest(url: URL(string: "http://127.0.0.1:53316/api/localsend/v2/prepare-upload")!)
+        prepare.httpMethod = "POST"
+        prepare.httpBody = try JSONSerialization.data(withJSONObject: prepareBody)
+        let (prepareData, _) = try await URLSession.shared.data(for: prepare)
+        let prepareJSON = try XCTUnwrap(try JSONSerialization.jsonObject(with: prepareData) as? [String: Any])
+        let sessionID = try XCTUnwrap(prepareJSON["sessionId"] as? String)
+        let token = try XCTUnwrap((prepareJSON["files"] as? [String: String])?[fileID])
+        var upload = URLRequest(url: URL(string: "http://127.0.0.1:53316/api/localsend/v2/upload?sessionId=\(sessionID)&fileId=\(fileID)&token=\(token)")!)
+        upload.httpMethod = "POST"
+        upload.httpBody = payload
+        let (_, response) = try await URLSession.shared.data(for: upload)
+
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 422)
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent("checksum.bin").path))
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent(".localsend").appendingPathComponent(sessionID).path))
+    }
+
+    func testLocalSendClientUploadsWithByteProgress() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let receiver = LocalSendReceiver(port: 53315, fileManager: fileManager)
+        try receiver.start(destinationRoot: root)
+        defer { receiver.stop() }
+
+        let source = root.appendingPathComponent("source.bin")
+        try Data((0..<256 * 1024).map { UInt8($0 % 251) }).write(to: source)
+        let file = LocalSendTransferFile(url: source, displayName: "uploaded.bin")
+        let device = LocalSendDevice(
+            id: "127.0.0.1:53315",
+            address: "127.0.0.1",
+            port: 53315,
+            protocolName: "http",
+            alias: "Receiver",
+            version: "2.0",
+            deviceModel: "test",
+            deviceType: "headless",
+            fingerprint: "receiver",
+            download: true
+        )
+        let client = LocalSendClient(alias: "Sender", fingerprint: "sender", port: 0)
+        let session = try await client.prepareUpload(to: device, files: [file])
+        var progress = [(Int64, Int64)]()
+        try await client.upload(to: device, session: session, files: [file]) { _, sent, total in
+            progress.append((sent, total))
+        }
+
+        XCTAssertFalse(progress.isEmpty)
+        XCTAssertEqual(progress.last?.1, Int64(256 * 1024))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("uploaded.bin")), try Data(contentsOf: source))
+    }
+
     func testExtractionCoordinatorCommitsCompletedStagingOutput() async throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -475,6 +730,183 @@ final class ZManagerMobileTests: XCTestCase {
             try Data(contentsOf: root.appendingPathComponent("output/docs/readme.txt")),
             Data("extracted".utf8)
         )
+    }
+
+    func testUnavailableSecurityScopedDestinationRetainsRecoveryRecord() async throws {
+        let fileManager = FileManager.default
+        let bridge = FakeArchiveBridgeClient()
+        bridge.onStartExtraction = { stagingPath in
+            let output = URL(fileURLWithPath: stagingPath).appendingPathComponent("docs/readme.txt")
+            try fileManager.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("extracted".utf8).write(to: output)
+        }
+        let coordinator = ArchiveExtractionCoordinator(bridge: bridge, fileManager: fileManager)
+        let destination = ExtractionDestination.folder(
+            URL(fileURLWithPath: "/definitely-missing-zmanager-destination")
+        )
+        let review = try coordinator.plan(
+            archive: testImportedArchive(),
+            selectedPaths: ["docs/readme.txt"],
+            destination: destination,
+            password: nil,
+            collisionPolicy: .refuse
+        )
+
+        let outcome = try await coordinator.awaitCompletion(
+            review: review,
+            jobId: try coordinator.start(review: review)
+        ) { _ in }
+
+        guard case .recoveryAvailable(let id, _) = outcome else {
+            return XCTFail("Expected recovery for an unavailable provider destination.")
+        }
+        XCTAssertEqual(coordinator.recoveryFiles(coordinator.recoveries().first { $0.id == id }!).count, 1)
+        if let record = coordinator.recoveries().first(where: { $0.id == id }) {
+            coordinator.discardRecovery(record)
+        }
+    }
+
+    func testBatchExtractionRunsIndependentArchivesAndReportsEachResult() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let bridge = FakeArchiveBridgeClient()
+        bridge.onStartExtraction = { stagingPath in
+            let output = URL(fileURLWithPath: stagingPath).appendingPathComponent("docs/readme.txt")
+            try fileManager.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("extracted".utf8).write(to: output)
+        }
+        let extraction = ArchiveExtractionCoordinator(bridge: bridge, fileManager: fileManager)
+        let batch = BatchExtractionCoordinator(extraction: extraction)
+        let first = testImportedArchive()
+        let second = ImportedArchive(
+            id: UUID(),
+            displayName: "second.zip",
+            localPath: "/cache/second.zip",
+            byteSize: 12,
+            importedAt: Date(timeIntervalSince1970: 0)
+        )
+        let review = try batch.plan(items: [
+            BatchExtractionItem(
+                archive: first,
+                selectedPaths: ["docs/readme.txt"],
+                destination: .appStorage(root.appendingPathComponent("first", isDirectory: true))
+            ),
+            BatchExtractionItem(
+                archive: second,
+                selectedPaths: ["docs/readme.txt"],
+                destination: .appStorage(root.appendingPathComponent("second", isDirectory: true))
+            )
+        ])
+
+        guard case .completed(let results) = await batch.run(review: review) else {
+            return XCTFail("Expected the batch to complete")
+        }
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(
+            results.allSatisfy { $0.status == .completed },
+            results.map { $0.message ?? "completed" }.joined(separator: " | ")
+        )
+        XCTAssertEqual(results.map(\.writtenEntries), [1, 1])
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("second/docs/readme.txt")),
+            Data("extracted".utf8)
+        )
+    }
+
+    func testPinnedBridgeAcceptsEncryptedFixturePasswordForExtraction() async throws {
+        let appBundle = try XCTUnwrap(Bundle(identifier: "org.tzap.zmanager.mobile"))
+        let fixture = try XCTUnwrap(appBundle.url(forResource: "maestro-encrypted", withExtension: "zip"))
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let archive = root.appendingPathComponent("encrypted.zip")
+        try fileManager.copyItem(at: fixture, to: archive)
+
+        let bridge = GeneratedArchiveBridgeClient()
+        let plan = try bridge.planExtraction(
+            path: archive.path,
+            destinationRoot: root.appendingPathComponent("output", isDirectory: true).path,
+            selectedPaths: ["maestro-inner.zip"],
+            password: ["v2", "test", "password"].joined(),
+            collisionPolicy: .refuse
+        )
+        let job = try bridge.startExtraction(
+            path: archive.path,
+            destinationRoot: plan.destinationRoot,
+            selectedPaths: ["maestro-inner.zip"],
+            password: ["v2", "test", "password"].joined(),
+            collisionPolicy: .refuse,
+            planToken: plan.planToken
+        )
+        var cursor: UInt64 = 0
+        var terminal = false
+        for _ in 0..<100 {
+            let update = try bridge.pollExtractionJob(jobId: job.jobId, cursor: cursor)
+            cursor = update.nextCursor
+            if update.isTerminal {
+                XCTAssertEqual(update.status, .completed)
+                terminal = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(terminal)
+        XCTAssertTrue(fileManager.fileExists(atPath: root.appendingPathComponent("output/maestro-inner.zip").path))
+    }
+
+    func testPinnedRepackagingCanDiscardPasswordFailureAndRetryWithPassword() async throws {
+        let appBundle = try XCTUnwrap(Bundle(identifier: "org.tzap.zmanager.mobile"))
+        let fixture = try XCTUnwrap(appBundle.url(forResource: "maestro-encrypted", withExtension: "zip"))
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let archivePath = root.appendingPathComponent("encrypted.zip")
+        try fileManager.copyItem(at: fixture, to: archivePath)
+        let archive = ImportedArchive(
+            id: UUID(),
+            displayName: "encrypted.zip",
+            localPath: archivePath.path,
+            byteSize: 348,
+            importedAt: Date()
+        )
+        let coordinator = ArchiveRepackagingCoordinator()
+        let output = root.appendingPathComponent("repackaged.zip")
+
+        let firstReview = try coordinator.plan(
+            request: ArchiveRepackagingRequest(
+                sourceArchive: archive,
+                selectedPaths: ["maestro-inner.zip"],
+                destinationArchivePath: output.path,
+                format: .zip,
+                sourcePassword: nil,
+                destinationPassword: nil
+            )
+        )
+        let firstOutcome = await coordinator.run(review: firstReview)
+        guard case .passwordRequired = firstOutcome else {
+            return XCTFail("Expected the first repackaging attempt to require a password.")
+        }
+        coordinator.discard(review: firstReview)
+
+        let retryReview = try coordinator.plan(
+            request: ArchiveRepackagingRequest(
+                sourceArchive: archive,
+                selectedPaths: ["maestro-inner.zip"],
+                destinationArchivePath: output.path,
+                format: .zip,
+                sourcePassword: ["v2", "test", "password"].joined(),
+                destinationPassword: nil
+            )
+        )
+        let retryOutcome = await coordinator.run(review: retryReview)
+        guard case .completed(_, let verified) = retryOutcome else {
+            return XCTFail("Expected the password retry to complete: \(retryOutcome)")
+        }
+        XCTAssertTrue(verified)
+        XCTAssertTrue(fileManager.fileExists(atPath: output.path))
     }
 
     private func testImportedArchive() -> ImportedArchive {

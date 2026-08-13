@@ -27,6 +27,8 @@ data class LocalSendReceivedFile(
 
 data class LocalSendReceiverSession(val port: Int, val destinationRoot: File)
 
+class LocalSendChecksumMismatchException : IOException("Received checksum does not match the request.")
+
 /**
  * Small, app-owned LocalSend upload receiver. It accepts only the v2 upload
  * endpoints and never writes outside the selected app-owned destination.
@@ -198,8 +200,10 @@ class LocalSendReceiver(
                 }
             }
             check(expected.expectedBytes < 0 || expected.expectedBytes == written) { "Received size does not match the request." }
-            check(expected.expectedSha256 == null || expected.expectedSha256.equals(digest.hex(), ignoreCase = true)) {
-                "Received checksum does not match the request."
+            if (expected.expectedSha256 != null &&
+                !expected.expectedSha256.equals(digest.hex(), ignoreCase = true)
+            ) {
+                throw LocalSendChecksumMismatchException()
             }
             val target = uniqueTarget(session.destinationRoot, expected.displayName)
             check(part.renameTo(target)) { "Unable to commit received file." }
@@ -211,9 +215,15 @@ class LocalSendReceiver(
                 session.root.deleteRecursively()
             }
             respond(output, 200, "OK")
-        }.onFailure {
+        }.onFailure { error ->
             part.delete()
-            respond(output, 400, it.message ?: "Upload rejected")
+            sessions.remove(session.id, session)
+            session.root.deleteRecursively()
+            respond(
+                output,
+                if (error is LocalSendChecksumMismatchException) 422 else 400,
+                error.message ?: "Upload rejected"
+            )
         }
     }
 

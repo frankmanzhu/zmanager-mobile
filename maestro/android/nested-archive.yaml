@@ -6,6 +6,9 @@ appId: org.tzap.zmanager.mobile
     clearState: true
 - assertVisible: "ZManager"
 - tapOn: "Load nested fixture"
+- scrollUntilVisible:
+    element: "ZIP - 1 entries"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "ZIP - 1 entries"
     timeout: 15000
@@ -15,10 +18,9 @@ appId: org.tzap.zmanager.mobile
     duration: 500
 - assertVisible: "maestro-inner.zip"
 - tapOn: "Open"
-- swipe:
-    start: 50%, 25%
-    end: 50%, 80%
-    duration: 500
+- scrollUntilVisible:
+    element: "ZIP - 1 entries"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "ZIP - 1 entries"
     timeout: 15000
@@ -32,10 +34,9 @@ appId: org.tzap.zmanager.mobile
     end: 50%, 80%
     duration: 500
 - tapOn: "Back"
-- swipe:
-    start: 50%, 25%
-    end: 50%, 80%
-    duration: 500
+- scrollUntilVisible:
+    element: "maestro-nested.zip"
+    direction: UP
 - assertVisible: "maestro-nested.zip"
 - swipe:
     start: 50%, 80%

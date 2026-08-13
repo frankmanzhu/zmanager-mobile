@@ -111,6 +111,38 @@ private object ArchiveImportMetadataForSharing {
 
 data class LocalSendUploadSession(val sessionId: String, val tokens: Map<String, String>)
 
+/** Stores only user-approved LocalSend fingerprints, never addresses or secrets. */
+class LocalSendTrustStore(context: Context) {
+    private val preferences = context.getSharedPreferences("localsend_trust", Context.MODE_PRIVATE)
+
+    fun isTrusted(device: LocalSendDevice): Boolean =
+        device.fingerprint?.let { preferences.getBoolean("fingerprint.$it", false) } == true
+
+    fun remember(device: LocalSendDevice) {
+        device.fingerprint?.let {
+            preferences.edit().putBoolean("fingerprint.$it", true).apply()
+        }
+    }
+
+    fun forget(device: LocalSendDevice) {
+        device.fingerprint?.let {
+            preferences.edit().remove("fingerprint.$it").apply()
+        }
+    }
+
+    fun forgetFingerprint(fingerprint: String) {
+        preferences.edit().remove("fingerprint.$fingerprint").apply()
+    }
+
+    fun fingerprints(): List<String> = preferences.all.keys
+        .asSequence()
+        .filter { it.startsWith("fingerprint.") }
+        .filter { preferences.getBoolean(it, false) }
+        .map { it.removePrefix("fingerprint.") }
+        .sorted()
+        .toList()
+}
+
 class LocalSendPinRequiredException : IOException("The LocalSend device requires a PIN.")
 
 class LocalSendRequestException(val statusCode: Int) : IOException(
@@ -132,6 +164,8 @@ object LocalSendProtocol {
     const val multicastAddress = "224.0.0.167"
     const val defaultPort = 53317
     const val protocolVersion = "2.0"
+
+    fun isPinRequiredStatus(statusCode: Int): Boolean = statusCode == 401
 
     fun announcement(
         alias: String,
@@ -178,6 +212,24 @@ class LocalSendClient(
     private val fingerprint: String = UUID.randomUUID().toString(),
     private val port: Int = LocalSendProtocol.defaultPort
 ) {
+    constructor(
+        context: Context,
+        alias: String = "ZManager Mobile",
+        port: Int = LocalSendProtocol.defaultPort
+    ) : this(alias, stableFingerprint(context), port)
+
+    companion object {
+        private const val IDENTITY_PREFS = "localsend_identity"
+        private const val FINGERPRINT_KEY = "fingerprint"
+
+        private fun stableFingerprint(context: Context): String {
+            val preferences = context.getSharedPreferences(IDENTITY_PREFS, Context.MODE_PRIVATE)
+            return preferences.getString(FINGERPRINT_KEY, null) ?: UUID.randomUUID().toString().also {
+                preferences.edit().putString(FINGERPRINT_KEY, it).apply()
+            }
+        }
+    }
+
     private val cancelled = AtomicBoolean(false)
 
     fun cancel() { cancelled.set(true) }
@@ -296,7 +348,9 @@ class LocalSendClient(
             }
             val response = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
             if (connection.responseCode !in 200..299) {
-                if (connection.responseCode == 403) throw LocalSendPinRequiredException()
+                if (LocalSendProtocol.isPinRequiredStatus(connection.responseCode)) {
+                    throw LocalSendPinRequiredException()
+                }
                 throw LocalSendRequestException(connection.responseCode)
             }
             return response?.bufferedReader()?.use { it.readText() }.orEmpty()

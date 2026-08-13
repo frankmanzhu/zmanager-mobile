@@ -20,9 +20,8 @@ different mobile-relative location. `ZMANAGER_DIR` is an absolute or
 mobile-relative override; `ZMANAGER_COMMIT`, `ZMANAGER_REPOSITORY`, and
 `ZMANAGER_CACHE_ROOT` are also available for controlled overrides.
 `check-rust.sh` runs the `zmanager-ffi` tests from the resolved checkout in
-both the explicit `full` (`--features tzap-online`) and `offline`
-(`--no-default-features`) profiles. The pinned default is the zmanager
-`1e5554e` profile-aware checkout; set `ZMANAGER_DIR` and `ZMANAGER_COMMIT`
+both the explicit `full` (`--features auth`) and `offline`
+(`--no-default-features`) profiles. Set `ZMANAGER_DIR` and `ZMANAGER_COMMIT`
 explicitly when validating another checked-out revision.
 
 ## Android
