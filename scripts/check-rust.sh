@@ -6,4 +6,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 
-cargo test --manifest-path "$ZMANAGER_DIR/Cargo.toml" -p zmanager-ffi
+for profile in full offline; do
+  profile_args=()
+  if [[ "$profile" == "full" ]]; then
+    profile_args=(--no-default-features --features tzap-online)
+  else
+    profile_args=(--no-default-features)
+  fi
+  cargo test --manifest-path "$ZMANAGER_DIR/Cargo.toml" -p zmanager-ffi "${profile_args[@]}"
+done

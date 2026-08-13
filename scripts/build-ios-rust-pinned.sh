@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/zmanager-paths.sh"
 ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 export ZMANAGER_DIR
+export ZMANAGER_TZAP_PROFILE="${ZMANAGER_TZAP_PROFILE:-offline}"
 
 "$ZMANAGER_DIR/scripts/build-ios-rust.sh"
 mkdir -p "$ROOT_DIR/ios/ZManagerMobile/build/rust"

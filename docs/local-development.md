@@ -19,7 +19,11 @@ the sibling `../zmanager` checkout. Set
 different mobile-relative location. `ZMANAGER_DIR` is an absolute or
 mobile-relative override; `ZMANAGER_COMMIT`, `ZMANAGER_REPOSITORY`, and
 `ZMANAGER_CACHE_ROOT` are also available for controlled overrides.
-`check-rust.sh` runs the `zmanager-ffi` tests from the resolved checkout.
+`check-rust.sh` runs the `zmanager-ffi` tests from the resolved checkout in
+both the explicit `full` (`--features tzap-online`) and `offline`
+(`--no-default-features`) profiles. The pinned default is the zmanager
+`1e5554e` profile-aware checkout; set `ZMANAGER_DIR` and `ZMANAGER_COMMIT`
+explicitly when validating another checked-out revision.
 
 ## Android
 
@@ -31,7 +35,7 @@ scripts/check-android.sh
 
 The script uses `./gradlew` when present, then an installed `gradle`, then the locally cached Gradle 8.9 distribution. It honors an existing `JAVA_HOME`; when `JAVA_HOME` is unset, it falls back to Android Studio's bundled JBR. Android Gradle Plugin 8.7 requires JDK 17, and this project is validated with Liberica JDK 17.0.20.
 
-Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. That script builds `zmanager-ffi` from the pinned checkout and copies the generated arm64 libraries into the ignored `android/app/src/main/jniLibs/arm64-v8a/` directory. Set `ZMANAGER_RELATIVE_DIR`, `ZMANAGER_DIR`, `ZMANAGER_COMMIT`, `ANDROID_NDK_HOME`, `ANDROID_NDK_VERSION`, or `ANDROID_API_LEVEL` when the defaults do not match the local machine.
+Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. That script builds the offline `zmanager-ffi` profile by default and copies the generated arm64 libraries into the ignored `android/app/src/main/jniLibs/arm64-v8a/` directory. Set `ZMANAGER_TZAP_PROFILE=full` when a hosted-auth build is required. You can also set `ZMANAGER_RELATIVE_DIR`, `ZMANAGER_DIR`, `ZMANAGER_COMMIT`, `ANDROID_NDK_HOME`, `ANDROID_NDK_VERSION`, or `ANDROID_API_LEVEL` when the defaults do not match the local machine.
 
 ## Maestro UI tests
 
@@ -98,7 +102,7 @@ Generated Android Kotlin is written to `android/app/src/main/java/org/tzap/zmana
 
 Generated iOS Swift/modulemap/header files are written to `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
 
-The iOS Xcode "Build Rust Bridge" phase invokes `scripts/build-ios-rust-pinned.sh`, which builds the pinned checkout and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`.
+The iOS Xcode "Build Rust Bridge" phase invokes `scripts/build-ios-rust-pinned.sh`, which builds the pinned checkout's offline profile by default and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`. Set `ZMANAGER_TZAP_PROFILE=full` for a hosted-auth build.
 
 Do not check generated native binary artifacts into the repository by default. Platform build integration should build or copy those artifacts explicitly.
 

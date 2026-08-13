@@ -9,6 +9,19 @@ ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION
 ANDROID_API_LEVEL="${ANDROID_API_LEVEL:-35}"
 TARGET="aarch64-linux-android"
 ABI="arm64-v8a"
+TZAP_PROFILE_ARGS=()
+case "${ZMANAGER_TZAP_PROFILE:-offline}" in
+  full)
+    TZAP_PROFILE_ARGS=(--no-default-features --features tzap-online)
+    ;;
+  offline)
+    TZAP_PROFILE_ARGS=(--no-default-features)
+    ;;
+  *)
+    echo "ZMANAGER_TZAP_PROFILE must be full or offline" >&2
+    exit 2
+    ;;
+esac
 if [[ -d "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-arm64" ]]; then
   NDK_HOST="darwin-arm64"
 elif [[ -d "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64" ]]; then
@@ -64,6 +77,7 @@ export PATH="$TEMP_TOOL_BIN:$TOOLCHAIN_DIR/bin:$PATH"
 cargo rustc \
   --manifest-path "$ZMANAGER_DIR/Cargo.toml" \
   -p zmanager-ffi \
+  "${TZAP_PROFILE_ARGS[@]}" \
   --target "$TARGET" \
   --release \
   --lib \

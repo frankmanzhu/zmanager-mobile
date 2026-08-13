@@ -5,7 +5,7 @@ set -euo pipefail
 
 : "${ROOT_DIR:?ROOT_DIR must be set before sourcing zmanager-paths.sh}"
 
-ZMANAGER_COMMIT="${ZMANAGER_COMMIT:-f65d23385ae583462f6d9e68dd84c6fcae1ec89c}"
+ZMANAGER_COMMIT="${ZMANAGER_COMMIT:-1e5554e}"
 ZMANAGER_RELATIVE_DIR="${ZMANAGER_RELATIVE_DIR:-.cache/zmanager}"
 if [[ -n "${ZMANAGER_DIR:-}" ]]; then
   ZMANAGER_DIR_OVERRIDE=1
