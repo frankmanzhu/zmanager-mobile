@@ -1,6 +1,6 @@
 # Mobile Follow-up Implementation Plan
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-14
 
 ## Purpose
 
@@ -41,9 +41,9 @@ The repository already has:
 - existing Maestro workflows for archive import/listing/testing and extraction
   fixtures.
 
-The main missing pieces are native create UI/coordinators, nested archive
-session navigation, LocalSend transport, and the corresponding device-level
-tests.
+The remaining work is concentrated in persistent LocalSend trust/pinning policy
+and reverse-transfer compatibility, lifecycle/background behavior, and broader
+device/E2E coverage.
 
 Implementation status for the current workstream:
 
@@ -57,25 +57,31 @@ Implementation status for the current workstream:
   native review checkpoint before the jobs start.
 - Android and iOS have outbound LocalSend primitives with v2.2 metadata,
   multicast discovery, HTTP registration fallback, upload preparation,
-  SHA-256 metadata, upload, cancellation, and visible transfer cancellation;
-  Android also reports upload byte progress. Both shells have an app-owned
-  upload receiver with token, size, checksum, traversal, and staging-cleanup
-  validation.
+  SHA-256 metadata, upload, cancellation, visible transfer cancellation, and
+  transient PIN-required retry UX. Each send now requires an explicit
+  device/address/fingerprint confirmation; no persistent trust decision is
+  stored yet.
+  Both shells can share the active archive or arbitrary selected files, expose
+  validated upload receivers with registration responses, and export validated
+  incoming files to an Android SAF or iOS security-scoped destination while
+  keeping receiver writes app-staged.
 - Multipart nested entries are explicitly rejected as single-file nested
   archives until volume grouping is implemented.
 - Deterministic nested and create/repackage fixtures are bundled in both
   shells. Nested browsing, native-folder creation, archive-folder
   repackaging, and receive-mode lifecycle Maestro flows pass on Android and
   iOS simulators.
-- Android unit tests (25 tests) and iOS XCTest coverage (17 tests) pass for the
-  current bridge/coordinator/protocol coverage. A controlled LocalSend peer
-  upload passes against Android through an adb-forwarded socket, and the iOS
-  simulator runs the same validated upload path in XCTest.
+- Android unit tests (31 tests) and iOS XCTest coverage (25 tests) pass for the
+  current bridge/coordinator/protocol coverage. Android ActivityScenario
+  instrumentation and iOS UI-test launch coverage also pass on their
+  respective simulators. Controlled Android and iOS Maestro flows pass for
+  nested browsing, archive repackaging, and receive lifecycle. A controlled
+  LocalSend peer upload passes against Android through an adb-forwarded socket,
+  and the iOS simulator runs the same validated upload path in XCTest.
 
-Remaining launch work is full output/export/share polish and arbitrary-file
-selection, user-selected receive destinations, LocalSend trust/PIN UX,
+Remaining launch work is persistent device trust/pinning policy,
 reverse-download support if required, lifecycle/background hardening,
-repackaging password-retry UX, native SAF/security-scoped instrumentation,
+repackaging password-retry UX, native SAF/security-scoped picker coverage,
 accessibility/device-matrix coverage, and cancellation-cleanup E2E for large
 transfers and archive jobs.
 

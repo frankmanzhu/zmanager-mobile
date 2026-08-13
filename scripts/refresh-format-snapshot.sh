@@ -7,7 +7,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONTRACT="$ROOT_DIR/../zmanager/crates/zmanager-cli/contracts/archive-formats.json"
+ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
+CONTRACT="$ZMANAGER_DIR/crates/zmanager-cli/contracts/archive-formats.json"
 SNAPSHOT="$ROOT_DIR/android/app/src/test/resources/format-capabilities.json"
 
 if [[ ! -f "$CONTRACT" ]]; then

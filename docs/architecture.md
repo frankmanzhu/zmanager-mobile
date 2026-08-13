@@ -83,7 +83,7 @@ ios/
     ZManagerMobile.xcodeproj/
     ZManagerMobile/
 
-../zmanager/
+.cache/zmanager/
   crates/zmanager-ffi/
   crates/zmanager-core/
 ```

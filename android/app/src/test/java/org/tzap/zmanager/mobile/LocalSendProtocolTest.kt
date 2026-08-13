@@ -9,9 +9,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
 class LocalSendProtocolTest {
+    @Test
+    fun selectedProviderFilesAreStagedForSharingAndCleanedUp() {
+        val context = RuntimeEnvironment.getApplication()
+        val source = File.createTempFile("localsend-source", ".txt")
+        source.writeText("share me")
+        var staged: StagedLocalSendFiles? = null
+        try {
+            staged = LocalSendSourceStager(context).stageUris(listOf(android.net.Uri.fromFile(source)))
+            assertEquals("share me", staged.files.single().file.readText())
+            assertTrue(staged.root.path.startsWith(context.cacheDir.path))
+            assertEquals(source.name, staged.files.single().displayName)
+        } finally {
+            staged?.let(LocalSendSourceStager(context)::discard)
+            source.delete()
+        }
+        assertTrue(!staged!!.root.exists())
+    }
+
     @Test
     fun prepareUploadUsesLocalSendV2MetadataShape() {
         val file = File.createTempFile("localsend", ".zip")
@@ -44,7 +63,8 @@ class LocalSendProtocolTest {
     @Test
     fun receiverStagesAndCommitsAValidatedUpload() {
         val root = createTempDir(prefix = "localsend-receiver")
-        val receiver = LocalSendReceiver(requestedPort = 0)
+        var callbackFile: LocalSendReceivedFile? = null
+        val receiver = LocalSendReceiver(requestedPort = 0, onFileCommitted = { callbackFile = it })
         try {
             val session = receiver.start(root)
             val fileId = "file-1"
@@ -72,6 +92,7 @@ class LocalSendProtocolTest {
             val committed = root.listFiles()?.firstOrNull { it.name == "archive.zip" }
             assertTrue(committed?.isFile == true)
             assertEquals("received archive", committed?.readText())
+            assertEquals("archive.zip", callbackFile?.displayName)
             assertTrue(root.resolve(".localsend").walkTopDown().none { it.isFile })
         } finally {
             receiver.stop()
@@ -83,6 +104,64 @@ class LocalSendProtocolTest {
     fun receiverRejectsTraversalNamesBeforeWriting() {
         assertEquals("evil.zip", LocalSendReceiver.sanitizeIncomingName("../../evil.zip"))
         assertEquals("received-file", LocalSendReceiver.sanitizeIncomingName("../"))
+    }
+
+    @Test
+    fun receiverStreamsAndChecksumsLargeUploadsWithoutBuffering() {
+        val root = createTempDir(prefix = "localsend-large")
+        val receiver = LocalSendReceiver(requestedPort = 0)
+        try {
+            val session = receiver.start(root)
+            val payload = ByteArray(8 * 1024 * 1024) { (it % 251).toByte() }
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(payload).joinToString("") { "%02x".format(it) }
+            val fileId = "large-file"
+            val prepare = postJson(
+                session.port,
+                "/api/localsend/v2/prepare-upload",
+                JSONObject().put("files", JSONObject().put(fileId, JSONObject()
+                    .put("id", fileId)
+                    .put("fileName", "large.bin")
+                    .put("size", payload.size)
+                    .put("sha256", digest)))
+            )
+            val prepareJson = JSONObject(prepare.body)
+            val token = prepareJson.getJSONObject("files").getString(fileId)
+            val uploaded = postBytes(
+                session.port,
+                "/api/localsend/v2/upload?sessionId=${prepareJson.getString("sessionId")}&fileId=$fileId&token=$token",
+                payload
+            )
+            assertEquals(200, uploaded.code)
+            assertEquals(payload.toList(), root.resolve("large.bin").readBytes().toList())
+            assertTrue(root.resolve(".localsend").walkTopDown().none { it.isFile })
+        } finally {
+            receiver.stop()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun receiverAnswersHttpRegistrationWithItsReachablePort() {
+        val root = createTempDir(prefix = "localsend-register")
+        val receiver = LocalSendReceiver(requestedPort = 0, fingerprint = "receiver-fingerprint")
+        try {
+            val session = receiver.start(root)
+            val response = postJson(
+                session.port,
+                "/api/localsend/v2/register",
+                LocalSendProtocol.announcement("Sender", "sender-fingerprint").put("announce", false)
+            )
+            assertEquals(200, response.code)
+            val announcement = JSONObject(response.body)
+            assertEquals("receiver-fingerprint", announcement.getString("fingerprint"))
+            assertEquals(session.port, announcement.getInt("port"))
+            assertEquals(false, announcement.getBoolean("announce"))
+            assertTrue(announcement.getBoolean("download"))
+        } finally {
+            receiver.stop()
+            root.deleteRecursively()
+        }
     }
 
     private fun postJson(port: Int, path: String, body: JSONObject): HttpResult =

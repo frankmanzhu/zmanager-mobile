@@ -33,7 +33,7 @@ See [docs/mobile-product-design.md](docs/mobile-product-design.md) for the expan
 ## Local Checks
 
 ```sh
-scripts/check-rust.sh     # runs zmanager-ffi tests in the sibling zmanager repo
+scripts/check-rust.sh     # runs zmanager-ffi tests in the pinned checkout
 scripts/check-android.sh
 scripts/check-ios.sh
 ```
@@ -41,10 +41,10 @@ scripts/check-ios.sh
 Regenerate UniFFI bindings after bridge UDL or config changes:
 
 ```sh
-../zmanager/scripts/regenerate-bindings.sh
+scripts/regenerate-bindings-pinned.sh
 ```
 
-Generated Android bindings live in `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`. Generated iOS bindings live in `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`. Native binary artifacts are built or copied by platform integration and are not checked in by default; the iOS Xcode build phase invokes `zmanager/scripts/build-ios-rust.sh`.
+Generated Android bindings live in `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`. Generated iOS bindings live in `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`. Native binary artifacts are built or copied by platform integration and are not checked in by default; the iOS Xcode build phase invokes `scripts/build-ios-rust-pinned.sh`.
 
 ## Initial Targets
 

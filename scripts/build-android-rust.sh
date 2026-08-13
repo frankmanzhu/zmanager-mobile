@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ZMANAGER_DIR="${ZMANAGER_DIR:-$ROOT_DIR/../zmanager}"
+ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
 ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-28.2.13676358}"
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION}"

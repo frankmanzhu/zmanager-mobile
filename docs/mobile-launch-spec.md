@@ -1,6 +1,6 @@
 # ZManager Mobile Launch Specification
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-14
 
 ## Purpose
 
@@ -69,15 +69,19 @@ Before release, Android and iOS device E2E must cover at minimum:
   interrupted flows.
 
 Current verification status: deterministic nested browsing, native-folder
-creation, archive-folder repackaging, and receive-mode lifecycle flows pass on
-both Android and iOS simulators. Android unit tests (25) and iOS XCTest
-coverage (17) pass. A controlled LocalSend peer upload has passed against the
-Android receiver, and the iOS simulator validates the same upload protocol in
-XCTest, including checksum, traversal-safe naming, destination commit, and
-staging cleanup. The complete release gate remains open for user-selected
-receive destinations, arbitrary-file share/export, trust/PIN UX, large-job
-cancellation cleanup, lifecycle/background behavior, accessibility, native
-picker instrumentation, and physical-device compatibility coverage.
+creation, archive-folder repackaging, receive-mode lifecycle, arbitrary-file
+sharing, LocalSend registration, selected-destination export, and transient
+PIN-required retry paths pass in the Android/iOS test suites and simulator
+builds. Android unit tests (31), Android ActivityScenario instrumentation, and
+iOS XCTest coverage (25) plus iOS UI-test launch coverage pass. Controlled
+Android and iOS Maestro flows pass for nested browsing, archive repackaging,
+and receive lifecycle. A controlled LocalSend peer upload has passed against
+the Android receiver, and the iOS simulator validates the same upload protocol
+in XCTest, including checksum, traversal-safe naming, destination commit, and
+staging cleanup. The complete release gate remains open for persistent device
+trust/pinning policy, large-job cancellation cleanup,
+lifecycle/background behavior, accessibility, native picker instrumentation,
+and physical-device compatibility coverage.
 
 ## Product Contract
 

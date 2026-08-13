@@ -6,10 +6,13 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var importModel = ArchiveImportModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isFileImporterPresented = false
     @State private var isDestinationPickerPresented = false
     @State private var isCreationFilesImporterPresented = false
     @State private var isCreationFolderImporterPresented = false
+    @State private var isLocalSendFilesImporterPresented = false
+    @State private var isLocalSendReceiveDestinationPickerPresented = false
 
     var body: some View {
         ScrollView {
@@ -103,10 +106,17 @@ struct ContentView: View {
             )
             LocalSendPanel(
                 archive: importModel.importedArchive,
+                selectedFileCount: importModel.localSendSelectedFileCount,
                 state: importModel.localSendState,
                 onDiscover: importModel.discoverLocalSendDevices,
-                onSend: { importModel.sendCurrentArchive(to: $0) },
+                onChooseFiles: { isLocalSendFilesImporterPresented = true },
+                onClearFiles: importModel.clearLocalSendSelection,
+                onSend: { importModel.pendingLocalSendDevice = $0 },
+                pinInput: $importModel.localSendPinInput,
+                onSubmitPin: { device, pin in importModel.sendSelectedFiles(to: device, pin: pin) },
                 onCancelSend: importModel.cancelLocalSend,
+                receiveDestinationLabel: importModel.localSendReceiveDestinationLabel,
+                onChooseReceiveDestination: { isLocalSendReceiveDestinationPickerPresented = true },
                 onStartReceive: importModel.startLocalReceive,
                 onStopReceive: importModel.stopLocalReceive
             )
@@ -225,8 +235,54 @@ struct ContentView: View {
         ) { result in
             importModel.handleCreationFolderResult(result)
         }
+        .fileImporter(
+            isPresented: $isLocalSendFilesImporterPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            importModel.handleLocalSendFilesResult(result)
+        }
+        .fileImporter(
+            isPresented: $isLocalSendReceiveDestinationPickerPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            importModel.handleLocalSendReceiveDestinationResult(result)
+        }
         .onOpenURL { url in
             importModel.importExternalURL(url)
+        }
+        .alert(
+            "Confirm local transfer",
+            isPresented: Binding(
+                get: { importModel.pendingLocalSendDevice != nil },
+                set: { if !$0 { importModel.pendingLocalSendDevice = nil } }
+            )
+        ) {
+            Button("Send") {
+                guard let device = importModel.pendingLocalSendDevice else { return }
+                importModel.pendingLocalSendDevice = nil
+                importModel.sendSelectedFiles(to: device)
+            }
+            Button("Cancel", role: .cancel) {
+                importModel.pendingLocalSendDevice = nil
+            }
+        } message: {
+            if let device = importModel.pendingLocalSendDevice {
+                Text(
+                    "Send the selected archive or files to \(device.alias)?\n" +
+                    "Address: \(device.address)\n" +
+                    "Fingerprint: \(device.fingerprint ?? "Unavailable")\n" +
+                    "Only continue if you recognize this device and fingerprint."
+                )
+            } else {
+                Text("")
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background || phase == .inactive {
+                importModel.handleSceneBackground()
+            }
         }
         .sheet(
             item: $importModel.previewDocument,
@@ -380,6 +436,54 @@ struct ArchiveCreationSourceStager {
             try? fileManager.removeItem(at: root)
             throw error
         }
+    }
+
+    private func uniqueTarget(root: URL, name: String) -> URL {
+        let safeName = name.isEmpty ? "file" : name
+        var candidate = root.appendingPathComponent(safeName)
+        var index = 1
+        while fileManager.fileExists(atPath: candidate.path) {
+            let base = candidate.deletingPathExtension().lastPathComponent
+            let ext = candidate.pathExtension
+            let next = ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)"
+            candidate = root.appendingPathComponent(next)
+            index += 1
+        }
+        return candidate
+    }
+}
+
+/// Copies security-scoped selections into private files before LocalSend reads them.
+struct LocalSendSourceStager {
+    let fileManager: FileManager
+
+    init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+    }
+
+    func stageFiles(_ urls: [URL]) throws -> StagedCreationSources {
+        guard !urls.isEmpty else { throw ArchiveImportError.emptySelection }
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/LocalSendSources/\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        do {
+            var paths: [String] = []
+            for url in urls {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
+                try fileManager.copyItem(at: url, to: target)
+                paths.append(target.path)
+            }
+            return StagedCreationSources(root: root, sourcePaths: paths)
+        } catch {
+            try? fileManager.removeItem(at: root)
+            throw error
+        }
+    }
+
+    func discard(_ staged: StagedCreationSources) {
+        try? fileManager.removeItem(at: staged.root)
     }
 
     private func uniqueTarget(root: URL, name: String) -> URL {
@@ -1579,6 +1683,8 @@ final class ArchiveImportModel: ObservableObject {
     @Published var creationFormat: CreateArchiveFormat = .zip
     @Published var creationPasswordInput = ""
     @Published var localSendState: LocalSendUIState = .idle
+    @Published var localSendPinInput = ""
+    @Published var pendingLocalSendDevice: LocalSendDevice?
 
     private let importStore: ArchiveImportStore
     private let listingLoader: ArchiveListingLoader
@@ -1587,12 +1693,17 @@ final class ArchiveImportModel: ObservableObject {
     private let extractionCoordinator: ArchiveExtractionCoordinator
     private let creationCoordinator: ArchiveCreationCoordinator
     private let creationSourceStager: ArchiveCreationSourceStager
+    private let localSendSourceStager: LocalSendSourceStager
     private let repackagingCoordinator: ArchiveRepackagingCoordinator
     private let localSendClient: LocalSendClient
     private let localSendReceiver: LocalSendReceiver
     private var activeLocalSendDevice: LocalSendDevice?
     private var activeLocalSendSessionID: String?
     private var stagedCreationSources: StagedCreationSources?
+    private var stagedLocalSendSources: StagedCreationSources?
+    private var localSendReceiveDestination: URL?
+    private var localSendReceiveDestinationAccess = false
+    private var localSendReceiveStagingRoot: URL?
     private var importGeneration = 0
     private var listingGeneration = 0
     private var previewGeneration = 0
@@ -1608,6 +1719,7 @@ final class ArchiveImportModel: ObservableObject {
         extractionCoordinator: ArchiveExtractionCoordinator = ArchiveExtractionCoordinator(),
         creationCoordinator: ArchiveCreationCoordinator = ArchiveCreationCoordinator(),
         creationSourceStager: ArchiveCreationSourceStager = ArchiveCreationSourceStager(),
+        localSendSourceStager: LocalSendSourceStager = LocalSendSourceStager(),
         repackagingCoordinator: ArchiveRepackagingCoordinator? = nil,
         localSendClient: LocalSendClient = LocalSendClient(),
         localSendReceiver: LocalSendReceiver = LocalSendReceiver()
@@ -1619,16 +1731,39 @@ final class ArchiveImportModel: ObservableObject {
         self.extractionCoordinator = extractionCoordinator
         self.creationCoordinator = creationCoordinator
         self.creationSourceStager = creationSourceStager
+        self.localSendSourceStager = localSendSourceStager
         self.repackagingCoordinator = repackagingCoordinator ?? ArchiveRepackagingCoordinator(
             extraction: extractionCoordinator,
             creation: creationCoordinator
         )
         self.localSendClient = localSendClient
         self.localSendReceiver = localSendReceiver
+        self.localSendReceiver.onFileCommitted = { [weak self] file, displayName in
+            Task { @MainActor in
+                self?.exportReceivedLocalSendFile(file, displayName: displayName)
+            }
+        }
     }
 
     deinit {
         localSendReceiver.stop()
+        if localSendReceiveDestinationAccess, let localSendReceiveDestination {
+            localSendReceiveDestination.stopAccessingSecurityScopedResource()
+        }
+        if let localSendReceiveStagingRoot {
+            try? FileManager.default.removeItem(at: localSendReceiveStagingRoot)
+        }
+        if let stagedLocalSendSources {
+            localSendSourceStager.discard(stagedLocalSendSources)
+        }
+    }
+
+    var localSendSelectedFileCount: Int {
+        stagedLocalSendSources?.sourcePaths.count ?? 0
+    }
+
+    var localSendReceiveDestinationLabel: String {
+        localSendReceiveDestination?.lastPathComponent ?? "App storage"
     }
 
     func handleFileImporterResult(_ result: Result<[URL], Error>) {
@@ -1663,6 +1798,7 @@ final class ArchiveImportModel: ObservableObject {
         passwordInput = ""
         entrySearchQuery = ""
         selectedEntryIds.removeAll()
+        clearLocalSendSelection()
 
         Task {
             do {
@@ -1882,6 +2018,63 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
+    func handleLocalSendFilesResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            do {
+                let staged = try localSendSourceStager.stageFiles(urls)
+                clearLocalSendSelection()
+                stagedLocalSendSources = staged
+                localSendState = .idle
+            } catch {
+                localSendState = .failed(error.localizedDescription)
+            }
+        case .failure(let error):
+            localSendState = .failed(error.localizedDescription)
+        }
+    }
+
+    func clearLocalSendSelection() {
+        if let stagedLocalSendSources {
+            localSendSourceStager.discard(stagedLocalSendSources)
+            self.stagedLocalSendSources = nil
+        }
+    }
+
+    func handleLocalSendReceiveDestinationResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            if localSendReceiveDestinationAccess, let localSendReceiveDestination {
+                localSendReceiveDestination.stopAccessingSecurityScopedResource()
+            }
+            localSendReceiveDestinationAccess = url.startAccessingSecurityScopedResource()
+            localSendReceiveDestination = url
+            localSendState = .idle
+        case .failure(let error):
+            localSendState = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Clears transient secrets and closes local-network listeners when the
+    /// app leaves the foreground. Archive jobs retain only their Rust-owned
+    /// request state; no password remains in the Swift UI model.
+    func handleSceneBackground() {
+        passwordInput = ""
+        previewPasswordInput = ""
+        testPasswordInput = ""
+        extractionPasswordInput = ""
+        creationPasswordInput = ""
+        localSendPinInput = ""
+        pendingLocalSendDevice = nil
+        if case .sending = localSendState {
+            cancelLocalSend()
+        }
+        if case .receiving = localSendState {
+            stopLocalReceive()
+        }
+    }
+
     #if DEBUG
     func createDebugFixture() {
         do {
@@ -1941,24 +2134,39 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
-    func sendCurrentArchive(to device: LocalSendDevice) {
-        guard let archive = importedArchive else { return }
+    func sendSelectedFiles(to device: LocalSendDevice, pin: String? = nil) {
+        let files: [LocalSendTransferFile]
+        if let stagedLocalSendSources {
+            files = stagedLocalSendSources.sourcePaths.map {
+                LocalSendTransferFile(url: URL(fileURLWithPath: $0))
+            }
+        } else if let archive = importedArchive {
+            files = [LocalSendTransferFile(url: URL(fileURLWithPath: archive.localPath), displayName: archive.displayName)]
+        } else {
+            return
+        }
         localSendState = .sending(device, "Preparing transfer")
         Task {
             do {
-                let file = LocalSendTransferFile(url: URL(fileURLWithPath: archive.localPath), displayName: archive.displayName)
-                let session = try await localSendClient.prepareUpload(to: device, files: [file])
+                let session = try await localSendClient.prepareUpload(to: device, files: files, pin: pin)
                 activeLocalSendDevice = device
                 activeLocalSendSessionID = session.sessionID
-                localSendState = .sending(device, "Uploading \(archive.displayName)")
-                try await localSendClient.upload(to: device, session: session, files: [file])
+                localSendState = .sending(device, "Uploading \(files.count) file(s)")
+                try await localSendClient.upload(to: device, session: session, files: files)
                 activeLocalSendDevice = nil
                 activeLocalSendSessionID = nil
+                localSendPinInput = ""
+                clearLocalSendSelection()
                 localSendState = .completed(device)
             } catch is CancellationError {
                 activeLocalSendDevice = nil
                 activeLocalSendSessionID = nil
                 localSendState = .failed("LocalSend transfer cancelled.")
+            } catch LocalSendTransferError.pinRequired {
+                activeLocalSendDevice = nil
+                activeLocalSendSessionID = nil
+                localSendPinInput = ""
+                localSendState = .pinRequired(device)
             } catch {
                 activeLocalSendDevice = nil
                 activeLocalSendSessionID = nil
@@ -1984,19 +2192,55 @@ final class ArchiveImportModel: ObservableObject {
 
     func startLocalReceive() {
         guard case .idle = localSendState else { return }
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ZManagerMobile/ReceivedFiles", isDirectory: true)
+        let root: URL
+        if localSendReceiveDestination == nil {
+            root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("ZManagerMobile/ReceivedFiles", isDirectory: true)
+        } else {
+            root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("ZManagerMobile/LocalSendReceive/\(UUID().uuidString)", isDirectory: true)
+            localSendReceiveStagingRoot = root
+        }
         do {
             let port = try localSendReceiver.start(destinationRoot: root)
             localSendState = .receiving(port)
         } catch {
+            localSendReceiveStagingRoot = nil
+            try? FileManager.default.removeItem(at: root)
             localSendState = .failed("Unable to receive LocalSend files.")
         }
     }
 
     func stopLocalReceive() {
         localSendReceiver.stop()
+        if let localSendReceiveStagingRoot {
+            try? FileManager.default.removeItem(at: localSendReceiveStagingRoot)
+            self.localSendReceiveStagingRoot = nil
+        }
         localSendState = .idle
+    }
+
+    private func exportReceivedLocalSendFile(_ source: URL, displayName: String) {
+        guard let destination = localSendReceiveDestination else { return }
+        do {
+            let target = uniqueReceiveDestination(destination, name: displayName)
+            try FileManager.default.copyItem(at: source, to: target)
+            try FileManager.default.removeItem(at: source)
+        } catch {
+            localSendState = .failed("Unable to export received file.")
+        }
+    }
+
+    private func uniqueReceiveDestination(_ root: URL, name: String) -> URL {
+        var candidate = root.appendingPathComponent(LocalSendReceiver.sanitizeIncomingName(name))
+        var index = 1
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            let base = candidate.deletingPathExtension().lastPathComponent
+            let ext = candidate.pathExtension
+            candidate = root.appendingPathComponent(ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)")
+            index += 1
+        }
+        return candidate
     }
 
     private func planCreation(staged: StagedCreationSources) throws {
@@ -2326,24 +2570,46 @@ struct ArchiveCreationPanel: View {
 
 struct LocalSendPanel: View {
     let archive: ImportedArchive?
+    let selectedFileCount: Int
     let state: LocalSendUIState
     let onDiscover: () -> Void
+    let onChooseFiles: () -> Void
+    let onClearFiles: () -> Void
     let onSend: (LocalSendDevice) -> Void
+    @Binding var pinInput: String
+    let onSubmitPin: (LocalSendDevice, String) -> Void
     let onCancelSend: () -> Void
+    let receiveDestinationLabel: String
+    let onChooseReceiveDestination: () -> Void
     let onStartReceive: () -> Void
     let onStopReceive: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Share on local network").font(.headline)
+            Text("Only send to devices you recognize on this local network.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Choose files", action: onChooseFiles)
+                if selectedFileCount > 0 {
+                    Button("Clear", action: onClearFiles)
+                }
+            }
+            if selectedFileCount > 0 {
+                Text("\(selectedFileCount) file(s) selected for sharing")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Button(state.isDiscovering ? "Discovering" : "Find LocalSend devices", action: onDiscover)
-                .disabled(archive == nil || state.isDiscovering)
+                .disabled((archive == nil && selectedFileCount == 0) || state.isDiscovering)
             if case .receiving(let port) = state {
                 Button("Stop receiving", action: onStopReceive)
-                Text("Receiving LocalSend files on port \(port) into app storage.")
+                Text("Receiving LocalSend files on port \(port) into \(receiveDestinationLabel).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                Button("Receive to: \(receiveDestinationLabel)", action: onChooseReceiveDestination)
                 Button("Receive files", action: onStartReceive)
             }
             switch state {
@@ -2353,15 +2619,35 @@ struct LocalSendPanel: View {
                 if devices.isEmpty { Text("No compatible devices found.") }
                 ForEach(devices) { device in
                     HStack {
-                        Text("\(device.alias) (\(device.address))")
+                        VStack(alignment: .leading) {
+                            Text("\(device.alias) (\(device.address))")
+                            if let fingerprint = device.fingerprint {
+                                Text("Fingerprint: \(fingerprint)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
-                        Button("Send archive") { onSend(device) }
+                        Button(selectedFileCount > 0 ? "Send files" : "Send archive") { onSend(device) }
                     }
                 }
             case .sending(let device, let message):
                 HStack {
                     Text("\(message) to \(device.alias)")
                     Spacer()
+                    Button("Cancel", action: onCancelSend)
+                }
+            case .pinRequired(let device):
+                Text("\(device.alias) requires a PIN before receiving this transfer.")
+                SecureField("LocalSend PIN", text: $pinInput)
+                    .textContentType(.oneTimeCode)
+                HStack {
+                    Button("Retry with PIN") {
+                        let pin = pinInput
+                        pinInput = ""
+                        onSubmitPin(device, pin)
+                    }
+                    .disabled(pinInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button("Cancel", action: onCancelSend)
                 }
             case .completed(let device):
@@ -3194,6 +3480,7 @@ enum LocalSendUIState {
     case discovering
     case devices([LocalSendDevice])
     case sending(LocalSendDevice, String)
+    case pinRequired(LocalSendDevice)
     case completed(LocalSendDevice)
     case failed(String)
 }
@@ -3427,7 +3714,11 @@ final class LocalSendClient: @unchecked Sendable {
     }
 
     private func validate(_ response: URLResponse) throws {
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse else {
+            throw LocalSendTransferError.rejected
+        }
+        if http.statusCode == 403 { throw LocalSendTransferError.pinRequired }
+        guard (200..<300).contains(http.statusCode) else {
             throw LocalSendTransferError.rejected
         }
     }
@@ -3484,6 +3775,7 @@ final class LocalSendReceiver: @unchecked Sendable {
     private let port: UInt16
     private let fileManager: FileManager
     private let queue = DispatchQueue(label: "org.tzap.zmanager.localsend.receiver")
+    var onFileCommitted: ((URL, String) -> Void)?
     private var listener: NWListener?
     private var announceConnection: NWConnectionGroup?
     private var announceTimer: DispatchSourceTimer?
@@ -3510,11 +3802,6 @@ final class LocalSendReceiver: @unchecked Sendable {
         self.listener = listener
         listener.newConnectionHandler = { [weak self] connection in
             self?.accept(connection)
-        }
-        listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state {
-                NSLog("LocalSend receiver stopped: \(error.localizedDescription)")
-            }
         }
         listener.start(queue: queue)
         startAnnouncements()
@@ -3638,6 +3925,8 @@ final class LocalSendReceiver: @unchecked Sendable {
             if request.path.hasPrefix("/api/localsend/v2/prepare-upload") {
                 try prepare(request)
                 respond(connection, status: 200, json: prepareResponse(request))
+            } else if request.path.hasPrefix("/api/localsend/v2/register") {
+                respond(connection, status: 200, json: registrationAnnouncement())
             } else if request.path.hasPrefix("/api/localsend/v2/upload") {
                 try commit(request)
                 respond(connection, status: 200, body: "OK")
@@ -3688,6 +3977,20 @@ final class LocalSendReceiver: @unchecked Sendable {
         return ["sessionId": sessionID, "files": files]
     }
 
+    private func registrationAnnouncement() -> [String: Any] {
+        [
+            "alias": alias,
+            "version": "2.0",
+            "deviceModel": UIDevice.current.model,
+            "deviceType": "mobile",
+            "fingerprint": fingerprint,
+            "port": Int(port),
+            "protocol": "http",
+            "download": true,
+            "announce": false
+        ]
+    }
+
     private func commit(_ request: RequestState) throws {
         guard let session = request.session, let expected = request.expected, let temporary = request.temporaryFile else {
             throw LocalSendTransferError.rejected
@@ -3702,6 +4005,7 @@ final class LocalSendReceiver: @unchecked Sendable {
         }
         let target = Self.uniqueTarget(root: session.destinationRoot, name: expected.displayName, fileManager: fileManager)
         try fileManager.moveItem(at: temporary, to: target)
+        onFileCommitted?(target, expected.displayName)
         session.completed.insert(expected.id)
         if session.completed.count == session.files.count, let sessionID = request.sessionID {
             sessions.removeValue(forKey: sessionID)
@@ -3792,6 +4096,7 @@ private extension URLSessionTask {
 
 enum LocalSendTransferError: LocalizedError {
     case missingToken
+    case pinRequired
     case rejected
     case invalidResponse
     case receiverAlreadyRunning
@@ -3799,6 +4104,7 @@ enum LocalSendTransferError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingToken: return "The LocalSend device did not provide an upload token."
+        case .pinRequired: return "The LocalSend device requires a PIN."
         case .rejected: return "The LocalSend device rejected the transfer."
         case .invalidResponse: return "The LocalSend device returned an invalid response."
         case .receiverAlreadyRunning: return "LocalSend receiving is already enabled."

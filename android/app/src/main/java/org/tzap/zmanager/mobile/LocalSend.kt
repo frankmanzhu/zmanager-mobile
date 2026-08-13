@@ -1,5 +1,7 @@
 package org.tzap.zmanager.mobile
 
+import android.content.Context
+import android.net.Uri
 import android.os.Build
 import org.json.JSONObject
 import java.io.File
@@ -35,7 +37,85 @@ data class LocalSendFile(
     val mimeType: String = "application/octet-stream"
 )
 
+data class StagedLocalSendFiles(
+    val root: File,
+    val files: List<LocalSendFile>
+)
+
+/** Copies provider-backed selections into private files before network access. */
+class LocalSendSourceStager(private val context: Context) {
+    fun stageUris(uris: List<Uri>): StagedLocalSendFiles {
+        require(uris.isNotEmpty()) { "Select at least one file." }
+        val root = File(context.cacheDir, "localsend-sources/${UUID.randomUUID()}")
+        check(root.mkdirs()) { "Unable to prepare LocalSend staging." }
+        return try {
+            val files = uris.mapIndexed { index, uri ->
+                val name = ArchiveImportNames.sanitizedDisplayName(
+                    ArchiveImportMetadataForSharing.displayName(context, uri) ?: uri.lastPathSegment ?: "file-$index"
+                )
+                val target = uniqueFile(root, name)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use(input::copyTo)
+                } ?: throw IOException("Unable to read selected file.")
+                LocalSendFile(
+                    file = target,
+                    displayName = target.name,
+                    mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                )
+            }
+            StagedLocalSendFiles(root, files)
+        } catch (error: Throwable) {
+            root.deleteRecursively()
+            throw error
+        }
+    }
+
+    fun discard(staged: StagedLocalSendFiles) {
+        staged.root.deleteRecursively()
+    }
+
+    private fun uniqueFile(root: File, name: String): File {
+        var candidate = File(root, name)
+        var index = 1
+        while (candidate.exists()) {
+            val base = name.substringBeforeLast('.', name)
+            val extension = name.substringAfterLast('.', "").takeIf { it != name }
+            candidate = File(
+                root,
+                if (extension == null) "$base ($index)" else "$base ($index).$extension"
+            )
+            index += 1
+        }
+        return candidate
+    }
+}
+
+private object ArchiveImportMetadataForSharing {
+    fun displayName(context: Context, uri: Uri): String? {
+        return runCatching {
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    cursor.takeIf { index >= 0 && !it.isNull(index) }?.getString(index)
+                } else null
+            }
+        }.getOrNull()
+    }
+}
+
 data class LocalSendUploadSession(val sessionId: String, val tokens: Map<String, String>)
+
+class LocalSendPinRequiredException : IOException("The LocalSend device requires a PIN.")
+
+class LocalSendRequestException(val statusCode: Int) : IOException(
+    if (statusCode == 403) "The LocalSend device rejected the PIN." else "LocalSend request was rejected."
+)
 
 sealed interface LocalSendUiState {
     data object Idle : LocalSendUiState
@@ -43,6 +123,7 @@ sealed interface LocalSendUiState {
     data object Discovering : LocalSendUiState
     data class Devices(val devices: List<LocalSendDevice>) : LocalSendUiState
     data class Sending(val device: LocalSendDevice, val message: String) : LocalSendUiState
+    data class PinRequired(val device: LocalSendDevice) : LocalSendUiState
     data class Completed(val device: LocalSendDevice) : LocalSendUiState
     data class Failed(val message: String) : LocalSendUiState
 }
@@ -197,7 +278,9 @@ class LocalSendClient(
                     onProgress(item, sent, item.file.length())
                 }
             } }
-            check(connection.responseCode in 200..299) { "LocalSend upload was rejected (${connection.responseCode})." }
+            if (connection.responseCode !in 200..299) {
+                throw LocalSendRequestException(connection.responseCode)
+            }
         } finally {
             connection.disconnect()
         }
@@ -212,7 +295,10 @@ class LocalSendClient(
                 connection.outputStream.use { it.write(body) }
             }
             val response = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
-            if (connection.responseCode !in 200..299) throw IOException("LocalSend request was rejected (${connection.responseCode}).")
+            if (connection.responseCode !in 200..299) {
+                if (connection.responseCode == 403) throw LocalSendPinRequiredException()
+                throw LocalSendRequestException(connection.responseCode)
+            }
             return response?.bufferedReader()?.use { it.readText() }.orEmpty()
         } finally {
             connection.disconnect()

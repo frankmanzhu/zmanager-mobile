@@ -6,7 +6,8 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.DatagramPacket
-import java.net.DatagramSocket
+import java.net.InetAddress
+import java.net.MulticastSocket
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
@@ -34,7 +35,8 @@ class LocalSendReceiver(
     private val alias: String = "ZManager Mobile",
     private val fingerprint: String = UUID.randomUUID().toString(),
     private val requestedPort: Int = LocalSendProtocol.defaultPort,
-    private val worker: ExecutorService = Executors.newCachedThreadPool()
+    private val worker: ExecutorService = Executors.newCachedThreadPool(),
+    private val onFileCommitted: (LocalSendReceivedFile) -> Unit = {}
 ) {
     private data class ExpectedFile(
         val id: String,
@@ -55,7 +57,7 @@ class LocalSendReceiver(
     private val running = AtomicBoolean(false)
     private val sessions = ConcurrentHashMap<String, Session>()
     private var server: ServerSocket? = null
-    private var announceSocket: DatagramSocket? = null
+    private var announceSocket: MulticastSocket? = null
     private var acceptThread: Thread? = null
     private var announceThread: Thread? = null
 
@@ -117,7 +119,7 @@ class LocalSendReceiver(
             }
             val length = headers["content-length"]?.toLongOrNull() ?: 0L
             if (length < 0 ||
-                (targetIsPrepare(request[1]) && length > MAX_REQUEST_BYTES)
+                (targetHasBoundedBody(request[1]) && length > MAX_REQUEST_BYTES)
             ) {
                 respond(output, 413, "Request too large")
                 return
@@ -125,6 +127,10 @@ class LocalSendReceiver(
             val target = request[1]
             when {
                 request[0] != "POST" -> respond(output, 405, "POST required")
+                target.substringBefore('?') == "/api/localsend/v2/register" -> {
+                    readExactly(input, length)
+                    register(output)
+                }
                 target.substringBefore('?') == "/api/localsend/v2/prepare-upload" -> {
                     val body = readExactly(input, length)
                     prepare(output, body, destinationRoot)
@@ -197,6 +203,9 @@ class LocalSendReceiver(
             }
             val target = uniqueTarget(session.destinationRoot, expected.displayName)
             check(part.renameTo(target)) { "Unable to commit received file." }
+            runCatching {
+                onFileCommitted(LocalSendReceivedFile(expected.id, expected.displayName, target, written))
+            }
             if (session.completed.add(expected.id) && session.completed.containsAll(session.files.keys)) {
                 sessions.remove(session.id, session)
                 session.root.deleteRecursively()
@@ -213,16 +222,53 @@ class LocalSendReceiver(
         respond(output, 200, "OK")
     }
 
+    private fun register(output: BufferedOutputStream) {
+        respondJson(
+            output,
+            200,
+            LocalSendProtocol.announcement(
+                alias = alias,
+                fingerprint = fingerprint,
+                port = server?.localPort ?: requestedPort,
+                download = true,
+                announce = false
+            )
+        )
+    }
+
     private fun announceLoop(port: Int) {
         runCatching {
-            DatagramSocket().use { socket ->
+            MulticastSocket(LocalSendProtocol.defaultPort).use { socket ->
                 announceSocket = socket
-                val target = java.net.InetAddress.getByName(LocalSendProtocol.multicastAddress)
-                val payload = LocalSendProtocol.announcement(alias, fingerprint, port, download = true).toString().toByteArray()
+                socket.reuseAddress = true
+                val target = InetAddress.getByName(LocalSendProtocol.multicastAddress)
+                socket.joinGroup(target)
+                socket.soTimeout = 1_000
                 while (running.get()) {
+                    val payload = LocalSendProtocol.announcement(alias, fingerprint, port, download = true).toString().toByteArray()
                     socket.send(DatagramPacket(payload, payload.size, target, LocalSendProtocol.defaultPort))
-                    Thread.sleep(1_000)
+                    val deadline = System.nanoTime() + 1_000_000_000L
+                    while (running.get() && System.nanoTime() < deadline) {
+                        try {
+                            val packet = DatagramPacket(ByteArray(16 * 1024), 16 * 1024)
+                            socket.receive(packet)
+                            val json = runCatching { JSONObject(String(packet.data, 0, packet.length)) }.getOrNull()
+                            if (json?.optString("fingerprint") != fingerprint && json?.optBoolean("announce", true) == true) {
+                                val response = LocalSendProtocol.announcement(
+                                    alias = alias,
+                                    fingerprint = fingerprint,
+                                    port = port,
+                                    download = true,
+                                    announce = false
+                                ).toString().toByteArray()
+                                socket.send(DatagramPacket(response, response.size, packet.address, packet.port))
+                            }
+                        } catch (_: java.net.SocketTimeoutException) {
+                            break
+                        }
+                    }
                 }
+                runCatching { socket.leaveGroup(target) }
             }
         }
     }
@@ -273,8 +319,11 @@ class LocalSendReceiver(
             URLDecoder.decode(parts[0], Charsets.UTF_8.name()) to URLDecoder.decode(parts.getOrElse(1) { "" }, Charsets.UTF_8.name())
         }
 
-    private fun targetIsPrepare(target: String): Boolean =
-        target.substringBefore('?') == "/api/localsend/v2/prepare-upload"
+    private fun targetHasBoundedBody(target: String): Boolean =
+        target.substringBefore('?') in setOf(
+            "/api/localsend/v2/register",
+            "/api/localsend/v2/prepare-upload"
+        )
 
     private fun thread(name: String, body: () -> Unit) = Thread(body, name).also { it.isDaemon = true; it.start() }
 

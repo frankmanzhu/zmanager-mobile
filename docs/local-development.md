@@ -8,7 +8,18 @@ Run commands from the repository root unless a section says otherwise.
 scripts/check-rust.sh
 ```
 
-The Rust bridge is owned by the sibling `zmanager` repository (`crates/zmanager-ffi`); this repo keeps no Rust workspace. `check-rust.sh` runs the `zmanager-ffi` tests there.
+The Rust bridge is owned by the `zmanager` repository (`crates/zmanager-ffi`); this repo keeps no Rust workspace. Mobile builds temporarily pin the Rust source to commit `f65d23385ae583462f6d9e68dd84c6fcae1ec89c` through the shared `ZMANAGER_RELATIVE_DIR` path configuration.
+
+The default `ZMANAGER_RELATIVE_DIR` is `.cache/zmanager`, while
+`ZMANAGER_COMMIT` pins that checkout to
+`f65d23385ae583462f6d9e68dd84c6fcae1ec89c`. The resolver clones that commit
+into the ignored cache directory when needed and does not read from or modify
+the sibling `../zmanager` checkout. Set
+`ZMANAGER_RELATIVE_DIR` when CI or a later refactor provides the checkout at a
+different mobile-relative location. `ZMANAGER_DIR` is an absolute or
+mobile-relative override; `ZMANAGER_COMMIT`, `ZMANAGER_REPOSITORY`, and
+`ZMANAGER_CACHE_ROOT` are also available for controlled overrides.
+`check-rust.sh` runs the `zmanager-ffi` tests from the resolved checkout.
 
 ## Android
 
@@ -20,7 +31,7 @@ scripts/check-android.sh
 
 The script uses `./gradlew` when present, then an installed `gradle`, then the locally cached Gradle 8.9 distribution. It honors an existing `JAVA_HOME`; when `JAVA_HOME` is unset, it falls back to Android Studio's bundled JBR. Android Gradle Plugin 8.7 requires JDK 17, and this project is validated with Liberica JDK 17.0.20.
 
-Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. That script builds `zmanager-ffi` from the sibling `zmanager` repository and copies the generated arm64 libraries into the ignored `android/app/src/main/jniLibs/arm64-v8a/` directory. Set `ZMANAGER_DIR`, `ANDROID_NDK_HOME`, `ANDROID_NDK_VERSION`, or `ANDROID_API_LEVEL` when the defaults do not match the local machine.
+Before Android's `preBuild`, Gradle invokes `scripts/build-android-rust.sh`. That script builds `zmanager-ffi` from the pinned checkout and copies the generated arm64 libraries into the ignored `android/app/src/main/jniLibs/arm64-v8a/` directory. Set `ZMANAGER_RELATIVE_DIR`, `ZMANAGER_DIR`, `ZMANAGER_COMMIT`, `ANDROID_NDK_HOME`, `ANDROID_NDK_VERSION`, or `ANDROID_API_LEVEL` when the defaults do not match the local machine.
 
 ## Maestro UI tests
 
@@ -76,17 +87,18 @@ scripts/check-ios.sh
 
 ## UniFFI Bindings
 
-The UDL and `uniffi.toml` live in the sibling `zmanager` repo (`crates/zmanager-ffi`). Regenerate bindings after edits there:
+The UDL and `uniffi.toml` live in the pinned `zmanager` checkout
+(`crates/zmanager-ffi`). Regenerate bindings after bridge edits:
 
 ```sh
-../zmanager/scripts/regenerate-bindings.sh
+scripts/regenerate-bindings-pinned.sh
 ```
 
 Generated Android Kotlin is written to `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`.
 
 Generated iOS Swift/modulemap/header files are written to `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
 
-The iOS Xcode "Build Rust Bridge" phase invokes `zmanager/scripts/build-ios-rust.sh` and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`.
+The iOS Xcode "Build Rust Bridge" phase invokes `scripts/build-ios-rust-pinned.sh`, which builds the pinned checkout and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`.
 
 Do not check generated native binary artifacts into the repository by default. Platform build integration should build or copy those artifacts explicitly.
 

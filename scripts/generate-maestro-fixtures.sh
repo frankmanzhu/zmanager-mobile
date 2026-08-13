@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/fixtures/maestro/contents"
 ANDROID_ASSETS_DIR="$ROOT_DIR/android/app/src/debug/assets"
 IOS_FIXTURES_DIR="$ROOT_DIR/ios/ZManagerMobile/ZManagerMobile/MaestroFixtures"
-CORE_ROOT="$ROOT_DIR/../zmanager"
+CORE_ROOT="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 CLI_MANIFEST="$CORE_ROOT/Cargo.toml"
 SOURCE_PATHS=(
   docs/readme.txt

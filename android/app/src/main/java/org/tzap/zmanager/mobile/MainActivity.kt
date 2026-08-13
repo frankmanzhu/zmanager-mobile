@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -50,6 +51,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,7 +62,9 @@ import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
 import org.tzap.zmanager.mobile.bridge.generated.CreateArchiveFormat
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import java.io.File
+import java.io.IOException
 import java.util.Locale
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private val incomingIntentState = mutableStateOf<Intent?>(null)
@@ -96,8 +103,8 @@ private fun ZManagerApp(
     val creationCoordinator = remember(context) { ArchiveCreationCoordinator(context) }
     val repackagingCoordinator = remember(context) { ArchiveRepackagingCoordinator(context, extractionCoordinator, creationCoordinator) }
     val creationSourceStager = remember(context) { ArchiveCreationSourceStager(context) }
+    val localSendSourceStager = remember(context) { LocalSendSourceStager(context) }
     val localSendClient = remember { LocalSendClient() }
-    val localSendReceiver = remember { LocalSendReceiver() }
     val scope = rememberCoroutineScope()
     var importedArchive by remember { mutableStateOf<ImportedArchive?>(null) }
     var listingState by remember { mutableStateOf<ArchiveListingState>(ArchiveListingState.Idle) }
@@ -120,8 +127,12 @@ private fun ZManagerApp(
     var createPasswordInput by remember { mutableStateOf("") }
     var stagedCreationSources by remember { mutableStateOf<StagedCreationSources?>(null) }
     var localSendState by remember { mutableStateOf<LocalSendUiState>(LocalSendUiState.Idle) }
+    var localSendPinInput by remember { mutableStateOf("") }
+    var pendingLocalSendDevice by remember { mutableStateOf<LocalSendDevice?>(null) }
     var activeLocalSendSession by remember { mutableStateOf<Pair<LocalSendDevice, String>?>(null) }
+    var stagedLocalSendFiles by remember { mutableStateOf<StagedLocalSendFiles?>(null) }
     var receiveSession by remember { mutableStateOf<LocalSendReceiverSession?>(null) }
+    var receiveDestinationUri by remember { mutableStateOf<Uri?>(null) }
     val archiveSessions = remember { ArchiveSessionStack() }
     var nestedNavigationVersion by remember { mutableStateOf(0) }
     var nestedOpenError by remember { mutableStateOf<String?>(null) }
@@ -131,8 +142,69 @@ private fun ZManagerApp(
     var testRequestId by remember { mutableStateOf(0L) }
     var showFixtureMenu by remember { mutableStateOf(false) }
 
+    val localSendReceiver = remember {
+        LocalSendReceiver(onFileCommitted = { received ->
+            val treeUri = receiveDestinationUri ?: return@LocalSendReceiver
+            runCatching {
+                val tree = DocumentFile.fromTreeUri(context, treeUri)
+                    ?: throw IOException("Unable to open the selected receive folder.")
+                val target = tree.createFile("application/octet-stream", received.displayName)
+                    ?: throw IOException("Unable to create the received file.")
+                context.contentResolver.openOutputStream(target.uri)?.use { output ->
+                    received.path.inputStream().use { input -> input.copyTo(output) }
+                } ?: throw IOException("Unable to write the received file.")
+                received.path.delete()
+            }.onFailure {
+                scope.launch {
+                    localSendState = LocalSendUiState.Failed("Unable to export received file.")
+                }
+            }
+        })
+    }
+
+    fun handleAppBackground() {
+        passwordInput = ""
+        previewPasswordInput = ""
+        testPasswordInput = ""
+        extractionPasswordInput = ""
+        createPasswordInput = ""
+        localSendPinInput = ""
+        pendingLocalSendDevice = null
+
+        val activeSession = activeLocalSendSession
+        localSendClient.cancel()
+        activeLocalSendSession = null
+        if (activeSession != null) {
+            scope.launch(Dispatchers.IO) {
+                runCatching { localSendClient.cancel(activeSession.first, activeSession.second) }
+            }
+        }
+        localSendReceiver.stop()
+        receiveSession = null
+        if (localSendState is LocalSendUiState.Sending || localSendState is LocalSendUiState.Receiving) {
+            localSendState = LocalSendUiState.Idle
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) handleAppBackground()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     DisposableEffect(localSendReceiver) {
-        onDispose { localSendReceiver.stop() }
+        onDispose {
+            localSendReceiver.stop()
+            stagedLocalSendFiles?.let(localSendSourceStager::discard)
+        }
+    }
+
+    fun clearLocalSendSelection() {
+        stagedLocalSendFiles?.let(localSendSourceStager::discard)
+        stagedLocalSendFiles = null
     }
 
     fun clearPreviewState() {
@@ -447,6 +519,7 @@ private fun ZManagerApp(
         passwordInput = ""
         entrySearchQuery = ""
         selectedEntryIds = emptySet()
+        clearLocalSendSelection()
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching { importer.importUris(uris) }
@@ -572,16 +645,17 @@ private fun ZManagerApp(
         }
     }
 
-    fun sendCurrentArchive(device: LocalSendDevice) {
-        val archive = importedArchive ?: return
+    fun sendSelectedFiles(device: LocalSendDevice, pin: String? = null) {
+        val selectedFiles = stagedLocalSendFiles?.files
+            ?: importedArchive?.let { listOf(LocalSendFile(file = File(it.localPath), displayName = it.displayName)) }
+            ?: return
         localSendState = LocalSendUiState.Sending(device, "Preparing transfer")
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val file = LocalSendFile(file = File(archive.localPath), displayName = archive.displayName)
-                    val session = localSendClient.prepareUpload(device, listOf(file))
+                    val session = localSendClient.prepareUpload(device, selectedFiles, pin)
                     activeLocalSendSession = device to session.sessionId
-                    localSendClient.upload(device, session, listOf(file)) { item, sent, total ->
+                    localSendClient.upload(device, session, selectedFiles) { item, sent, total ->
                         scope.launch {
                             localSendState = LocalSendUiState.Sending(
                                 device,
@@ -593,8 +667,19 @@ private fun ZManagerApp(
             }
             activeLocalSendSession = null
             localSendState = result.fold(
-                onSuccess = { LocalSendUiState.Completed(device) },
-                onFailure = { LocalSendUiState.Failed(it.message ?: "LocalSend transfer failed.") }
+                onSuccess = {
+                    localSendPinInput = ""
+                    clearLocalSendSelection()
+                    LocalSendUiState.Completed(device)
+                },
+                onFailure = { error ->
+                    if (error is LocalSendPinRequiredException) {
+                        localSendPinInput = ""
+                        LocalSendUiState.PinRequired(device)
+                    } else {
+                        LocalSendUiState.Failed(error.message ?: "LocalSend transfer failed.")
+                    }
+                }
             )
         }
     }
@@ -611,10 +696,16 @@ private fun ZManagerApp(
 
     fun startLocalReceive() {
         if (receiveSession != null) return
+        val selectedTree = receiveDestinationUri
+        val receiveRoot = if (selectedTree == null) {
+            File(context.filesDir, "ReceivedFiles")
+        } else {
+            File(context.cacheDir, "localsend-receive/${UUID.randomUUID()}")
+        }
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    localSendReceiver.start(File(context.filesDir, "ReceivedFiles"))
+                    localSendReceiver.start(receiveRoot)
                 }
             }
             result.onSuccess {
@@ -680,6 +771,38 @@ private fun ZManagerApp(
                     runCatching { creationSourceStager.stageTree(uri) }
                 }.onSuccess(::planCreation)
                     .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage selected folder.") }
+            }
+        }
+    }
+    val receiveDestinationPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            receiveDestinationUri = uri
+            localSendState = LocalSendUiState.Idle
+        }
+    }
+    val localSendFilesPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { localSendSourceStager.stageUris(uris) }
+                }
+                result.onSuccess {
+                    clearLocalSendSelection()
+                    stagedLocalSendFiles = it
+                    localSendState = LocalSendUiState.Idle
+                }.onFailure {
+                    localSendState = LocalSendUiState.Failed(it.message ?: "Unable to stage selected files.")
+                }
             }
         }
     }
@@ -785,10 +908,21 @@ private fun ZManagerApp(
                     )
             LocalSendPanel(
                 archive = importedArchive,
+                selectedFileCount = stagedLocalSendFiles?.files?.size ?: 0,
                 state = localSendState,
                 onDiscover = ::discoverLocalSendDevices,
-                onSend = ::sendCurrentArchive,
+                onChooseFiles = { localSendFilesPicker.launch(arrayOf("*/*")) },
+                onClearFiles = ::clearLocalSendSelection,
+                onSend = { pendingLocalSendDevice = it },
+                pinInput = localSendPinInput,
+                onPinChanged = { localSendPinInput = it },
+                onSubmitPin = { device, pin ->
+                    localSendPinInput = ""
+                    sendSelectedFiles(device, pin)
+                },
                 onCancelSend = ::cancelLocalSend,
+                receiveDestinationLabel = if (receiveDestinationUri == null) "App storage" else "Selected folder",
+                onChooseReceiveDestination = { receiveDestinationPicker.launch(null) },
                 onStartReceive = ::startLocalReceive,
                 onStopReceive = ::stopLocalReceive
             )
@@ -999,6 +1133,35 @@ private fun ZManagerApp(
                 }
             }
         }
+        pendingLocalSendDevice?.let { device ->
+            AlertDialog(
+                onDismissRequest = { pendingLocalSendDevice = null },
+                title = { Text("Confirm local transfer") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Send the selected archive or files to ${device.alias}?")
+                        Text("Address: ${device.address}", style = MaterialTheme.typography.bodySmall)
+                        device.fingerprint?.let {
+                            Text("Fingerprint: $it", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(
+                            "Only continue if you recognize this device and fingerprint.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        val confirmedDevice = pendingLocalSendDevice
+                        pendingLocalSendDevice = null
+                        confirmedDevice?.let(::sendSelectedFiles)
+                    }) { Text("Send") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingLocalSendDevice = null }) { Text("Cancel") }
+                }
+            )
+        }
     }
 }
 
@@ -1087,22 +1250,45 @@ private fun CreateFormatButton(
 @Composable
 private fun LocalSendPanel(
     archive: ImportedArchive?,
+    selectedFileCount: Int,
     state: LocalSendUiState,
     onDiscover: () -> Unit,
+    onChooseFiles: () -> Unit,
+    onClearFiles: () -> Unit,
     onSend: (LocalSendDevice) -> Unit,
+    pinInput: String,
+    onPinChanged: (String) -> Unit,
+    onSubmitPin: (LocalSendDevice, String) -> Unit,
     onCancelSend: () -> Unit,
+    receiveDestinationLabel: String,
+    onChooseReceiveDestination: () -> Unit,
     onStartReceive: () -> Unit,
     onStopReceive: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Share on local network", style = MaterialTheme.typography.titleMedium)
-        Button(enabled = archive != null && state !is LocalSendUiState.Discovering, onClick = onDiscover) {
+        Text(
+            "Only send to devices you recognize on this local network.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        val hasSelection = archive != null || selectedFileCount > 0
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onChooseFiles) { Text("Choose files") }
+            if (selectedFileCount > 0) {
+                TextButton(onClick = onClearFiles) { Text("Clear") }
+            }
+        }
+        if (selectedFileCount > 0) {
+            Text("$selectedFileCount file(s) selected for sharing")
+        }
+        Button(enabled = hasSelection && state !is LocalSendUiState.Discovering, onClick = onDiscover) {
             Text(if (state is LocalSendUiState.Discovering) "Discovering" else "Find LocalSend devices")
         }
         if (state is LocalSendUiState.Receiving) {
             OutlinedButton(onClick = onStopReceive) { Text("Stop receiving") }
-            Text("Receiving LocalSend files on port ${state.port} into app storage.")
+            Text("Receiving LocalSend files on port ${state.port} into $receiveDestinationLabel.")
         } else {
+            OutlinedButton(onClick = onChooseReceiveDestination) { Text("Receive to: $receiveDestinationLabel") }
             OutlinedButton(onClick = onStartReceive) { Text("Receive files") }
         }
         when (state) {
@@ -1112,14 +1298,36 @@ private fun LocalSendPanel(
                 if (state.devices.isEmpty()) Text("No compatible devices found.")
                 state.devices.forEach { device ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${device.alias} (${device.address})", modifier = Modifier.weight(1f))
-                        OutlinedButton(onClick = { onSend(device) }) { Text("Send archive") }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("${device.alias} (${device.address})")
+                            device.fingerprint?.let { Text("Fingerprint: $it", style = MaterialTheme.typography.bodySmall) }
+                        }
+                        OutlinedButton(onClick = { onSend(device) }) {
+                            Text(if (selectedFileCount > 0) "Send files" else "Send archive")
+                        }
                     }
                 }
             }
             is LocalSendUiState.Sending -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${state.message} to ${state.device.alias}", modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = onCancelSend) { Text("Cancel") }
+            }
+            is LocalSendUiState.PinRequired -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("${state.device.alias} requires a PIN before receiving this transfer.")
+                OutlinedTextField(
+                    value = pinInput,
+                    onValueChange = onPinChanged,
+                    label = { Text("LocalSend PIN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        enabled = pinInput.isNotBlank(),
+                        onClick = { onSubmitPin(state.device, pinInput) }
+                    ) { Text("Retry with PIN") }
+                    TextButton(onClick = onCancelSend) { Text("Cancel") }
+                }
             }
             is LocalSendUiState.Completed -> Text("Sent to ${state.device.alias}")
             is LocalSendUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)

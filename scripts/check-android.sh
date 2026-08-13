@@ -5,9 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android"
 JBR_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
-# The format contract snapshot must match the sibling zmanager contract
+# The format contract snapshot must match the pinned zmanager contract
 # (secondary gate; the byte-compare test in zmanager-cli is the primary one).
-CONTRACT="$ROOT_DIR/../zmanager/crates/zmanager-cli/contracts/archive-formats.json"
+ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
+CONTRACT="$ZMANAGER_DIR/crates/zmanager-cli/contracts/archive-formats.json"
 SNAPSHOT="$ANDROID_DIR/app/src/test/resources/format-capabilities.json"
 if [[ -f "$CONTRACT" ]]; then
   if ! cmp -s "$CONTRACT" "$SNAPSHOT"; then

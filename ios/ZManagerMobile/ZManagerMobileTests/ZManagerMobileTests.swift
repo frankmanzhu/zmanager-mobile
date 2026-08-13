@@ -306,10 +306,68 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(json["announce"] as? Bool, true)
     }
 
+    func testLocalSendSourceStagerCopiesAndCleansSelectedFiles() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let source = root.appendingPathComponent("selected.txt")
+        try Data("share me".utf8).write(to: source)
+
+        let stager = LocalSendSourceStager(fileManager: fileManager)
+        let staged = try stager.stageFiles([source])
+
+        XCTAssertEqual(staged.sourcePaths.count, 1)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: staged.sourcePaths[0])), Data("share me".utf8))
+        XCTAssertTrue(staged.root.path.contains("LocalSendSources"))
+
+        stager.discard(staged)
+        XCTAssertFalse(fileManager.fileExists(atPath: staged.root.path))
+    }
+
+    @MainActor
+    func testSceneBackgroundClearsTransientPasswords() {
+        let model = ArchiveImportModel()
+        model.passwordInput = "archive-password"
+        model.previewPasswordInput = "preview-password"
+        model.testPasswordInput = "test-password"
+        model.extractionPasswordInput = "extract-password"
+        model.creationPasswordInput = "create-password"
+
+        model.handleSceneBackground()
+
+        XCTAssertTrue(model.passwordInput.isEmpty)
+        XCTAssertTrue(model.previewPasswordInput.isEmpty)
+        XCTAssertTrue(model.testPasswordInput.isEmpty)
+        XCTAssertTrue(model.extractionPasswordInput.isEmpty)
+        XCTAssertTrue(model.creationPasswordInput.isEmpty)
+    }
+
     func testLocalSendReceiverSanitizesIncomingNames() {
         XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName("../../evil.zip"), "evil.zip")
         XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName(".."), "received-file")
         XCTAssertEqual(LocalSendReceiver.sanitizeIncomingName("nested\\archive.zip"), "archive.zip")
+    }
+
+    func testLocalSendReceiverAnswersHttpRegistration() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let receiver = LocalSendReceiver(alias: "Receiver", fingerprint: "receiver-fingerprint", port: 53320, fileManager: fileManager)
+        try receiver.start(destinationRoot: root)
+        defer { receiver.stop() }
+
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:53320/api/localsend/v2/register")!)
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["fingerprint"] as? String, "receiver-fingerprint")
+        XCTAssertEqual(json["port"] as? Int, 53320)
+        XCTAssertEqual(json["announce"] as? Bool, false)
     }
 
     func testLocalSendReceiverAcceptsAndCommitsValidatedUpload() async throws {
@@ -317,7 +375,9 @@ final class ZManagerMobileTests: XCTestCase {
         let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
+        var callbackFile: URL?
         let receiver = LocalSendReceiver(port: 53319, fileManager: fileManager)
+        receiver.onFileCommitted = { file, _ in callbackFile = file }
         try receiver.start(destinationRoot: root)
         defer { receiver.stop() }
 
@@ -348,6 +408,39 @@ final class ZManagerMobileTests: XCTestCase {
         let (_, uploadResponse) = try await URLSession.shared.data(for: upload)
         XCTAssertEqual((uploadResponse as? HTTPURLResponse)?.statusCode, 200)
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("controlled-peer.txt")), payload)
+        XCTAssertEqual(callbackFile?.lastPathComponent, "controlled-peer.txt")
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent(".localsend").appendingPathComponent(sessionID).path))
+    }
+
+    func testLocalSendReceiverStreamsAndChecksumsLargeUpload() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let receiver = LocalSendReceiver(port: 53318, fileManager: fileManager)
+        try receiver.start(destinationRoot: root)
+        defer { receiver.stop() }
+
+        let payload = Data((0..<(8 * 1024 * 1024)).map { UInt8($0 % 251) })
+        let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+        let fileID = "large-file"
+        let prepareBody: [String: Any] = ["files": [fileID: [
+            "id": fileID, "fileName": "large.bin", "size": payload.count, "sha256": digest
+        ]]]
+        var prepare = URLRequest(url: URL(string: "http://127.0.0.1:53318/api/localsend/v2/prepare-upload")!)
+        prepare.httpMethod = "POST"
+        prepare.httpBody = try JSONSerialization.data(withJSONObject: prepareBody)
+        let (prepareData, _) = try await URLSession.shared.data(for: prepare)
+        let prepareJSON = try XCTUnwrap(try JSONSerialization.jsonObject(with: prepareData) as? [String: Any])
+        let sessionID = try XCTUnwrap(prepareJSON["sessionId"] as? String)
+        let files = try XCTUnwrap(prepareJSON["files"] as? [String: String])
+        let token = try XCTUnwrap(files[fileID])
+        var upload = URLRequest(url: URL(string: "http://127.0.0.1:53318/api/localsend/v2/upload?sessionId=\(sessionID)&fileId=\(fileID)&token=\(token)")!)
+        upload.httpMethod = "POST"
+        upload.httpBody = payload
+        let (_, response) = try await URLSession.shared.data(for: upload)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("large.bin")), payload)
         XCTAssertFalse(fileManager.fileExists(atPath: root.appendingPathComponent(".localsend").appendingPathComponent(sessionID).path))
     }
 

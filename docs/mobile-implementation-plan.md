@@ -84,7 +84,7 @@ Deliverables:
 - Confirm Android app skeleton opens in Android Studio and can build a debug target.
 - Confirm iOS project opens in Xcode and builds against the generated UniFFI bindings once available.
 - Add local fixture directory conventions for archive test files.
-- Use the existing documented regeneration command: `../zmanager/scripts/regenerate-bindings.sh`.
+- Use the existing documented regeneration command: `scripts/regenerate-bindings-pinned.sh`.
 - Add CI placeholders or scripts for Rust checks, Android checks, and iOS checks.
 - Store generated Android Kotlin bindings in `android/app/src/main/java/org/tzap/zmanager/mobile/bridge/generated/`.
 - Store generated iOS Swift bindings in `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
