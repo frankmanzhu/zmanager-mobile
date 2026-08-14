@@ -73,4 +73,29 @@ class ArchiveJobForegroundServiceTest {
         assertEquals("recovery-id-1234", result?.recoveryId)
         assertFalse(result!!.message!!.contains("password", ignoreCase = true))
     }
+
+    @Test
+    fun separateCreationResultRoundTripsAllCommittedOutputs() {
+        val result = ArchiveForegroundResult(
+            token = "create-separate-token",
+            kind = "create-separately",
+            status = "COMPLETED",
+            outputPath = "/files/one.zip",
+            outputPaths = listOf("/files/one.zip", "/files/two.zip"),
+            verified = true
+        )
+        val intent = Intent(ArchiveJobForegroundService.ACTION_RESULT)
+            .putExtra("token", result.token)
+            .putExtra("kind", result.kind)
+            .putExtra("status", result.status)
+            .putExtra("outputPath", result.outputPath)
+            .putStringArrayListExtra("outputPaths", ArrayList(result.outputPaths))
+            .putExtra("verified", true)
+
+        val parsed = ArchiveJobForegroundService.resultFrom(intent)
+
+        assertEquals(result.outputPath, parsed?.outputPath)
+        assertEquals(result.outputPaths, parsed?.outputPaths)
+        assertTrue(parsed?.verified == true)
+    }
 }

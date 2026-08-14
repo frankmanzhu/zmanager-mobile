@@ -10,6 +10,13 @@ appId: org.tzap.zmanager.mobile
     visible: "Review batch extraction"
     timeout: 15000
 - assertVisible: "2 archives will be extracted to separate app-storage folders."
+- scrollUntilVisible:
+    element: "Start batch extraction"
+    direction: DOWN
+- swipe:
+    start: 50%, 80%
+    end: 50%, 45%
+    duration: 500
 - tapOn: "Start batch extraction"
 - extendedWaitUntil:
     visible: "Batch extraction complete: 2 completed, 0 failed."

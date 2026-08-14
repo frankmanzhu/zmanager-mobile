@@ -74,23 +74,30 @@ sharing, LocalSend registration, selected-destination export, transient
 PIN-required retry paths, and explicit fingerprint trust storage pass in the
 Android/iOS test suites and simulator
 builds. The encrypted nested fixture passes wrong-password retry through
-verified repackaging on both platforms. Android has 44 JVM tests plus three
-ActivityScenario/instrumentation tests; the iOS Xcode suite reports 44 passed
-unit/bridge/coordinator/UI tests. Controlled Android and iOS Maestro flows pass for
+verified repackaging and separate-item creation on both platforms. Android has
+53 JVM tests plus eight connected ActivityScenario/provider tests; the iOS
+Xcode suite reports 54 passed tests (52 unit/bridge/coordinator plus two stable
+UI tests). Controlled Android and iOS Maestro flows pass for
 nested browsing, archive repackaging, encrypted password retry, receive
-lifecycle, deterministic extraction completion, and deterministic extraction
-cancellation, plus Android timeout recovery. A controlled LocalSend peer upload
+lifecycle, deterministic extraction completion, deterministic extraction
+cancellation, separate-item creation, and split-volume output commitment,
+plus Android timeout recovery. A controlled LocalSend peer upload
 has passed against the Android
 receiver, and the iOS simulator validates the same upload protocol in XCTest,
 including checksum, traversal-safe naming, destination commit, and staging
 cleanup. The complete release gate remains open for lifecycle/background behavior
 beyond the covered cleanup boundaries, real Android foreground-service
-timeout-boundary recovery, accessibility, native picker instrumentation,
+timeout-boundary recovery, accessibility, iOS security-scoped/Photos picker
+instrumentation,
 production-size large-job cancellation, and physical-device compatibility
 coverage. Simulator accessibility targets, responsive wide-screen constraints,
-and Trusted devices revocation controls are implemented but still need
-hardware-device evidence. The Android emulator process-death recovery harness
+About/help reachability, and Trusted devices revocation controls are implemented.
+Hardware-device evidence is still needed for TalkBack/VoiceOver and the real
+picker/provider flows. The Android emulator process-death recovery harness
 and both-platform deterministic cancellation-cleanup harnesses now pass.
+The iOS Share Extension target is embedded in the app and its app-group handoff
+is covered by unit tests; live share-sheet/provider behavior remains a device
+QA gate.
 
 ## Product Contract
 
@@ -154,7 +161,7 @@ Shared:
 - Rust UniFFI bridge owned by the sibling `zmanager` repository (`crates/zmanager-ffi`) over `zmanager-core`
 - ZManager-Core for archive logic
 - Native UI and platform file access do not share code
-- All format support is implemented in `zmanager-core` or Rust-owned backends behind the mobile bridge. Kotlin and Swift do not call AppleArchive, XIP, `aa`, `xip`, libarchive, or other archive engines directly.
+- All format support is implemented in `zmanager-core` or Rust-owned adapters behind the mobile bridge. Kotlin and Swift use the generated engine/session contract and do not call AppleArchive, XIP, `aa`, `xip`, or any archive engine directly.
 - Platform gates for formats validate mobile file access, lifecycle, destination commit, UI, and error behavior; they do not transfer archive behavior into Android or iOS shells.
 
 ## Format Scope

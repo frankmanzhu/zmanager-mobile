@@ -12,6 +12,7 @@ data class ArchiveRepackagingRequest(
     val selectedPaths: List<String>,
     val destinationArchivePath: String,
     val format: CreateArchiveFormat,
+    val volumeSize: ULong? = null,
     val sourcePassword: String? = null,
     val destinationPassword: String? = null,
     val verifyAfterCreate: Boolean = true
@@ -24,7 +25,11 @@ data class ArchiveRepackagingReview(
 )
 
 sealed interface ArchiveRepackagingOutcome {
-    data class Completed(val outputPath: String, val verified: Boolean) : ArchiveRepackagingOutcome
+    data class Completed(
+        val outputPath: String,
+        val verified: Boolean,
+        val outputPaths: List<String> = listOf(outputPath)
+    ) : ArchiveRepackagingOutcome
     data object Cancelled : ArchiveRepackagingOutcome
     data class PasswordRequired(val message: String) : ArchiveRepackagingOutcome
     data class Failed(val message: String) : ArchiveRepackagingOutcome
@@ -111,6 +116,7 @@ class ArchiveRepackagingCoordinator(
                     sourcePaths = listOf(session.stagingRoot.absolutePath),
                     destinationArchivePath = session.request.destinationArchivePath,
                     format = session.request.format,
+                    volumeSize = session.request.volumeSize,
                     password = session.request.destinationPassword,
                     verifyAfterCreate = session.request.verifyAfterCreate
                 )
@@ -130,7 +136,7 @@ class ArchiveRepackagingCoordinator(
             when (val created = creation.awaitCompletion(createReview, createJob) { onProgress(it.message) }) {
                 is ArchiveCreationOutcome.Completed -> finish(
                     review.id,
-                    ArchiveRepackagingOutcome.Completed(created.outputPath, created.verified)
+                    ArchiveRepackagingOutcome.Completed(created.outputPath, created.verified, created.outputPaths)
                 )
                 ArchiveCreationOutcome.Cancelled -> finish(review.id, ArchiveRepackagingOutcome.Cancelled)
                 is ArchiveCreationOutcome.Failed -> finish(review.id, ArchiveRepackagingOutcome.Failed(created.message))

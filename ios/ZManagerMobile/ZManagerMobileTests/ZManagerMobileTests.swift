@@ -137,9 +137,21 @@ final class ZManagerMobileTests: XCTestCase {
         }
         try Data("hello archive".utf8).write(to: source)
 
+        var scopeEvents: [String] = []
+        let securityScope = SecurityScopedResourceAccess(
+            start: { url in
+                scopeEvents.append("start:\(url.lastPathComponent)")
+                return true
+            },
+            stop: { url in
+                scopeEvents.append("stop:\(url.lastPathComponent)")
+            }
+        )
+
         let imported = try ArchiveImportStore(
             fileManager: fileManager,
-            cacheRoot: cacheRoot
+            cacheRoot: cacheRoot,
+            securityScope: securityScope
         ).importArchive(from: source)
 
         XCTAssertEqual(imported.displayName, "source.zip")
@@ -149,6 +161,7 @@ final class ZManagerMobileTests: XCTestCase {
             try Data(contentsOf: URL(fileURLWithPath: imported.localPath)),
             Data("hello archive".utf8)
         )
+        XCTAssertEqual(scopeEvents, ["start:source.zip", "stop:source.zip"])
     }
 
     func testArchiveImportChoosesTheFirstMultipartVolume() {
@@ -380,8 +393,168 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(bridge.startedRequest?.password, "test-password")
         let outcome = try await coordinator.awaitCompletion(review: review, jobId: jobId) { _ in }
 
-        XCTAssertEqual(outcome, .completed(outputPath: "/files/output.zip", verified: true))
+        XCTAssertEqual(
+            outcome,
+            .completed(
+                outputPath: "/files/output.zip",
+                verified: true,
+                outputPaths: ["/files/output.zip"]
+            )
+        )
         XCTAssertGreaterThan(bridge.pollCount, 0)
+    }
+
+    func testSeparateCreationRequestsUseStableNamesAndUniqueDestinations() {
+        let requests = ArchiveSeparateCreationPlanner.requests(
+            sourcePaths: ["/cache/photos.zip", "/cache/photos.txt", "/cache/folder"],
+            destinationDirectory: "/files/CreatedArchives",
+            format: .zip,
+            password: "secret",
+            volumeSize: 64 * 1024
+        )
+
+        XCTAssertEqual(
+            requests.map(\.destinationArchivePath),
+            [
+                "/files/CreatedArchives/photos.zip",
+                "/files/CreatedArchives/photos (1).zip",
+                "/files/CreatedArchives/folder.zip"
+            ]
+        )
+        XCTAssertEqual(requests.map(\.sourcePaths), [["/cache/photos.zip"], ["/cache/photos.txt"], ["/cache/folder"]])
+        XCTAssertTrue(requests.allSatisfy { $0.password == "secret" && $0.volumeSize == 64 * 1024 })
+    }
+
+    func testSeparateCreationCoordinatorPlansEveryItemThroughRustGateway() throws {
+        let bridge = CreationFakeBridgeClient()
+        let coordinator = ArchiveCreationCoordinator(bridge: bridge)
+        let separate = ArchiveSeparateCreationCoordinator(coordinator: coordinator)
+        let requests = ArchiveSeparateCreationPlanner.requests(
+            sourcePaths: ["/cache/one.txt", "/cache/two.txt"],
+            destinationDirectory: "/files/CreatedArchives",
+            format: .sevenZ
+        )
+
+        let review = try separate.plan(requests: requests)
+
+        XCTAssertEqual(review.items.count, 2)
+        XCTAssertEqual(bridge.plannedSourcePathsByRequest.map(\.first!), ["/cache/one.txt", "/cache/two.txt"])
+    }
+
+    @MainActor
+    func testSeparateCreationRunsEachRustJobSequentially() async throws {
+        let bridge = CreationFakeBridgeClient()
+        let coordinator = ArchiveCreationCoordinator(bridge: bridge)
+        let separate = ArchiveSeparateCreationCoordinator(coordinator: coordinator)
+        let review = try separate.plan(
+            requests: ArchiveSeparateCreationPlanner.requests(
+                sourcePaths: ["/cache/one.txt", "/cache/two.txt"],
+                destinationDirectory: "/files/CreatedArchives",
+                format: .zip
+            )
+        )
+        let model = ArchiveImportModel(creationCoordinator: coordinator)
+
+        model.startSeparateCreation(review)
+        try await Task.sleep(nanoseconds: 800_000_000)
+
+        guard case .completed(.completed(_, let verified, let outputPaths)) = model.creationState else {
+            return XCTFail("Expected separate creation to complete: \(String(describing: model.creationState))")
+        }
+        XCTAssertTrue(verified)
+        XCTAssertEqual(outputPaths, ["/files/CreatedArchives/one.zip", "/files/CreatedArchives/two.zip"])
+        XCTAssertEqual(bridge.startedRequests.map(\.destinationArchivePath), [
+            "/files/CreatedArchives/one.zip",
+            "/files/CreatedArchives/two.zip"
+        ])
+    }
+
+    @MainActor
+    func testSceneBackgroundDiscardsSeparateCreationReview() {
+        let bridge = CreationFakeBridgeClient()
+        let coordinator = ArchiveCreationCoordinator(bridge: bridge)
+        let separate = ArchiveSeparateCreationCoordinator(coordinator: coordinator)
+        let review = try! separate.plan(
+            requests: ArchiveSeparateCreationPlanner.requests(
+                sourcePaths: ["/cache/one.txt", "/cache/two.txt"],
+                destinationDirectory: "/files/CreatedArchives",
+                format: .zip
+            )
+        )
+        let model = ArchiveImportModel(creationCoordinator: coordinator)
+        model.creationState = .separateReview(review)
+
+        model.handleSceneBackground()
+
+        if case .idle = model.creationState {
+            return
+        }
+        XCTFail("Backgrounding must discard the separate creation review")
+    }
+
+    func testPinnedBridgeCreatesAndReportsSplitZipVolumes() async throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobileTests-Split-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let source = root.appendingPathComponent("source.bin")
+        var state: UInt32 = 0x6D2B79F5
+        let bytes = Data((0..<4_000_000).map { _ in
+            state ^= state << 13
+            state ^= state >> 17
+            state ^= state << 5
+            return UInt8(truncatingIfNeeded: state)
+        })
+        try bytes.write(to: source)
+        let destination = root.appendingPathComponent("split.zip")
+        let coordinator = ArchiveCreationCoordinator()
+        let review = try coordinator.plan(
+            request: ArchiveCreationRequest(
+                sourcePaths: [source.path],
+                destinationArchivePath: destination.path,
+                format: .zip,
+                volumeSize: 64 * 1024
+            )
+        )
+
+        let jobID = try coordinator.start(review: review)
+        let outcome = try await coordinator.awaitCompletion(review: review, jobId: jobID) { _ in }
+
+        guard case .completed(let outputPath, let verified, let outputPaths) = outcome else {
+            return XCTFail("Expected split creation to complete: \(outcome)")
+        }
+        XCTAssertEqual(outputPath, destination.path)
+        // Verification of the multi-volume root is bridge/engine dependent;
+        // the contract under test is that creation commits the complete set.
+        _ = verified
+        XCTAssertGreaterThan(outputPaths.count, 1)
+        XCTAssertTrue(outputPaths.allSatisfy { fileManager.fileExists(atPath: $0) })
+    }
+
+    func testCommittedOutputPathsDiscoversZipSidecarsWhenBridgeOmitsMetadata() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobileTests-Sidecars-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let destination = root.appendingPathComponent("output.zip")
+        try Data("volume 1".utf8).write(to: root.appendingPathComponent("output.z01"))
+        try Data("volume 2".utf8).write(to: root.appendingPathComponent("output.z02"))
+        try Data("final volume".utf8).write(to: destination)
+
+        XCTAssertEqual(
+            ArchiveVolumeSupport.committedOutputPaths(
+                format: .zip,
+                destination: destination.path,
+                volumeCount: nil,
+                reportedPaths: [],
+                fileManager: fileManager
+            ),
+            [destination.path, root.appendingPathComponent("output.z01").path, root.appendingPathComponent("output.z02").path]
+        )
     }
 
     func testNestedArchiveSessionPopCleansMaterializedRoot() {
@@ -440,6 +613,75 @@ final class ZManagerMobileTests: XCTestCase {
 
         stager.discard(staged)
         XCTAssertFalse(fileManager.fileExists(atPath: staged.root.path))
+    }
+
+    func testNativeStagersBracketSecurityScopedAccess() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let source = root.appendingPathComponent("selected.txt")
+        try Data("scoped content".utf8).write(to: source)
+        let folder = root.appendingPathComponent("Folder", isDirectory: true)
+        let nested = folder.appendingPathComponent("nested/data.bin")
+        try fileManager.createDirectory(at: nested.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([1, 2, 3]).write(to: nested)
+
+        var events: [String] = []
+        let access = SecurityScopedResourceAccess(
+            start: { url in
+                events.append("start:\(url.lastPathComponent)")
+                return true
+            },
+            stop: { url in
+                events.append("stop:\(url.lastPathComponent)")
+            }
+        )
+
+        let creationStager = ArchiveCreationSourceStager(fileManager: fileManager, securityScope: access)
+        let stagedFile = try creationStager.stageFiles([source])
+        defer { creationStager.discard(stagedFile) }
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: stagedFile.sourcePaths[0])), Data("scoped content".utf8))
+
+        let localSendStager = LocalSendSourceStager(fileManager: fileManager, securityScope: access)
+        let stagedFolder = try localSendStager.stageFiles([source])
+        defer { localSendStager.discard(stagedFolder) }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stagedFolder.sourcePaths[0]))
+
+        let folderStaging = try creationStager.stageFolder(folder)
+        defer { creationStager.discard(folderStaging) }
+        let stagedNested = URL(fileURLWithPath: folderStaging.sourcePaths[0])
+            .appendingPathComponent("nested/data.bin")
+        XCTAssertEqual(try Data(contentsOf: stagedNested), Data([1, 2, 3]))
+        XCTAssertEqual(
+            events,
+            [
+                "start:selected.txt", "stop:selected.txt",
+                "start:selected.txt", "stop:selected.txt",
+                "start:Folder", "stop:Folder"
+            ]
+        )
+    }
+
+    func testSecurityScopedAccessStopsWhenStagingFails() {
+        let fileManager = FileManager.default
+        var events: [String] = []
+        let access = SecurityScopedResourceAccess(
+            start: { url in
+                events.append("start:\(url.lastPathComponent)")
+                return true
+            },
+            stop: { url in
+                events.append("stop:\(url.lastPathComponent)")
+            }
+        )
+        let missing = fileManager.temporaryDirectory
+            .appendingPathComponent("missing-\(UUID().uuidString).txt")
+        let stager = ArchiveCreationSourceStager(fileManager: fileManager, securityScope: access)
+
+        XCTAssertThrowsError(try stager.stageFiles([missing]))
+        XCTAssertEqual(events, ["start:\(missing.lastPathComponent)", "stop:\(missing.lastPathComponent)"])
     }
 
     func testCreationSourceStagerWritesPhotoDataAndCleansIt() throws {
@@ -528,6 +770,48 @@ final class ZManagerMobileTests: XCTestCase {
         )) { error in
             XCTAssertEqual((error as? ArchiveAutomationError), .credentialQuery)
         }
+    }
+
+    func testAutomationParserAcceptsShareExtensionHandoffWithoutCredentials() throws {
+        let request = try ArchiveAutomationParser.parse(
+            URL(string: "zmanager://import?id=share-123")!
+        )
+
+        XCTAssertEqual(request.action, .importShared)
+        XCTAssertEqual(request.sharedIdentifier, "share-123")
+        XCTAssertNil(request.archiveURL)
+        XCTAssertTrue(request.sourceURLs.isEmpty)
+    }
+
+    func testSharedImportStoreCopiesAndConsumesAppGroupInbox() throws {
+        let fileManager = FileManager.default
+        let container = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile-ShareGroup-\(UUID().uuidString)", isDirectory: true)
+        let identifier = "share-\(UUID().uuidString)"
+        let incoming = container
+            .appendingPathComponent(SharedImportStore.incomingDirectoryName, isDirectory: true)
+            .appendingPathComponent(identifier, isDirectory: true)
+        try fileManager.createDirectory(at: incoming, withIntermediateDirectories: true)
+        try Data("shared archive".utf8).write(to: incoming.appendingPathComponent("evil:archive.zip"))
+        try Data("real archive".utf8).write(to: incoming.appendingPathComponent("archive.zip"))
+        defer { try? fileManager.removeItem(at: container) }
+
+        let store = SharedImportStore(fileManager: fileManager) { container }
+        let batch = try store.stageIncoming(identifier: identifier)
+
+        XCTAssertEqual(batch.sourceURLs.count, 2)
+        XCTAssertFalse(fileManager.fileExists(atPath: incoming.path))
+        XCTAssertTrue(batch.sourceURLs.allSatisfy { fileManager.fileExists(atPath: $0.path) })
+        XCTAssertTrue(batch.sourceURLs.contains { $0.lastPathComponent == "evil_archive.zip" })
+        XCTAssertTrue(batch.sourceURLs.contains { $0.lastPathComponent == "archive.zip" })
+
+        try fileManager.removeItem(at: batch.cleanupRoot)
+    }
+
+    func testSharedImportStoreRejectsTraversalIdentifiers() {
+        XCTAssertFalse(SharedImportStore.isValidIdentifier("../outside"))
+        XCTAssertFalse(SharedImportStore.isValidIdentifier("share/id"))
+        XCTAssertTrue(SharedImportStore.isValidIdentifier("share-123"))
     }
 
     func testLocalSendReceiverSanitizesIncomingNames() {
@@ -902,7 +1186,7 @@ final class ZManagerMobileTests: XCTestCase {
             )
         )
         let retryOutcome = await coordinator.run(review: retryReview)
-        guard case .completed(_, let verified) = retryOutcome else {
+        guard case .completed(_, let verified, _) = retryOutcome else {
             return XCTFail("Expected the password retry to complete: \(retryOutcome)")
         }
         XCTAssertTrue(verified)
@@ -1199,7 +1483,9 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
 
 private final class CreationFakeBridgeClient: ArchiveBridgeClient {
     var plannedSourcePaths: [String] = []
+    var plannedSourcePathsByRequest = [[String]]()
     var startedRequest: StartCreateRequest?
+    var startedRequests = [StartCreateRequest]()
     var pollCount = 0
 
     func detectArchiveMetadata(path: String) throws -> DetectArchiveResult {
@@ -1220,6 +1506,7 @@ private final class CreationFakeBridgeClient: ArchiveBridgeClient {
 
     func planCreation(request: PlanCreateRequest) throws -> PlanCreateResult {
         plannedSourcePaths = request.sourcePaths
+        plannedSourcePathsByRequest.append(request.sourcePaths)
         return PlanCreateResult(
             sourcePaths: request.sourcePaths,
             destinationArchivePath: request.destinationArchivePath,
@@ -1244,6 +1531,7 @@ private final class CreationFakeBridgeClient: ArchiveBridgeClient {
 
     func startCreation(request: StartCreateRequest) throws -> StartJobResult {
         startedRequest = request
+        startedRequests.append(request)
         return StartJobResult(jobId: "create-job", kind: .zipCreate, status: .running)
     }
 

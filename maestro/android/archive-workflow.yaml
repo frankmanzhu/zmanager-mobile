@@ -29,7 +29,11 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: "Archive verified"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Search"
+    direction: UP
 - tapOn: "Search"
+- eraseText: 32
 - inputText: "release"
 - pressKey: BACK
 - assertVisible: "release-notes.md"

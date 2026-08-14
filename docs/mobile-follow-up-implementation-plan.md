@@ -47,8 +47,8 @@ send/receive sessions with checksum and traversal-safe receiver commits,
 explicit trusted-device revocation, deterministic archive creation/extraction
 Maestro flows, and redacted operation reports. The remaining work is
 concentrated in reverse-transfer compatibility, lifecycle/background behavior,
-provider permission instrumentation, format promotion beyond the pinned create
-DTO, accessibility/device evidence, and broader edge-case E2E coverage. Failed
+format promotion beyond the pinned create DTO, accessibility/device evidence,
+and broader edge-case E2E coverage. Failed
 native extraction commits now retain redacted recovery records and expose
 Retry/Export/Discard actions on both shells.
 
@@ -64,7 +64,8 @@ Implementation status for the current workstream:
   native review checkpoint before the jobs start.
 - Android and iOS have outbound LocalSend primitives with v2.2 metadata,
   multicast discovery, HTTP registration fallback, upload preparation,
-  SHA-256 metadata, upload, cancellation, visible transfer cancellation, and
+  SHA-256 metadata, upload, cancellation, visible transfer cancellation, HTTPS
+  certificate-fingerprint validation, and
   transient PIN-required retry UX. Each send now requires an explicit
   device/address/fingerprint confirmation. Stable per-installation fingerprints
   can be explicitly remembered, listed in a Trusted devices section, and
@@ -90,6 +91,10 @@ Implementation status for the current workstream:
 - iOS creation now accepts Photos picker image/video selections and iPad
   document drag/drop into the creation staging path. Provider data remains
   app-staged before Rust creation.
+- iOS now has a native Share Extension target. It copies selected provider
+  files into an app-group inbox, opens the main app through the registered
+  `zmanager://import` handoff, and lets the existing app-owned import path
+  consume and clean the staged files. The extension contains no archive logic.
 - Deterministic nested and create/repackage fixtures are bundled in both
   shells. Nested browsing, native-folder creation, archive-folder
   repackaging, and receive-mode lifecycle Maestro flows pass on Android and
@@ -97,6 +102,21 @@ Implementation status for the current workstream:
   retry through successful verified repackaging on both platforms. The pinned
   iOS bridge, coordinator handoff, native XCUITest, and iOS Maestro flow all
   pass for the same recovery path.
+- Split-volume creation is now wired through the pinned `volume_size` DTO for
+  ZIP, 7z, and TZAP. Rust remains responsible for volume writing and
+  verification; the shells derive companion filenames only for display and
+  destination bookkeeping. Deterministic split-create flows pass on the
+  Android emulator and iOS simulator with committed volume counts. Both shells
+  also discover committed sidecar volumes when the pinned bridge omits volume
+  metadata. The pinned bridge may report verification as unavailable for a
+  multi-volume root, which
+  the UI surfaces as "Created without verification" rather than claiming a
+  false verification result.
+- Completed archive creation and archive-folder repackaging now expose native
+  `Share output` actions. Android shares one or multiple committed volumes
+  through FileProvider; iOS presents the native activity sheet with the same
+  committed output set. The share action never changes Rust-owned creation or
+  repackaging semantics.
 - Deterministic cancellation flows now exist at
   `maestro/android/extraction-cancellation.yaml` and
   `maestro/ios/extraction-cancellation.yaml`. They use debug-only pacing to
@@ -106,6 +126,9 @@ Implementation status for the current workstream:
   `maestro/android/extraction-timeout.yaml`; the timed-out coordinator discards
   its staging and the UI exposes a retryable timeout message. iOS LocalSend
   uploads now report byte progress through `URLSession` delegate callbacks.
+- Android instrumentation now includes a debug-only `DocumentsProvider` fixture
+  covering real `content://` archive import, `DocumentFile` folder staging, SAF
+  destination commit, and collision rename behavior.
 - Android and iOS native extraction commits now reject traversal and symlink-like
   paths outside the private staging root before writing platform destinations.
   Both shells also stop active LocalSend/repackaging work when entering the
@@ -115,20 +138,32 @@ Implementation status for the current workstream:
   and iOS simulator, leaving no committed final extraction files after a paced
   cancellation. This verifies the app-controlled cleanup path, not every
   production-size or OS-suspended job shape.
-- Android has 44 JVM tests plus three ActivityScenario/instrumentation tests, and
-  the iOS Xcode suite reports 44 passed unit/bridge/coordinator/UI tests.
+- Android has 52 JVM tests plus eight connected ActivityScenario/provider tests, and
+  the iOS Xcode suite reports 53 passed tests (51 unit/bridge/coordinator plus
+  two stable UI tests).
+  The connected Android suite includes a real provider-backed `ACTION_VIEW`
+  archive-import handoff.
   Controlled Android and iOS Maestro flows pass for nested browsing, archive repackaging,
-  encrypted password retry, and receive lifecycle. A controlled LocalSend peer
+  encrypted password retry, receive lifecycle, and separate-item creation. A controlled LocalSend peer
   upload passes against Android through an adb-forwarded socket, and the iOS
   simulator runs the same validated upload path in XCTest.
 
+An installed official LocalSend desktop peer was also queried successfully: its
+v2 registration response and HTTPS certificate fingerprint were accepted by the
+interoperability probe (`LOCALSEND_HOST=... scripts/check-localsend-interop.sh`).
+Full user-approved external upload still needs a
+controlled peer session because the official desktop requires interactive
+transfer approval.
+
 Remaining launch work is reverse-download support if required, real Android 15
 foreground-service timeout-boundary validation, deeper iOS interruption and
-background-suspension hardening, native SAF/security-scoped and Photos picker
-instrumentation, physical-device/device-matrix coverage, and production-size
-large-job cancellation evidence. Simulator accessibility targets and responsive
-wide-screen constraints are now wired; hardware TalkBack/VoiceOver and real
-picker behavior still require device evidence.
+background-suspension hardening, native iOS picker/provider device
+instrumentation,
+physical-device/device-matrix coverage, and production-size
+large-job cancellation evidence. The native About/help surface and default
+destination controls are now reachable on both shells. Simulator accessibility
+targets and responsive wide-screen constraints are now wired; hardware
+TalkBack/VoiceOver and real picker behavior still require device evidence.
 
 ## Track 1: Nested archive browsing
 

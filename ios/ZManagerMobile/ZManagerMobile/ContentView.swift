@@ -2,6 +2,7 @@ import QuickLook
 import CryptoKit
 import Network
 import PhotosUI
+import Security
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -157,6 +158,8 @@ struct ContentView: View {
     @State private var isLocalSendReceiveDestinationPickerPresented = false
     @State private var localSendTrustVersion = 0
     @State private var recoveryShareURLs = [URL]()
+    @State private var createdShareURLs = [URL]()
+    @State private var isHelpPresented = false
 
     var body: some View {
         ScrollView {
@@ -174,6 +177,10 @@ struct ContentView: View {
                 Button("Reset default destination") {
                     importModel.resetDefaultExtractionDestination()
                 }
+                Button("About & help") {
+                    isHelpPresented = true
+                }
+                .accessibilityIdentifier("aboutAndHelp")
 #if DEBUG
                 Button("Load nested fixture") {
                     importModel.importMaestroFixture(named: "maestro-nested.zip")
@@ -183,6 +190,12 @@ struct ContentView: View {
                 }
                 Button("Create debug folder archive") {
                     importModel.createDebugFixture()
+                }
+                Button("Create debug split archive") {
+                    importModel.createDebugSplitFixture()
+                }
+                Button("Create debug separate archives") {
+                    importModel.createDebugSeparateFixture()
                 }
                 Button("Run debug batch extraction") {
                     importModel.startDebugBatchFixture()
@@ -281,6 +294,11 @@ struct ContentView: View {
                 onRetryRepackagingWithPassword: { entries, password in
                     importModel.retryRepackagingWithPassword(selectedEntries: entries, password: password)
                 },
+                onShareRepackagedOutput: { paths in
+                    createdShareURLs = paths
+                        .map(URL.init(fileURLWithPath:))
+                        .filter { FileManager.default.fileExists(atPath: $0.path) }
+                },
                 onStartRepackaging: importModel.runRepackaging,
                 onCancelRepackaging: importModel.cancelRepackaging
             )
@@ -297,16 +315,26 @@ struct ContentView: View {
                 state: importModel.creationState,
                 format: importModel.creationFormat,
                 password: importModel.creationPasswordInput,
+                volumeSizeInput: importModel.creationVolumeSizeInput,
+                separateItems: importModel.creationSeparateItems,
                 onPasswordChanged: { importModel.creationPasswordInput = $0 },
+                onVolumeSizeChanged: { importModel.creationVolumeSizeInput = $0 },
+                onSeparateItemsChanged: { importModel.creationSeparateItems = $0 },
                 onFormatChanged: { importModel.creationFormat = $0 },
                 onChooseFiles: { isCreationFilesImporterPresented = true },
                 onChooseFolder: { isCreationFolderImporterPresented = true },
                 onDropFiles: importModel.handleDroppedCreationFiles,
-                onStart: importModel.startCreation,
+                onStart: { review in importModel.startCreation(review) },
+                onStartSeparate: importModel.startSeparateCreation,
+                onShareOutput: { paths in
+                    createdShareURLs = paths
+                        .map(URL.init(fileURLWithPath:))
+                        .filter { FileManager.default.fileExists(atPath: $0.path) }
+                },
                 onCancel: importModel.cancelCreation
             )
             if case .completed(let outcome) = importModel.creationState,
-               case .completed(let outputPath, let verified) = outcome {
+               case .completed(let outputPath, let verified, _) = outcome {
                 Button("Save operation report") {
                     importModel.saveCreationReport(outputPath: outputPath, verified: verified)
                 }
@@ -551,6 +579,32 @@ struct ContentView: View {
         )) {
             RecoveryShareSheet(urls: recoveryShareURLs)
         }
+        .sheet(isPresented: Binding(
+            get: { !createdShareURLs.isEmpty },
+            set: { if !$0 { createdShareURLs = [] } }
+        )) {
+            RecoveryShareSheet(urls: createdShareURLs)
+        }
+        .sheet(isPresented: $isHelpPresented) {
+            NavigationView {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("ZManager keeps archive listing, extraction, verification, and creation in the Rust core.")
+                        Text("Choose an archive to inspect it, select entries to extract or repackage, and use Share on local network for LocalSend-compatible transfers.")
+                        Text("Passwords are transient and are not included in operation reports.")
+                    }
+                    .frame(maxWidth: 700, alignment: .leading)
+                    .padding()
+                }
+                .navigationTitle("About ZManager")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Close") { isHelpPresented = false }
+                    }
+                }
+            }
+            .accessibilityIdentifier("aboutAndHelpSheet")
+        }
     }
 }
 
@@ -620,12 +674,26 @@ enum ArchiveAutomationAction: Equatable {
     case extract
     case create
     case verify
+    case importShared
 }
 
 struct ArchiveAutomationRequest: Equatable {
     let action: ArchiveAutomationAction
     let archiveURL: URL?
     let sourceURLs: [URL]
+    let sharedIdentifier: String?
+
+    init(
+        action: ArchiveAutomationAction,
+        archiveURL: URL?,
+        sourceURLs: [URL],
+        sharedIdentifier: String? = nil
+    ) {
+        self.action = action
+        self.archiveURL = archiveURL
+        self.sourceURLs = sourceURLs
+        self.sharedIdentifier = sharedIdentifier
+    }
 }
 
 enum ArchiveAutomationError: LocalizedError, Equatable {
@@ -635,6 +703,8 @@ enum ArchiveAutomationError: LocalizedError, Equatable {
     case missingArchive
     case missingFiles
     case nonLocalURL
+    case missingSharedImport
+    case invalidSharedImport
 
     var errorDescription: String? {
         switch self {
@@ -644,6 +714,8 @@ enum ArchiveAutomationError: LocalizedError, Equatable {
         case .missingArchive: return "Automation requires a local archive URL."
         case .missingFiles: return "Create automation requires local files."
         case .nonLocalURL: return "Automation accepts only local file URLs."
+        case .missingSharedImport: return "Share import is missing its handoff identifier."
+        case .invalidSharedImport: return "Share import contains an invalid handoff identifier."
         }
     }
 }
@@ -659,6 +731,7 @@ enum ArchiveAutomationParser {
         case "extract": action = .extract
         case "create": action = .create
         case "verify": action = .verify
+        case "import": action = .importShared
         default: throw ArchiveAutomationError.unsupportedAction
         }
         let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -682,6 +755,19 @@ enum ArchiveAutomationParser {
                 throw ArchiveAutomationError.missingArchive
             }
             return ArchiveAutomationRequest(action: action, archiveURL: archive, sourceURLs: [])
+        case .importShared:
+            guard let identifier = queryItems.first(where: { $0.name == "id" })?.value else {
+                throw ArchiveAutomationError.missingSharedImport
+            }
+            guard SharedImportStore.isValidIdentifier(identifier) else {
+                throw ArchiveAutomationError.invalidSharedImport
+            }
+            return ArchiveAutomationRequest(
+                action: action,
+                archiveURL: nil,
+                sourceURLs: [],
+                sharedIdentifier: identifier
+            )
         }
     }
 }
@@ -706,6 +792,28 @@ enum ArchiveImportError: LocalizedError {
     }
 }
 
+/// Keeps security-scoped URL lifetime management in the native shell. Tests
+/// can inject a recorder without depending on a real Files provider.
+struct SecurityScopedResourceAccess {
+    let start: (URL) -> Bool
+    let stop: (URL) -> Void
+
+    static let system = SecurityScopedResourceAccess(
+        start: { $0.startAccessingSecurityScopedResource() },
+        stop: { $0.stopAccessingSecurityScopedResource() }
+    )
+
+    func withAccess<T>(_ url: URL, operation: () throws -> T) rethrows -> T {
+        let didStart = start(url)
+        defer {
+            if didStart {
+                stop(url)
+            }
+        }
+        return try operation()
+    }
+}
+
 struct StagedCreationSources {
     let root: URL
     let sourcePaths: [String]
@@ -715,9 +823,14 @@ struct StagedCreationSources {
 /// before the Rust create bridge is called.
 struct ArchiveCreationSourceStager {
     let fileManager: FileManager
+    let securityScope: SecurityScopedResourceAccess
 
-    init(fileManager: FileManager = .default) {
+    init(
+        fileManager: FileManager = .default,
+        securityScope: SecurityScopedResourceAccess = .system
+    ) {
         self.fileManager = fileManager
+        self.securityScope = securityScope
     }
 
     func stageFiles(_ urls: [URL]) throws -> StagedCreationSources {
@@ -728,11 +841,11 @@ struct ArchiveCreationSourceStager {
         do {
             var paths: [String] = []
             for url in urls {
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
-                try fileManager.copyItem(at: url, to: target)
-                paths.append(target.path)
+                try securityScope.withAccess(url) {
+                    let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
+                    try fileManager.copyItem(at: url, to: target)
+                    paths.append(target.path)
+                }
             }
             return StagedCreationSources(root: root, sourcePaths: paths)
         } catch {
@@ -761,18 +874,18 @@ struct ArchiveCreationSourceStager {
     }
 
     func stageFolder(_ url: URL) throws -> StagedCreationSources {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        do {
-            let target = root.appendingPathComponent(ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent), isDirectory: true)
-            try fileManager.copyItem(at: url, to: target)
-            return StagedCreationSources(root: root, sourcePaths: [target.path])
-        } catch {
-            try? fileManager.removeItem(at: root)
-            throw error
+        try securityScope.withAccess(url) {
+            let root = fileManager.temporaryDirectory
+                .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
+            try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+            do {
+                let target = root.appendingPathComponent(ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent), isDirectory: true)
+                try fileManager.copyItem(at: url, to: target)
+                return StagedCreationSources(root: root, sourcePaths: [target.path])
+            } catch {
+                try? fileManager.removeItem(at: root)
+                throw error
+            }
         }
     }
 
@@ -799,6 +912,47 @@ struct ArchiveCreationSourceStager {
         }
     }
 
+    /// Deterministic incompressible source used by split-volume device E2E only.
+    func stageDebugSplitFixture() throws -> StagedCreationSources {
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
+        let folder = root.appendingPathComponent("split-fixture-folder", isDirectory: true)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        do {
+            try Data("ZManager Mobile split creation fixture\n".utf8)
+                .write(to: folder.appendingPathComponent("readme.txt"))
+            var state: UInt32 = 0x6D2B79F5
+            let bytes = Data((0..<4_000_000).map { _ in
+                state ^= state << 13
+                state ^= state >> 17
+                state ^= state << 5
+                return UInt8(truncatingIfNeeded: state)
+            })
+            try bytes.write(to: folder.appendingPathComponent("payload.bin"))
+            return StagedCreationSources(root: root, sourcePaths: [folder.path])
+        } catch {
+            try? fileManager.removeItem(at: root)
+            throw error
+        }
+    }
+
+    /// Two top-level files used by separate-archive device E2E only.
+    func stageDebugSeparateFixture() throws -> StagedCreationSources {
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/CreationSources/\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        do {
+            let first = root.appendingPathComponent("one.txt")
+            let second = root.appendingPathComponent("two.txt")
+            try Data("first separate archive\n".utf8).write(to: first)
+            try Data("second separate archive\n".utf8).write(to: second)
+            return StagedCreationSources(root: root, sourcePaths: [first.path, second.path])
+        } catch {
+            try? fileManager.removeItem(at: root)
+            throw error
+        }
+    }
+
     private func uniqueTarget(root: URL, name: String) -> URL {
         let safeName = name.isEmpty ? "file" : name
         var candidate = root.appendingPathComponent(safeName)
@@ -817,9 +971,14 @@ struct ArchiveCreationSourceStager {
 /// Copies security-scoped selections into private files before LocalSend reads them.
 struct LocalSendSourceStager {
     let fileManager: FileManager
+    let securityScope: SecurityScopedResourceAccess
 
-    init(fileManager: FileManager = .default) {
+    init(
+        fileManager: FileManager = .default,
+        securityScope: SecurityScopedResourceAccess = .system
+    ) {
         self.fileManager = fileManager
+        self.securityScope = securityScope
     }
 
     func stageFiles(_ urls: [URL]) throws -> StagedCreationSources {
@@ -830,11 +989,11 @@ struct LocalSendSourceStager {
         do {
             var paths: [String] = []
             for url in urls {
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
-                try fileManager.copyItem(at: url, to: target)
-                paths.append(target.path)
+                try securityScope.withAccess(url) {
+                    let target = uniqueTarget(root: root, name: ArchiveImportStore.sanitizedDisplayName(url.lastPathComponent))
+                    try fileManager.copyItem(at: url, to: target)
+                    paths.append(target.path)
+                }
             }
             return StagedCreationSources(root: root, sourcePaths: paths)
         } catch {
@@ -890,6 +1049,7 @@ struct ArchiveListingPanel: View {
     @Binding var repackagingPassword: String
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
     let onRetryRepackagingWithPassword: ([ArchiveEntrySummary], String) -> Void
+    let onShareRepackagedOutput: ([String]) -> Void
     let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
@@ -928,6 +1088,7 @@ struct ArchiveListingPanel: View {
                 repackagingPassword: $repackagingPassword,
                 onRepackageEntries: onRepackageEntries,
                 onRetryRepackagingWithPassword: onRetryRepackagingWithPassword,
+                onShareRepackagedOutput: onShareRepackagedOutput,
                 onStartRepackaging: onStartRepackaging,
                 onCancelRepackaging: onCancelRepackaging
             )
@@ -987,6 +1148,7 @@ struct ArchiveListingReadyPanel: View {
     @Binding var repackagingPassword: String
     let onRepackageEntries: ([ArchiveEntrySummary]) -> Void
     let onRetryRepackagingWithPassword: ([ArchiveEntrySummary], String) -> Void
+    let onShareRepackagedOutput: ([String]) -> Void
     let onStartRepackaging: () -> Void
     let onCancelRepackaging: () -> Void
 
@@ -1085,6 +1247,7 @@ struct ArchiveListingReadyPanel: View {
                 state: repackagingState,
                 password: $repackagingPassword,
                 onRetryWithPassword: onRetryRepackagingWithPassword,
+                onShareOutput: onShareRepackagedOutput,
                 onStart: onStartRepackaging,
                 onCancel: onCancelRepackaging
             )
@@ -1137,6 +1300,7 @@ struct ArchiveRepackagingPanel: View {
     let state: ArchiveRepackagingState
     @Binding var password: String
     let onRetryWithPassword: ([ArchiveEntrySummary], String) -> Void
+    let onShareOutput: ([String]) -> Void
     let onStart: () -> Void
     let onCancel: () -> Void
     @State private var draftPassword = ""
@@ -1205,12 +1369,18 @@ struct ArchiveRepackagingPanel: View {
                 Spacer()
                 Button("Cancel", action: onCancel)
             }
-        case .completed(let outputPath, let verified):
+        case .completed(let outputPath, let verified, let outputPaths):
             VStack(alignment: .leading, spacing: 2) {
                 Text("Created \(outputPath)").font(.subheadline)
+                if outputPaths.count > 1 {
+                    Text("\(outputPaths.count) volumes committed").font(.caption)
+                }
                 Text(verified ? "Verified" : "Created without verification")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button("Share output") {
+                    onShareOutput(outputPaths.isEmpty ? [outputPath] : outputPaths)
+                }
             }
         case .cancelled:
             Text("Repackaging cancelled").font(.subheadline)
@@ -1366,10 +1536,16 @@ struct ArchiveImportStore {
 
     private let fileManager: FileManager
     private let cacheRoot: URL?
+    private let securityScope: SecurityScopedResourceAccess
 
-    init(fileManager: FileManager = .default, cacheRoot: URL? = nil) {
+    init(
+        fileManager: FileManager = .default,
+        cacheRoot: URL? = nil,
+        securityScope: SecurityScopedResourceAccess = .system
+    ) {
         self.fileManager = fileManager
         self.cacheRoot = cacheRoot
+        self.securityScope = securityScope
     }
 
     func importArchive(from url: URL) throws -> ImportedArchive {
@@ -1381,12 +1557,12 @@ struct ArchiveImportStore {
             throw ArchiveImportError.emptySelection
         }
         let scopedURLs = urls.map { url in
-            (url, url.startAccessingSecurityScopedResource())
+            (url, securityScope.start(url))
         }
         defer {
             scopedURLs.forEach { url, didStartAccessing in
                 if didStartAccessing {
-                    url.stopAccessingSecurityScopedResource()
+                    securityScope.stop(url)
                 }
             }
         }
@@ -1466,6 +1642,105 @@ struct ArchiveImportStore {
             ?? names.first { $0.range(of: #"(?i)^.+\.part1\.rar$"#, options: .regularExpression) != nil }
             ?? names.first { $0.range(of: #"(?i)^.+\.7z\.001$"#, options: .regularExpression) != nil }
             ?? names.first { $0.lowercased().hasSuffix(".zip") }
+    }
+}
+
+struct SharedImportBatch {
+    let sourceURLs: [URL]
+    let cleanupRoot: URL
+}
+
+/// App-group handoff used by the iOS Share Extension. The extension only
+/// copies provider files here; the main app owns archive import and parsing.
+struct SharedImportStore {
+    static let appGroupIdentifier = "group.org.tzap.zmanager.mobile"
+    static let incomingDirectoryName = "Incoming"
+
+    private let fileManager: FileManager
+    private let appGroupContainer: () -> URL?
+
+    init(
+        fileManager: FileManager = .default,
+        appGroupContainer: (() -> URL?)? = nil
+    ) {
+        self.fileManager = fileManager
+        self.appGroupContainer = appGroupContainer ?? {
+            fileManager.containerURL(
+                forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
+            )
+        }
+    }
+
+    static func isValidIdentifier(_ identifier: String) -> Bool {
+        !identifier.isEmpty &&
+            identifier.count <= 80 &&
+            identifier.unicodeScalars.allSatisfy { scalar in
+                CharacterSet.alphanumerics.contains(scalar) || scalar == "-"
+            }
+    }
+
+    func stageIncoming(identifier: String) throws -> SharedImportBatch {
+        guard Self.isValidIdentifier(identifier), let container = appGroupContainer() else {
+            throw ArchiveAutomationError.invalidSharedImport
+        }
+        let sourceRoot = container
+            .appendingPathComponent(Self.incomingDirectoryName, isDirectory: true)
+            .appendingPathComponent(identifier, isDirectory: true)
+        let sourceURLs = try fileManager.contentsOfDirectory(
+            at: sourceRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ).filter { url in
+            (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true
+        }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard !sourceURLs.isEmpty else {
+            throw ArchiveAutomationError.missingSharedImport
+        }
+
+        let cleanupRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("ZManagerMobile/ShareImports", isDirectory: true)
+            .appendingPathComponent(identifier, isDirectory: true)
+        try fileManager.createDirectory(at: cleanupRoot, withIntermediateDirectories: true)
+        do {
+            let copiedURLs = try sourceURLs.map { sourceURL -> URL in
+                let name = ArchiveImportStore.sanitizedDisplayName(sourceURL.lastPathComponent)
+                let destination = uniqueURL(
+                    in: cleanupRoot,
+                    name: name
+                )
+                try fileManager.copyItem(at: sourceURL, to: destination)
+                return destination
+            }
+            try? fileManager.removeItem(at: sourceRoot)
+            return SharedImportBatch(sourceURLs: copiedURLs, cleanupRoot: cleanupRoot)
+        } catch {
+            try? fileManager.removeItem(at: cleanupRoot)
+            throw error
+        }
+    }
+
+    func discardIncoming(identifier: String) {
+        guard Self.isValidIdentifier(identifier), let container = appGroupContainer() else {
+            return
+        }
+        let sourceRoot = container
+            .appendingPathComponent(Self.incomingDirectoryName, isDirectory: true)
+            .appendingPathComponent(identifier, isDirectory: true)
+        try? fileManager.removeItem(at: sourceRoot)
+    }
+
+    private func uniqueURL(in root: URL, name: String) -> URL {
+        var candidate = root.appendingPathComponent(name)
+        var index = 1
+        while fileManager.fileExists(atPath: candidate.path) {
+            let base = candidate.deletingPathExtension().lastPathComponent
+            let ext = candidate.pathExtension
+            candidate = root.appendingPathComponent(
+                ext.isEmpty ? "\(base) (\(index))" : "\(base) (\(index)).\(ext)"
+            )
+            index += 1
+        }
+        return candidate
     }
 }
 
@@ -1566,7 +1841,7 @@ enum ArchiveRepackagingState {
     case passwordRequired(String, [ArchiveEntrySummary], ArchiveRepackagingReview?)
     case review(ArchiveRepackagingReview)
     case running(ArchiveRepackagingReview, String)
-    case completed(outputPath: String, verified: Bool)
+    case completed(outputPath: String, verified: Bool, outputPaths: [String])
     case cancelled
     case failed(String)
 
@@ -2118,6 +2393,8 @@ final class ArchiveImportModel: ObservableObject {
     @Published var creationState: ArchiveCreationState = .idle
     @Published var creationFormat: CreateArchiveFormat = .zip
     @Published var creationPasswordInput = ""
+    @Published var creationVolumeSizeInput = ""
+    @Published var creationSeparateItems = false
     @Published var localSendState: LocalSendUIState = .idle
     @Published var localSendPinInput = ""
     @Published var pendingLocalSendDevice: LocalSendDevice?
@@ -2134,12 +2411,14 @@ final class ArchiveImportModel: ObservableObject {
     private let extractionCoordinator: ArchiveExtractionCoordinator
     private let batchExtractionCoordinator: BatchExtractionCoordinator
     private let creationCoordinator: ArchiveCreationCoordinator
+    private let separateCreationCoordinator: ArchiveSeparateCreationCoordinator
     private let creationSourceStager: ArchiveCreationSourceStager
     private let localSendSourceStager: LocalSendSourceStager
     private let repackagingCoordinator: ArchiveRepackagingCoordinator
     private let localSendClient: LocalSendClient
     private let localSendReceiver: LocalSendReceiver
     private let destinationPreferences: ArchiveDestinationPreferences
+    private let sharedImportStore: SharedImportStore
     private var activeLocalSendDevice: LocalSendDevice?
     private var activeLocalSendSessionID: String?
     private var stagedCreationSources: StagedCreationSources?
@@ -2162,12 +2441,14 @@ final class ArchiveImportModel: ObservableObject {
         testLoader: ArchiveTestLoader = ArchiveTestLoader(),
         extractionCoordinator: ArchiveExtractionCoordinator = ArchiveExtractionCoordinator(),
         creationCoordinator: ArchiveCreationCoordinator = ArchiveCreationCoordinator(),
+        separateCreationCoordinator: ArchiveSeparateCreationCoordinator? = nil,
         creationSourceStager: ArchiveCreationSourceStager = ArchiveCreationSourceStager(),
         localSendSourceStager: LocalSendSourceStager = LocalSendSourceStager(),
         repackagingCoordinator: ArchiveRepackagingCoordinator? = nil,
         localSendClient: LocalSendClient = LocalSendClient(),
         localSendReceiver: LocalSendReceiver = LocalSendReceiver(),
-        destinationPreferences: ArchiveDestinationPreferences = ArchiveDestinationPreferences()
+        destinationPreferences: ArchiveDestinationPreferences = ArchiveDestinationPreferences(),
+        sharedImportStore: SharedImportStore = SharedImportStore()
     ) {
         self.importStore = importStore
         self.listingLoader = listingLoader
@@ -2176,6 +2457,8 @@ final class ArchiveImportModel: ObservableObject {
         self.extractionCoordinator = extractionCoordinator
         self.batchExtractionCoordinator = BatchExtractionCoordinator(extraction: extractionCoordinator)
         self.creationCoordinator = creationCoordinator
+        self.separateCreationCoordinator = separateCreationCoordinator
+            ?? ArchiveSeparateCreationCoordinator(coordinator: creationCoordinator)
         self.creationSourceStager = creationSourceStager
         self.localSendSourceStager = localSendSourceStager
         self.repackagingCoordinator = repackagingCoordinator ?? ArchiveRepackagingCoordinator(
@@ -2185,6 +2468,7 @@ final class ArchiveImportModel: ObservableObject {
         self.localSendClient = localSendClient
         self.localSendReceiver = localSendReceiver
         self.destinationPreferences = destinationPreferences
+        self.sharedImportStore = sharedImportStore
         self.defaultExtractionDestinationLabel = defaultExtractionDestination().label
         self.recoveryRecords = extractionCoordinator.recoveries()
         self.localSendReceiver.onFileCommitted = { [weak self] file, displayName in
@@ -2288,6 +2572,12 @@ final class ArchiveImportModel: ObservableObject {
             switch request.action {
             case .create:
                 handleCreationFilesResult(.success(request.sourceURLs))
+            case .importShared:
+                guard let identifier = request.sharedIdentifier else {
+                    throw ArchiveAutomationError.missingSharedImport
+                }
+                let batch = try sharedImportStore.stageIncoming(identifier: identifier)
+                importExternalURLs(batch.sourceURLs, cleanupRoot: batch.cleanupRoot)
             case .open, .extract, .verify:
                 if let archiveURL = request.archiveURL {
                     importExternalURLs(
@@ -2304,7 +2594,8 @@ final class ArchiveImportModel: ObservableObject {
 
     func importExternalURLs(
         _ urls: [URL],
-        pendingAction: ArchiveAutomationAction? = nil
+        pendingAction: ArchiveAutomationAction? = nil,
+        cleanupRoot: URL? = nil
     ) {
         if pendingAction != .extract {
             debugExtractionDelayNanoseconds = 0
@@ -2327,6 +2618,11 @@ final class ArchiveImportModel: ObservableObject {
         clearLocalSendSelection()
 
         Task {
+            defer {
+                if let cleanupRoot {
+                    try? FileManager.default.removeItem(at: cleanupRoot)
+                }
+            }
             do {
                 let importStore = importStore
                 let imported = try await Task.detached(priority: .userInitiated) {
@@ -2443,11 +2739,19 @@ final class ArchiveImportModel: ObservableObject {
         case .tarZst: suffix = ".tar.zst"
         case .tzap: suffix = ".tzap"
         }
+        let volumeSize: UInt64?
+        do {
+            volumeSize = try ArchiveVolumeSupport.parseVolumeSize(creationVolumeSizeInput)
+        } catch {
+            repackagingState = .failed(error.localizedDescription)
+            return
+        }
         let request = ArchiveRepackagingRequest(
             sourceArchive: archive,
             selectedPaths: selectedPaths,
             destinationArchivePath: creationCoordinator.appStorageOutput(displayName: "repackaged\(suffix)").path,
             format: creationFormat,
+            volumeSize: volumeSize,
             sourcePassword: sourcePassword ?? (repackagingPasswordInput.isEmpty ? nil : repackagingPasswordInput),
             destinationPassword: creationPasswordInput.isEmpty ? nil : creationPasswordInput
         )
@@ -2493,9 +2797,9 @@ final class ArchiveImportModel: ObservableObject {
             let outcome = await repackagingCoordinator.run(review: review) { message in
                 Task { @MainActor in self.repackagingState = .running(review, message) }
             }
-            switch outcome {
-            case .completed(let outputPath, let verified):
-                repackagingState = .completed(outputPath: outputPath, verified: verified)
+        switch outcome {
+            case .completed(let outputPath, let verified, let outputPaths):
+                repackagingState = .completed(outputPath: outputPath, verified: verified, outputPaths: outputPaths)
             case .cancelled:
                 repackagingState = .cancelled
             case .passwordRequired(let message):
@@ -2550,8 +2854,9 @@ final class ArchiveImportModel: ObservableObject {
                     try self.extractionCoordinator.plan(
                         archive: archive,
                         // An empty selection means every entry. Preserve that
-                        // bridge contract so full extraction reaches the
-                        // format's native backend rather than per-entry I/O.
+                        // bridge contract so full extraction uses the engine's
+                        // whole-archive operation rather than selected-entry
+                        // I/O.
                         selectedPaths: selectedPaths,
                         destination: destination,
                         password: password,
@@ -2796,8 +3101,14 @@ final class ArchiveImportModel: ObservableObject {
         switch creationState {
         case .running(_, let jobID, _):
             Task.detached { try? self.creationCoordinator.cancel(jobId: jobID) }
+        case .runningSeparate(_, let jobID, _):
+            Task.detached { try? self.creationCoordinator.cancel(jobId: jobID) }
         case .review(let review):
             creationCoordinator.discard(review: review)
+            discardCreationSources()
+            creationState = .idle
+        case .separateReview(let review):
+            separateCreationCoordinator.discard(review: review)
             discardCreationSources()
             creationState = .idle
         default:
@@ -2857,7 +3168,25 @@ final class ArchiveImportModel: ObservableObject {
             creationState = .failed(error.localizedDescription)
         }
     }
-    #endif
+
+    func createDebugSplitFixture() {
+        do {
+            creationVolumeSizeInput = "64k"
+            try planCreation(staged: creationSourceStager.stageDebugSplitFixture())
+        } catch {
+            creationState = .failed(error.localizedDescription)
+        }
+    }
+
+    func createDebugSeparateFixture() {
+        do {
+            creationSeparateItems = true
+            try planCreation(staged: creationSourceStager.stageDebugSeparateFixture())
+        } catch {
+            creationState = .failed(error.localizedDescription)
+        }
+    }
+#endif
 
     func startCreation(_ review: ArchiveCreationReview) {
         creationPasswordInput = ""
@@ -2884,12 +3213,69 @@ final class ArchiveImportModel: ObservableObject {
         }
     }
 
+    func startSeparateCreation(_ review: ArchiveSeparateCreationReview) {
+        creationPasswordInput = ""
+        creationState = .startingSeparate(review)
+        Task {
+            var completedOutputs = [String]()
+            var verified = true
+            do {
+                for (index, item) in review.items.enumerated() {
+                    let jobID = try await Task.detached(priority: .userInitiated) {
+                        try self.creationCoordinator.start(review: item)
+                    }.value
+                    creationState = .runningSeparate(review, jobID, "Creating archive \(index + 1) of \(review.items.count)")
+                    let outcome = try await creationCoordinator.awaitCompletion(review: item, jobId: jobID) { progress in
+                        Task { @MainActor in
+                            self.creationState = .runningSeparate(review, jobID, progress.message)
+                        }
+                    }
+                    switch outcome {
+                    case .completed(let outputPath, let itemVerified, let outputPaths):
+                        completedOutputs.append(contentsOf: outputPaths)
+                        verified = verified && itemVerified
+                        if index == review.items.count - 1 {
+                            creationState = .completed(
+                                .completed(
+                                    outputPath: completedOutputs.first ?? outputPath,
+                                    verified: verified,
+                                    outputPaths: completedOutputs
+                                )
+                            )
+                        }
+                    case .cancelled:
+                        separateCreationCoordinator.discard(review: review)
+                        creationState = .cancelled
+                        discardCreationSources()
+                        return
+                    case .failed(let message):
+                        separateCreationCoordinator.discard(review: review)
+                        creationState = .failed(message)
+                        discardCreationSources()
+                        return
+                    }
+                }
+                discardCreationSources()
+            } catch {
+                separateCreationCoordinator.discard(review: review)
+                discardCreationSources()
+                creationState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     func cancelCreation() {
         switch creationState {
         case .running(_, let jobID, _):
             Task.detached { try? self.creationCoordinator.cancel(jobId: jobID) }
+        case .runningSeparate(_, let jobID, _):
+            Task.detached { try? self.creationCoordinator.cancel(jobId: jobID) }
         case .review(let review):
             creationCoordinator.discard(review: review)
+            discardCreationSources()
+            creationState = .idle
+        case .separateReview(let review):
+            separateCreationCoordinator.discard(review: review)
             discardCreationSources()
             creationState = .idle
         default:
@@ -3054,21 +3440,47 @@ final class ArchiveImportModel: ObservableObject {
         case .tarZst: suffix = ".tar.zst"
         case .tzap: suffix = ".tzap"
         }
-        let request = ArchiveCreationRequest(
-            sourcePaths: staged.sourcePaths,
-            destinationArchivePath: creationCoordinator.appStorageOutput(displayName: "archive\(suffix)").path,
-            format: creationFormat,
-            password: creationPasswordInput.isEmpty ? nil : creationPasswordInput
-        )
+        let volumeSize = try ArchiveVolumeSupport.parseVolumeSize(creationVolumeSizeInput)
         creationState = .planning
         Task {
             do {
-                let review = try await Task.detached(priority: .userInitiated) {
-                    try self.creationCoordinator.plan(request: request)
-                }.value
-                creationState = review.plan.canStart
-                    ? .review(review)
-                    : .failed(review.plan.warnings.first?.message ?? "This creation plan cannot be started.")
+                let password = creationPasswordInput.isEmpty ? nil : creationPasswordInput
+                if creationSeparateItems && staged.sourcePaths.count > 1 {
+                    let requests = ArchiveSeparateCreationPlanner.requests(
+                        sourcePaths: staged.sourcePaths,
+                        destinationDirectory: creationCoordinator.appStorageOutput(displayName: "archive\(suffix)")
+                            .deletingLastPathComponent().path,
+                        format: creationFormat,
+                        password: password,
+                        volumeSize: volumeSize
+                    )
+                    let review = try await Task.detached(priority: .userInitiated) {
+                        try self.separateCreationCoordinator.plan(requests: requests)
+                    }.value
+                    let blocked = review.items.first { !$0.plan.canStart }
+                    if let blocked {
+                        separateCreationCoordinator.discard(review: review)
+                        creationState = .failed(
+                            blocked.plan.warnings.first?.message ?? "One of the separate creation plans cannot be started."
+                        )
+                    } else {
+                        creationState = .separateReview(review)
+                    }
+                } else {
+                    let request = ArchiveCreationRequest(
+                        sourcePaths: staged.sourcePaths,
+                        destinationArchivePath: creationCoordinator.appStorageOutput(displayName: "archive\(suffix)").path,
+                        format: creationFormat,
+                        password: password,
+                        volumeSize: volumeSize
+                    )
+                    let review = try await Task.detached(priority: .userInitiated) {
+                        try self.creationCoordinator.plan(request: request)
+                    }.value
+                    creationState = review.plan.canStart
+                        ? .review(review)
+                        : .failed(review.plan.warnings.first?.message ?? "This creation plan cannot be started.")
+                }
             } catch {
                 discardCreationSources()
                 creationState = .failed(error.localizedDescription)
@@ -3310,8 +3722,11 @@ enum ArchiveCreationState {
     case idle
     case planning
     case review(ArchiveCreationReview)
+    case separateReview(ArchiveSeparateCreationReview)
     case starting(ArchiveCreationReview)
+    case startingSeparate(ArchiveSeparateCreationReview)
     case running(ArchiveCreationReview, String, String)
+    case runningSeparate(ArchiveSeparateCreationReview, String, String)
     case completed(ArchiveCreationOutcome)
     case cancelled
     case failed(String)
@@ -3320,8 +3735,8 @@ enum ArchiveCreationState {
 private extension ArchiveCreationOutcome {
     var creationState: ArchiveCreationState {
         switch self {
-        case .completed(let outputPath, let verified):
-            return .completed(.completed(outputPath: outputPath, verified: verified))
+        case .completed(let outputPath, let verified, let outputPaths):
+            return .completed(.completed(outputPath: outputPath, verified: verified, outputPaths: outputPaths))
         case .cancelled:
             return .cancelled
         case .failed(let message):
@@ -3334,12 +3749,18 @@ struct ArchiveCreationPanel: View {
     let state: ArchiveCreationState
     let format: CreateArchiveFormat
     let password: String
+    let volumeSizeInput: String
+    let separateItems: Bool
     let onPasswordChanged: (String) -> Void
+    let onVolumeSizeChanged: (String) -> Void
+    let onSeparateItemsChanged: (Bool) -> Void
     let onFormatChanged: (CreateArchiveFormat) -> Void
     let onChooseFiles: () -> Void
     let onChooseFolder: () -> Void
     let onDropFiles: ([URL]) -> Void
     let onStart: (ArchiveCreationReview) -> Void
+    let onStartSeparate: (ArchiveSeparateCreationReview) -> Void
+    let onShareOutput: ([String]) -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -3359,6 +3780,20 @@ struct ArchiveCreationPanel: View {
                 get: { password },
                 set: onPasswordChanged
             ))
+            if ArchiveVolumeSupport.supportsVolumeSize(format) {
+                TextField("Optional split volume size (for example 4m)", text: Binding(
+                    get: { volumeSizeInput },
+                    set: onVolumeSizeChanged
+                ))
+                .textFieldStyle(.roundedBorder)
+                Text("Leave blank for one archive; split output is committed as a volume set.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle("Archive each selected item separately", isOn: Binding(
+                get: { separateItems },
+                set: onSeparateItemsChanged
+            ))
             switch state {
             case .idle, .failed, .completed, .cancelled:
                 HStack {
@@ -3367,11 +3802,17 @@ struct ArchiveCreationPanel: View {
                 }
                 if case .failed(let message) = state { Text(message).foregroundStyle(.red) }
                 if case .completed(let outcome) = state,
-                   case .completed(let outputPath, let verified) = outcome {
-                    Text("Created \(outputPath)")
+                   case .completed(let outputPath, let verified, let outputPaths) = outcome {
+                    Text("Created \(URL(fileURLWithPath: outputPath).lastPathComponent)")
+                    if outputPaths.count > 1 {
+                        Text("\(outputPaths.count) output files committed")
+                    }
                     Text(verified ? "Verified" : "Created without verification")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Button("Share output") {
+                        onShareOutput(outputPaths.isEmpty ? [outputPath] : outputPaths)
+                    }
                 }
                 if case .cancelled = state { Text("Archive creation cancelled") }
             case .planning:
@@ -3385,10 +3826,28 @@ struct ArchiveCreationPanel: View {
                     Button("Cancel", action: onCancel)
                     Button("Start creation") { onStart(review) }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("startCreation")
+                }
+            case .separateReview(let review):
+                Text("\(review.items.count) archives will be created")
+                HStack {
+                    Button("Cancel", action: onCancel)
+                    Button("Start creation") { onStartSeparate(review) }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("startCreation")
+                }
+                ForEach(review.items, id: \.id) { item in
+                    Text(URL(fileURLWithPath: item.request.destinationArchivePath).lastPathComponent)
+                        .font(.caption)
                 }
             case .starting:
                 Text("Starting archive creation")
+            case .startingSeparate:
+                Text("Starting separate archive creation")
             case .running(_, _, let message):
+                Text(message)
+                Button("Cancel creation", action: onCancel)
+            case .runningSeparate(_, _, let message):
                 Text(message)
                 Button("Cancel creation", action: onCancel)
             }
@@ -4302,11 +4761,11 @@ struct ArchiveBatchExtractionPanel: View {
         case .review(let review):
             VStack(alignment: .leading, spacing: 6) {
                 Text("Review batch extraction").font(.headline)
-                Text("\(review.items.count) archives will be extracted to separate app-storage folders.")
                 HStack {
                     Button("Start batch extraction", action: onStart)
                     Button("Cancel", action: onCancel)
                 }
+                Text("\(review.items.count) archives will be extracted to separate app-storage folders.")
             }
         case .running:
             HStack {
@@ -4370,10 +4829,81 @@ struct ArchiveCreationRequest {
     }
 }
 
+enum ArchiveSeparateCreationPlanner {
+    static func requests(
+        sourcePaths: [String],
+        destinationDirectory: String,
+        format: CreateArchiveFormat,
+        password: String? = nil,
+        preserveMetadata: Bool = true,
+        replaceExisting: Bool = false,
+        cleanSource: Bool = false,
+        verifyAfterCreate: Bool = true,
+        level: UInt32 = 6,
+        encryptFileNames: Bool = false,
+        volumeSize: UInt64? = nil,
+        recoveryPercentage: UInt8 = 0,
+        volumeLossTolerance: UInt8 = 0
+    ) -> [ArchiveCreationRequest] {
+        precondition(!sourcePaths.isEmpty, "Select at least one file or folder.")
+        let names = uniqueOutputNames(sourcePaths: sourcePaths, format: format)
+        return zip(sourcePaths, names).map { sourcePath, name in
+            ArchiveCreationRequest(
+                sourcePaths: [sourcePath],
+                destinationArchivePath: URL(fileURLWithPath: destinationDirectory)
+                    .appendingPathComponent(name).path,
+                format: format,
+                password: password,
+                preserveMetadata: preserveMetadata,
+                replaceExisting: replaceExisting,
+                cleanSource: cleanSource,
+                verifyAfterCreate: verifyAfterCreate,
+                level: level,
+                encryptFileNames: encryptFileNames,
+                volumeSize: volumeSize,
+                recoveryPercentage: recoveryPercentage,
+                volumeLossTolerance: volumeLossTolerance
+            )
+        }
+    }
+
+    private static func uniqueOutputNames(sourcePaths: [String], format: CreateArchiveFormat) -> [String] {
+        let suffix: String
+        switch format {
+        case .zip: suffix = ".zip"
+        case .sevenZ: suffix = ".7z"
+        case .tarZst: suffix = ".tar.zst"
+        case .tzap: suffix = ".tzap"
+        }
+        var used = Set<String>()
+        return sourcePaths.map { sourcePath in
+            let sourceName = URL(fileURLWithPath: sourcePath).lastPathComponent
+            var base = URL(fileURLWithPath: sourceName).deletingPathExtension().lastPathComponent
+            base = base
+                .replacingOccurrences(of: "[\\\\/:*?\"<>|]", with: "_", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            if base.isEmpty { base = "archive" }
+            var candidate = "\(base)\(suffix)"
+            var index = 1
+            while used.contains(candidate) {
+                candidate = "\(base) (\(index))\(suffix)"
+                index += 1
+            }
+            used.insert(candidate)
+            return candidate
+        }
+    }
+}
+
 struct ArchiveCreationReview {
     let id: UUID
     let request: ArchiveCreationRequest
     let plan: PlanCreateResult
+}
+
+struct ArchiveSeparateCreationReview {
+    let items: [ArchiveCreationReview]
 }
 
 struct ArchiveCreationProgress {
@@ -4385,9 +4915,143 @@ struct ArchiveCreationProgress {
 }
 
 enum ArchiveCreationOutcome: Equatable {
-    case completed(outputPath: String, verified: Bool)
+    case completed(outputPath: String, verified: Bool, outputPaths: [String])
     case cancelled
     case failed(String)
+}
+
+enum ArchiveVolumeSupport {
+    static func supportsVolumeSize(_ format: CreateArchiveFormat) -> Bool {
+        switch format {
+        case .zip, .sevenZ, .tzap:
+            return true
+        case .tarZst:
+            return false
+        }
+    }
+
+    static func parseVolumeSize(_ raw: String) throws -> UInt64? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if value.isEmpty { return nil }
+        let suffixes: [(String, UInt64)] = [
+            ("tib", 1024 * 1024 * 1024 * 1024), ("tb", 1024 * 1024 * 1024 * 1024),
+            ("ti", 1024 * 1024 * 1024 * 1024), ("t", 1024 * 1024 * 1024 * 1024),
+            ("gib", 1024 * 1024 * 1024), ("gb", 1024 * 1024 * 1024),
+            ("gi", 1024 * 1024 * 1024), ("g", 1024 * 1024 * 1024),
+            ("mib", 1024 * 1024), ("mb", 1024 * 1024),
+            ("mi", 1024 * 1024), ("m", 1024 * 1024),
+            ("kib", 1024), ("kb", 1024), ("ki", 1024), ("k", 1024),
+            ("b", 1)
+        ]
+        let suffix = suffixes.first(where: { value.hasSuffix($0.0) })
+        let number = suffix.map { String(value.dropLast($0.0.count)) } ?? value
+        guard let amount = UInt64(number), !number.isEmpty else {
+            throw ArchiveVolumeSizeError.invalid
+        }
+        let (result, overflow) = amount.multipliedReportingOverflow(by: suffix?.1 ?? 1)
+        guard !overflow else { throw ArchiveVolumeSizeError.invalid }
+        return result
+    }
+
+    static func outputPaths(
+        format: CreateArchiveFormat,
+        destination: String,
+        volumeCount: UInt64?,
+        reportedPaths: [String]
+    ) -> [String] {
+        guard let count = volumeCount, count > 1, count <= UInt64(Int.max) else {
+            return [destination]
+        }
+        let destinationURL = URL(fileURLWithPath: destination)
+        let parent = destinationURL.deletingLastPathComponent()
+        let stem = destinationURL.deletingPathExtension().lastPathComponent
+        switch format {
+        case .zip:
+            return (1..<Int(count)).map { index in
+                parent.appendingPathComponent("\(stem).z\(String(format: "%02d", index))").path
+            } + [destination]
+        case .sevenZ:
+            return (1...Int(count)).map { index in
+                "\(destination).\(String(format: "%03d", index))"
+            }
+        case .tzap:
+            let extensionName = destinationURL.pathExtension.isEmpty ? "tzap" : destinationURL.pathExtension
+            return (0..<Int(count)).map { index in
+                parent.appendingPathComponent("\(stem).vol\(String(format: "%03d", index)).\(extensionName)").path
+            }
+        case .tarZst:
+            return reportedPaths.isEmpty ? [destination] : reportedPaths
+        }
+    }
+
+    /// Older bridge revisions may omit volume metadata even though the engine
+    /// committed sidecar volumes. Recover the committed set from the
+    /// app-owned output directory before presenting or sharing it.
+    static func committedOutputPaths(
+        format: CreateArchiveFormat,
+        destination: String,
+        volumeCount: UInt64?,
+        reportedPaths: [String],
+        fileManager: FileManager = .default
+    ) -> [String] {
+        var paths = outputPaths(
+            format: format,
+            destination: destination,
+            volumeCount: volumeCount,
+            reportedPaths: reportedPaths
+        )
+        if volumeCount.map({ $0 > 1 }) == true || !reportedPaths.isEmpty {
+            return paths
+        }
+        let destinationURL = URL(fileURLWithPath: destination)
+        let parent = destinationURL.deletingLastPathComponent()
+        let baseName = destinationURL.lastPathComponent
+        let stem = destinationURL.deletingPathExtension().lastPathComponent
+        let extensionName = destinationURL.pathExtension
+        let sidecars: [String]
+        if let contents = try? fileManager.contentsOfDirectory(
+            at: parent,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            sidecars = contents.filter { url in
+                guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                    return false
+                }
+                let name = url.lastPathComponent
+                switch format {
+                case .zip:
+                    return name.hasPrefix("\(stem).z") &&
+                        name.count == stem.count + 4 &&
+                        name.dropFirst(stem.count + 2).allSatisfy(\.isNumber)
+                case .sevenZ:
+                    return name.hasPrefix("\(baseName).") &&
+                        name.count == baseName.count + 4 &&
+                        name.dropFirst(baseName.count + 1).allSatisfy(\.isNumber)
+                case .tzap:
+                    return name.hasPrefix("\(stem).vol") &&
+                        name.hasSuffix(".\(extensionName)")
+                case .tarZst:
+                    return false
+                }
+            }.map(\.path)
+        } else {
+            sidecars = []
+        }
+        for path in sidecars.sorted() where !paths.contains(path) {
+            paths.append(path)
+        }
+        let existing = paths.filter { fileManager.fileExists(atPath: $0) }
+        return existing.isEmpty ? [destination] : existing
+    }
+}
+
+enum ArchiveVolumeSizeError: LocalizedError {
+    case invalid
+
+    var errorDescription: String? {
+        "Volume size must look like 64k, 1m, or 1g."
+    }
 }
 
 enum ArchiveCreationError: LocalizedError {
@@ -4517,10 +5181,17 @@ final class ArchiveCreationCoordinator: @unchecked Sendable {
                 switch update.status {
                 case .completed:
                     let verified = request.verifyAfterCreate && update.terminalSummary?.verified == true
+                    let outputPaths = ArchiveVolumeSupport.committedOutputPaths(
+                        format: request.format,
+                        destination: request.destinationArchivePath,
+                        volumeCount: update.terminalSummary?.volumeCount,
+                        reportedPaths: update.terminalSummary?.outputPaths ?? []
+                    )
                     discard(review: review)
                     return .completed(
-                        outputPath: update.terminalSummary?.outputPaths.first ?? request.destinationArchivePath,
-                        verified: verified
+                        outputPath: request.destinationArchivePath,
+                        verified: verified,
+                        outputPaths: outputPaths
                     )
                 case .cancelled:
                     discard(review: review)
@@ -4548,11 +5219,40 @@ final class ArchiveCreationCoordinator: @unchecked Sendable {
     }
 }
 
+/// Plans separate outputs while delegating every archive operation to the
+/// existing Rust-backed creation coordinator.
+final class ArchiveSeparateCreationCoordinator: @unchecked Sendable {
+    private let coordinator: ArchiveCreationCoordinator
+
+    init(coordinator: ArchiveCreationCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    func plan(requests: [ArchiveCreationRequest]) throws -> ArchiveSeparateCreationReview {
+        guard !requests.isEmpty else { throw ArchiveCreationError.expiredReview }
+        var reviews = [ArchiveCreationReview]()
+        do {
+            for request in requests {
+                reviews.append(try coordinator.plan(request: request))
+            }
+            return ArchiveSeparateCreationReview(items: reviews)
+        } catch {
+            reviews.forEach(coordinator.discard)
+            throw error
+        }
+    }
+
+    func discard(review: ArchiveSeparateCreationReview) {
+        review.items.forEach(coordinator.discard)
+    }
+}
+
 struct ArchiveRepackagingRequest {
     let sourceArchive: ImportedArchive
     let selectedPaths: [String]
     let destinationArchivePath: String
     let format: CreateArchiveFormat
+    let volumeSize: UInt64?
     let sourcePassword: String?
     let destinationPassword: String?
     let verifyAfterCreate: Bool
@@ -4562,6 +5262,7 @@ struct ArchiveRepackagingRequest {
         selectedPaths: [String],
         destinationArchivePath: String,
         format: CreateArchiveFormat,
+        volumeSize: UInt64? = nil,
         sourcePassword: String? = nil,
         destinationPassword: String? = nil,
         verifyAfterCreate: Bool = true
@@ -4570,6 +5271,7 @@ struct ArchiveRepackagingRequest {
         self.selectedPaths = selectedPaths
         self.destinationArchivePath = destinationArchivePath
         self.format = format
+        self.volumeSize = volumeSize
         self.sourcePassword = sourcePassword
         self.destinationPassword = destinationPassword
         self.verifyAfterCreate = verifyAfterCreate
@@ -4583,7 +5285,7 @@ struct ArchiveRepackagingReview {
 }
 
 enum ArchiveRepackagingOutcome: Equatable {
-    case completed(outputPath: String, verified: Bool)
+    case completed(outputPath: String, verified: Bool, outputPaths: [String])
     case cancelled
     case passwordRequired(String)
     case failed(String)
@@ -4676,7 +5378,8 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
                     destinationArchivePath: session.request.destinationArchivePath,
                     format: session.request.format,
                     password: session.request.destinationPassword,
-                    verifyAfterCreate: session.request.verifyAfterCreate
+                    verifyAfterCreate: session.request.verifyAfterCreate,
+                    volumeSize: session.request.volumeSize
                 )
             )
             guard createReview.plan.canStart else {
@@ -4691,8 +5394,8 @@ final class ArchiveRepackagingCoordinator: @unchecked Sendable {
             switch try await creation.awaitCompletion(review: createReview, jobId: creationJob) { progress in
                 onProgress(progress.message)
             } {
-            case .completed(let outputPath, let verified):
-                return finish(review.id, outcome: .completed(outputPath: outputPath, verified: verified))
+            case .completed(let outputPath, let verified, let outputPaths):
+                return finish(review.id, outcome: .completed(outputPath: outputPath, verified: verified, outputPaths: outputPaths))
             case .cancelled:
                 return finish(review.id, outcome: .cancelled)
             case .failed(let message):
@@ -4859,6 +5562,65 @@ struct LocalSendAnnouncement: Codable {
     let `protocol`: String
     let download: Bool
     let announce: Bool?
+}
+
+private enum LocalSendCertificatePinning {
+    static func normalize(_ value: String) -> String {
+        value.filter { $0.isLetter || $0.isNumber }.uppercased()
+    }
+
+    static func fingerprint(_ trust: SecTrust) -> String? {
+        guard let certificate = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first else {
+            return nil
+        }
+        let data = SecCertificateCopyData(certificate) as Data
+        return SHA256.hash(data: data).map { String(format: "%02X", $0) }.joined()
+    }
+
+    static func validate(
+        _ trust: SecTrust,
+        expectedFingerprint: String?,
+        allowUntrusted: Bool
+    ) -> String? {
+        guard let actual = fingerprint(trust) else { return nil }
+        if allowUntrusted {
+            return actual
+        }
+        guard let expectedFingerprint,
+              normalize(expectedFingerprint) == actual else {
+            return nil
+        }
+        return actual
+    }
+}
+
+private final class LocalSendTrustDelegate: NSObject, URLSessionDelegate {
+    let expectedFingerprint: String?
+    let allowUntrusted: Bool
+    private(set) var serverFingerprint: String?
+
+    init(expectedFingerprint: String?, allowUntrusted: Bool) {
+        self.expectedFingerprint = expectedFingerprint
+        self.allowUntrusted = allowUntrusted
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard let trust = challenge.protectionSpace.serverTrust,
+              let actual = LocalSendCertificatePinning.validate(
+                trust,
+                expectedFingerprint: expectedFingerprint,
+                allowUntrusted: allowUntrusted
+              ) else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        serverFingerprint = actual
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
 }
 
 struct ArchiveOperationReport {
@@ -5040,35 +5802,48 @@ final class LocalSendClient: @unchecked Sendable {
     func discoverHTTP(hosts: [String]) async -> [LocalSendDevice] {
         await withTaskGroup(of: LocalSendDevice?.self, returning: [LocalSendDevice].self) { group in
             for host in hosts {
-                group.addTask {
-                    guard let url = URL(string: "http://\(host):\(Self.defaultPort)/api/localsend/v2/register") else {
-                        return nil
+                for protocolName in ["http", "https"] {
+                    group.addTask {
+                        guard let url = URL(string: "\(protocolName)://\(host):\(Self.defaultPort)/api/localsend/v2/register") else {
+                            return nil
+                        }
+                        var request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                        request.httpBody = try? JSONSerialization.data(withJSONObject: self.announcement(announce: false))
+                        guard let (data, response, certificateFingerprint) = try? await self.data(
+                            for: request,
+                            expectedFingerprint: nil,
+                            allowUntrusted: protocolName == "https"
+                        ),
+                        (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
+                        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        let alias = json["alias"] as? String else {
+                            return nil
+                        }
+                        let port = json["port"] as? Int ?? Self.defaultPort
+                        let fingerprint = json["fingerprint"] as? String
+                        guard fingerprint != self.fingerprint else { return nil }
+                        if protocolName == "https" {
+                            guard let fingerprint,
+                                  let certificateFingerprint,
+                                  LocalSendCertificatePinning.normalize(fingerprint) == certificateFingerprint else {
+                                return nil
+                            }
+                        }
+                        return LocalSendDevice(
+                            id: "\(host):\(port)",
+                            address: host,
+                            port: port,
+                            protocolName: (json["protocol"] as? String) ?? protocolName,
+                            alias: alias,
+                            version: (json["version"] as? String) ?? "2.0",
+                            deviceModel: json["deviceModel"] as? String,
+                            deviceType: json["deviceType"] as? String,
+                            fingerprint: fingerprint,
+                            download: (json["download"] as? Bool) ?? false
+                        )
                     }
-                    var request = URLRequest(url: url)
-                    request.httpMethod = "POST"
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.httpBody = try? JSONSerialization.data(withJSONObject: self.announcement(announce: false))
-                    guard let (data, response) = try? await URLSession.shared.data(for: request),
-                          (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
-                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                          let alias = json["alias"] as? String else {
-                        return nil
-                    }
-                    let port = json["port"] as? Int ?? Self.defaultPort
-                    let fingerprint = json["fingerprint"] as? String
-                    guard fingerprint != self.fingerprint else { return nil }
-                    return LocalSendDevice(
-                        id: "\(host):\(port)",
-                        address: host,
-                        port: port,
-                        protocolName: (json["protocol"] as? String) ?? "http",
-                        alias: alias,
-                        version: (json["version"] as? String) ?? "2.0",
-                        deviceModel: json["deviceModel"] as? String,
-                        deviceType: json["deviceType"] as? String,
-                        fingerprint: fingerprint,
-                        download: (json["download"] as? Bool) ?? false
-                    )
                 }
             }
             var devices = [String: LocalSendDevice]()
@@ -5107,7 +5882,11 @@ final class LocalSendClient: @unchecked Sendable {
             })
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response, _) = try await data(
+            for: request,
+            expectedFingerprint: device.fingerprint,
+            allowUntrusted: false
+        )
         try validate(response)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         let sessionID = try string(json, key: "sessionId")
@@ -5133,7 +5912,11 @@ final class LocalSendClient: @unchecked Sendable {
             guard let url = components?.url else { throw URLError(.badURL) }
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            let delegate = LocalSendUploadDelegate(file: file, onProgress: onProgress)
+            let delegate = LocalSendUploadDelegate(
+                file: file,
+                expectedFingerprint: device.fingerprint,
+                onProgress: onProgress
+            )
             let sessionConfiguration = URLSessionConfiguration.default
             let delegateSession = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
             let uploadTask = delegateSession.uploadTask(with: request, fromFile: file.url)
@@ -5154,13 +5937,32 @@ final class LocalSendClient: @unchecked Sendable {
         guard let url = components?.url else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response, _) = try await data(
+            for: request,
+            expectedFingerprint: device.fingerprint,
+            allowUntrusted: false
+        )
         try validate(response)
     }
 
     func cancelActiveUpload() {
         activeTask?.cancel()
         activeTask = nil
+    }
+
+    private func data(
+        for request: URLRequest,
+        expectedFingerprint: String?,
+        allowUntrusted: Bool
+    ) async throws -> (Data, URLResponse, String?) {
+        let delegate = LocalSendTrustDelegate(
+            expectedFingerprint: expectedFingerprint,
+            allowUntrusted: allowUntrusted
+        )
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(for: request)
+        return (data, response, delegate.serverFingerprint)
     }
 
     private func announcement(announce: Bool) -> [String: Any] {
@@ -5200,15 +6002,35 @@ final class LocalSendClient: @unchecked Sendable {
 
 private final class LocalSendUploadDelegate: NSObject, URLSessionTaskDelegate {
     private let file: LocalSendTransferFile
+    private let expectedFingerprint: String?
     private let onProgress: (LocalSendTransferFile, Int64, Int64) -> Void
     private var continuation: CheckedContinuation<Void, Error>?
 
     init(
         file: LocalSendTransferFile,
+        expectedFingerprint: String?,
         onProgress: @escaping (LocalSendTransferFile, Int64, Int64) -> Void
     ) {
         self.file = file
+        self.expectedFingerprint = expectedFingerprint
         self.onProgress = onProgress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard let trust = challenge.protectionSpace.serverTrust,
+              LocalSendCertificatePinning.validate(
+                trust,
+                expectedFingerprint: expectedFingerprint,
+                allowUntrusted: false
+              ) != nil else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: trust))
     }
 
     func start(task: URLSessionTask) async throws {

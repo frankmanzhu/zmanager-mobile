@@ -7,6 +7,8 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -49,6 +51,53 @@ class ProviderBoundaryInstrumentedTest {
     }
 
     @Test
+    fun pinnedNativeBridgeListsAndVerifiesARealArchive() {
+        val archive = File.createTempFile("bridge-health-", ".zip", context.cacheDir)
+        ZipOutputStream(archive.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("hello.txt"))
+            zip.write("hello from the native bridge".toByteArray())
+            zip.closeEntry()
+        }
+
+        try {
+            val bridge = GeneratedArchiveBridgeGateway()
+            val listing = bridge.listArchive(archive.absolutePath, null)
+            assertEquals(1UL, listing.entryCount)
+            val verification = bridge.testArchive(archive.absolutePath, emptyList(), null)
+            assertEquals(true, verification.verified)
+        } finally {
+            archive.delete()
+        }
+    }
+
+    @Test
+    fun sequentialNativeCreationJobsRemainVerified() = runBlocking {
+        val root = File(context.cacheDir, "sequential-create-${UUID.randomUUID()}")
+        check(root.mkdirs())
+        val sourcePaths = listOf("one", "two").map { name ->
+            File(root, "$name.txt").also { it.writeText("$name archive") }
+        }
+        val coordinator = ArchiveCreationCoordinator(context)
+
+        try {
+            sourcePaths.forEach { source ->
+                val destination = File(root, "${source.nameWithoutExtension}.zip")
+                val review = coordinator.plan(
+                    ArchiveCreationRequest(
+                        sourcePaths = listOf(source.absolutePath),
+                        destinationArchivePath = destination.absolutePath,
+                        format = org.tzap.zmanager.mobile.bridge.generated.CreateArchiveFormat.ZIP
+                    )
+                )
+                val outcome = coordinator.awaitCompletion(review, coordinator.start(review)) {}
+                assertTrue("${source.name} should be verified", outcome is ArchiveCreationOutcome.Completed && outcome.verified)
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun creationSourceStagerCopiesSingleAndTreeDocumentsThroughDocumentFile() {
         val single = createDocument(
             "provider-single-${UUID.randomUUID()}.txt",
@@ -56,7 +105,7 @@ class ProviderBoundaryInstrumentedTest {
         )
         val folder = DocumentsContract.createDocument(
             resolver,
-            TestDocumentsProvider.treeUri(),
+            TestDocumentsProvider.documentUri(TestDocumentsProvider.ROOT_ID),
             DocumentsContract.Document.MIME_TYPE_DIR,
             "provider-folder-${UUID.randomUUID()}"
         )!!
@@ -67,14 +116,22 @@ class ProviderBoundaryInstrumentedTest {
             "nested.txt"
         )!!
         resolver.openOutputStream(child, "wt")!!.use { it.write("nested provider file".toByteArray()) }
+        val tree = DocumentsContract.buildTreeDocumentUri(
+            TestDocumentsProvider.AUTHORITY,
+            DocumentsContract.getDocumentId(folder)
+        )
+
+        val sourceTree = DocumentFile.fromTreeUri(
+            context,
+            tree
+        )
+        assertNotNull("provider folder must be visible as a tree", sourceTree)
+        assertNotNull("provider child must be visible through DocumentFile", sourceTree!!.findFile("nested.txt"))
 
         val stager = ArchiveCreationSourceStager(context)
         val stagedFile = stager.stageFiles(listOf(single))
         val stagedTree = stager.stageTree(
-            DocumentsContract.buildTreeDocumentUri(
-                TestDocumentsProvider.AUTHORITY,
-                DocumentsContract.getDocumentId(folder)
-            )
+            tree
         )
 
         try {
@@ -94,18 +151,18 @@ class ProviderBoundaryInstrumentedTest {
         val destinationName = "provider-output-${UUID.randomUUID()}"
         val destination = DocumentsContract.createDocument(
             resolver,
-            TestDocumentsProvider.treeUri(),
+            TestDocumentsProvider.documentUri(TestDocumentsProvider.ROOT_ID),
             DocumentsContract.Document.MIME_TYPE_DIR,
             destinationName
         )!!
-        val existing = DocumentsContract.createDocument(resolver, destination, "text/plain", "readme.txt")!!
-        resolver.openOutputStream(existing, "wt")!!.use { it.write("existing".toByteArray()) }
-
-        val coordinator = ArchiveExtractionCoordinator(context, ProviderExtractionGateway())
         val destinationTree = DocumentsContract.buildTreeDocumentUri(
             TestDocumentsProvider.AUTHORITY,
             DocumentsContract.getDocumentId(destination)
         )
+        val existing = DocumentsContract.createDocument(resolver, destination, "text/plain", "readme.txt")!!
+        resolver.openOutputStream(existing, "wt")!!.use { it.write("existing".toByteArray()) }
+
+        val coordinator = ArchiveExtractionCoordinator(context, ProviderExtractionGateway())
         val review = coordinator.plan(
             archive = ImportedArchive("provider-archive", "archive.zip", "/cache/archive.zip", 9L, "application/zip", 0L),
             selectedPaths = listOf("docs/readme.txt"),

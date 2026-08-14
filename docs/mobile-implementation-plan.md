@@ -31,6 +31,10 @@ V2 must adopt:
 - password-required, wrong-password, encrypted-create, test/verify, verify-after-compression, progress, cancellation, and completion states
 - split/multipart detection, native destination choice, collision handling, safe extraction planning, redacted diagnostics, and no platform archive parsing
 
+The pinned bridge now also exposes the safe split-volume create option for ZIP,
+7z, and TZAP. Mobile shells pass the requested size through unchanged and
+report the Rust-created volume set without implementing archive splitting.
+
 V2 should adopt:
 
 - AppleArchive / AAR, XIP extraction, old filename charset handling, archive-items-separately, split-volume creation, iPad drag/drop, Photos picker input, VoiceOver, Dynamic Type, and default destination settings
@@ -148,7 +152,7 @@ Bridge rules:
 - Requests must use app-controlled paths, cache IDs, or explicit bridge-owned file tokens.
 - Platform permission tokens must stay native-owned.
 - Bridge DTOs must be serializable through UniFFI without exposing internal core types directly.
-- All format support is implemented in `zmanager-core` or Rust-owned backends behind the mobile bridge. Kotlin and Swift must not call AppleArchive, XIP, `aa`, `xip`, libarchive, or other archive engines directly.
+- All format support is implemented in `zmanager-core` or Rust-owned adapters behind the mobile bridge. Kotlin and Swift must use the generated engine/session contract and must not call AppleArchive, XIP, `aa`, `xip`, or any archive engine directly.
 - Platform gates for AppleArchive / AAR, XIP, and other formats validate mobile file access, lifecycle, destination commit, UI, and error behavior; they do not transfer archive behavior into Android or iOS shells.
 - Long-running operations must return a `JobId` quickly and emit progress through `poll_job_events`.
 - Launch job progress uses a pull model, matching ZManager Desktop: native shells call `poll_job_events` instead of subscribing to pushed platform-native streams.
@@ -349,6 +353,14 @@ Native manifest requirements:
 - Avoid leaking full original paths into normal diagnostics.
 - Treat provider failures as native errors mapped into user-readable states.
 
+Implementation status: the Android and iOS shells now expose the separate-item
+output mode through the existing Rust create plan/start/poll operation. Each
+top-level staged item receives a collision-safe output name; Android executes
+the planned requests sequentially in its foreground service, while iOS runs
+the same Rust-owned requests sequentially in its creation coordinator. Both
+paths aggregate verification and committed output paths and have deterministic
+Maestro coverage.
+
 Encrypted ZIP requirements:
 
 - Match `zmanager-cli` behavior exposed by the bridge.
@@ -424,7 +436,7 @@ Deliverables:
 
   - V2 format exposure matrix at `docs/mobile-format-matrix.md`, with one row per launch-scope operation and explicit bridge/core, Android, iOS, and UI evidence.
 - Supported-format help page or in-app surface.
-- Settings/about/license/help screen.
+- About/help in-app surface, with default-destination settings available from the home screen; license copy and richer settings remain release-polish follow-up.
 - Android and iOS app icons generated from the ZManager Desktop icon.
 - Diagnostics/report detail screen.
 - Default destination settings and destination reset flow.
@@ -449,10 +461,11 @@ Definition of done:
 
 Purpose: identify a bridge-readable archive source without exposing platform provider lifetimes to Rust.
 
-The current generated bridge is path-based (`archivePath`), not handle-based.
-Treat this as a native/session model unless and until the sibling bridge adds an
-opaque handle API; do not imply that a native handle is already accepted by
-UniFFI.
+The generated bridge accepts an `archivePath` only when opening a Rust-owned
+engine session, then returns an opaque `sessionId`. Listing and selected
+extraction use that session id plus engine-owned `EntryId` values; the bridge
+does not expose Rust's `ArchiveHandle` type directly. Treat this as a native
+session model, not as repeated path-based archive execution.
 
 Fields to consider:
 
@@ -1131,7 +1144,8 @@ iOS-specific tasks:
 - Implement staged commit while holding security-scoped access.
 - Handle iCloud file unavailable states.
 - Add Shortcuts and X-Callback-URL entry points after safe request validation exists.
-- Add a Share Extension target and its app-group/import handoff if “share/import” means accepting files from the iOS share sheet; `onOpenURL` and document types alone do not provide a Share Extension.
+- The iOS Share Extension target and app-group/import handoff are implemented;
+  retain the native picker/provider instrumentation gate for device QA.
 - Add iPad multi-window support.
 - Treat long extraction as foreground-first at launch.
 - Implement background task support only after lifecycle and partial-output behavior is tested.
@@ -1139,7 +1153,9 @@ iOS-specific tasks:
 
 iOS tests:
 
-- Add an XCUITest target if native UI automation is needed; the current Xcode project has unit tests only. Maestro remains the cross-platform device E2E runner.
+- Use the existing XCUITest target for native UI automation; the project also
+  embeds the Share Extension target and app-group handoff. Maestro remains the
+  cross-platform device E2E runner.
 - Document picker import.
 - Share/import extension.
 - Security scope opens and closes.
@@ -1578,6 +1594,7 @@ The following are explicit implementation gates, not implicit assumptions:
 - **Pause/resume:** deferred; no UI or required bridge call until the bridge contract and interruption semantics exist.
 - **Android background execution:** choose the foreground-service type, notification/lifecycle policy, and exact maximum job behavior for target SDK 35 before enabling jobs that outlive the visible activity.
 - **iOS provider allowlist:** approve providers one at a time after security-scoped lifetime, coordinated write, interruption, and recovery tests; third-party providers default to export/share fallback.
-- **iOS share/import scope:** add a Share Extension target if share-sheet import is launch scope; `onOpenURL` alone is not an extension.
+- **iOS share/import scope:** the Share Extension target is now launch-scoped;
+  its app-group handoff must remain file-staging-only and credentials-free.
 
 Any decision that changes launch scope, format claims, privacy posture, or archive behavior belongs in [mobile-launch-spec.md](mobile-launch-spec.md) before this implementation plan is updated. Provider-specific limitations and implementation bugs should be resolved against these gates rather than becoming implicit scope changes.

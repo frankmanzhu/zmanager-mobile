@@ -20,7 +20,7 @@ appId: org.tzap.zmanager.mobile
 - tapOn: "Open"
 - scrollUntilVisible:
     element: "ZIP - 1 entries"
-    direction: DOWN
+    direction: UP
 - extendedWaitUntil:
     visible: "ZIP - 1 entries"
     timeout: 15000

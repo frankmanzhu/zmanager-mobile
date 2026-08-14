@@ -29,17 +29,11 @@ appId: org.tzap.zmanager.mobile
     end: 50%, 25%
     duration: 500
 - assertVisible: "readme.txt"
-- swipe:
-    start: 50%, 25%
-    end: 50%, 80%
-    duration: 500
+- scrollUntilVisible:
+    element: "Back"
+    direction: UP
 - tapOn: "Back"
 - scrollUntilVisible:
-    element: "maestro-nested.zip"
-    direction: UP
-- assertVisible: "maestro-nested.zip"
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 500
+    element: "maestro-inner.zip"
+    direction: DOWN
 - assertVisible: "maestro-inner.zip"

@@ -6,6 +6,9 @@ appId: org.tzap.zmanager.mobile
     clearState: true
 - assertVisible: "ZManager"
 - tapOn: "Run debug batch extraction"
+- scrollUntilVisible:
+    element: "Review batch extraction"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "Review batch extraction"
     timeout: 15000

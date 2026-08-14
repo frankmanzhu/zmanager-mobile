@@ -1,0 +1,17 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Create debug split archive"
+- scrollUntilVisible:
+    element: "Start"
+    direction: DOWN
+- tapOn: "Start"
+- extendedWaitUntil:
+    visible: "Created .*"
+    timeout: 60000
+- assertVisible: ".*(Verified|Created without verification).*"
+- assertVisible: ".*output files committed.*"

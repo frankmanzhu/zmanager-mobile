@@ -9,10 +9,22 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: "Start creation"
     timeout: 15000
-- tapOn: "Start creation"
+- scrollUntilVisible:
+    element: "Start creation"
+    direction: DOWN
+- swipe:
+    start: 50%, 80%
+    end: 50%, 45%
+    duration: 500
+- tapOn:
+    id: "startCreation"
 - extendedWaitUntil:
     visible: "Verified"
     timeout: 30000
+- assertVisible: "Share output"
+- scrollUntilVisible:
+    element: "Load nested fixture"
+    direction: UP
 - tapOn: "Load nested fixture"
 - scrollUntilVisible:
     element: "ZIP - 1 entries"
@@ -42,3 +54,4 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: "Verified"
     timeout: 30000
+- assertVisible: "Share output"

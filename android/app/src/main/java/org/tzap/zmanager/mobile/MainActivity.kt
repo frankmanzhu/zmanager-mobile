@@ -108,6 +108,7 @@ private fun ZManagerApp(
     val destinationPreferences = remember(context) { ArchiveDestinationPreferences(context) }
     val batchExtractionCoordinator = remember(context) { BatchExtractionCoordinator(extractionCoordinator) }
     val creationCoordinator = remember(context) { ArchiveCreationCoordinator(context) }
+    val separateCreationCoordinator = remember(context) { ArchiveSeparateCreationCoordinator(creationCoordinator) }
     val repackagingCoordinator = remember(context) { ArchiveRepackagingCoordinator(context, extractionCoordinator, creationCoordinator) }
     val creationSourceStager = remember(context) { ArchiveCreationSourceStager(context) }
     val localSendSourceStager = remember(context) { LocalSendSourceStager(context) }
@@ -136,6 +137,8 @@ private fun ZManagerApp(
     var creationState by remember { mutableStateOf<ArchiveCreationUiState>(ArchiveCreationUiState.Idle) }
     var createFormat by remember { mutableStateOf(CreateArchiveFormat.ZIP) }
     var createPasswordInput by remember { mutableStateOf("") }
+    var createVolumeSizeInput by remember { mutableStateOf("") }
+    var createSeparateItems by remember { mutableStateOf(false) }
     var stagedCreationSources by remember { mutableStateOf<StagedCreationSources?>(null) }
     var localSendState by remember { mutableStateOf<LocalSendUiState>(LocalSendUiState.Idle) }
     var localSendPinInput by remember { mutableStateOf("") }
@@ -168,6 +171,7 @@ private fun ZManagerApp(
     var previewRequestId by remember { mutableStateOf(0L) }
     var testRequestId by remember { mutableStateOf(0L) }
     var showFixtureMenu by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     val localSendReceiver = remember {
         LocalSendReceiver(onFileCommitted = { received ->
@@ -266,7 +270,11 @@ private fun ZManagerApp(
     }
 
     fun clearCreationState() {
-        (creationState as? ArchiveCreationUiState.Review)?.review?.let(creationCoordinator::discard)
+        when (val state = creationState) {
+            is ArchiveCreationUiState.Review -> creationCoordinator.discard(state.review)
+            is ArchiveCreationUiState.SeparateReview -> separateCreationCoordinator.discard(state.review)
+            else -> Unit
+        }
         stagedCreationSources?.let(creationSourceStager::discard)
         stagedCreationSources = null
         creationState = ArchiveCreationUiState.Idle
@@ -288,11 +296,32 @@ private fun ZManagerApp(
                     "COMPLETED" -> ArchiveCreationUiState.Completed(
                         ArchiveCreationOutcome.Completed(
                             outputPath = result.outputPath ?: state.review.request.destinationArchivePath,
-                            verified = result.verified == true
+                            verified = result.verified == true,
+                            outputPaths = result.outputPaths.ifEmpty {
+                                result.outputPath?.let(::listOf)
+                                    ?: listOf(state.review.request.destinationArchivePath)
+                            }
                         )
                     )
                     "CANCELLED" -> ArchiveCreationUiState.Cancelled
                     else -> ArchiveCreationUiState.Failed(result.message ?: "Unable to create archive.")
+                }
+                stagedCreationSources?.let(creationSourceStager::discard)
+                stagedCreationSources = null
+            }
+            result.kind == "create-separately" &&
+                (creationState as? ArchiveCreationUiState.RunningSeparate)?.jobId == result.token -> {
+                val state = creationState as ArchiveCreationUiState.RunningSeparate
+                creationState = when (result.status) {
+                    "COMPLETED" -> ArchiveCreationUiState.Completed(
+                        ArchiveCreationOutcome.Completed(
+                            outputPath = result.outputPath ?: state.review.items.first().request.destinationArchivePath,
+                            verified = result.verified == true,
+                            outputPaths = result.outputPaths.ifEmpty { result.outputPath?.let(::listOf).orEmpty() }
+                        )
+                    )
+                    "CANCELLED" -> ArchiveCreationUiState.Cancelled
+                    else -> ArchiveCreationUiState.Failed(result.message ?: "Unable to create separate archives.")
                 }
                 stagedCreationSources?.let(creationSourceStager::discard)
                 stagedCreationSources = null
@@ -323,8 +352,8 @@ private fun ZManagerApp(
             }
             else -> {
                 foregroundRecoveryMessage = when (result.status) {
-                    "COMPLETED" -> if (result.kind == "create") {
-                        "Archive job completed${result.outputPath?.let { ": $it" } ?: ""}."
+                    "COMPLETED" -> if (result.kind == "create" || result.kind == "create-separately") {
+                        "Archive job completed${result.outputPath?.let { ": ${File(it).name}" } ?: ""}."
                     } else {
                         "Extraction job completed${result.message?.let { " to $it" } ?: ""}."
                     }
@@ -394,6 +423,34 @@ private fun ZManagerApp(
         }
     }
 
+    fun shareOutputFiles(paths: List<String>, title: String = "Share created archive") {
+        val files = paths.map(::File).filter { it.isFile }
+        if (files.isEmpty()) {
+            foregroundRecoveryMessage = "The created archive is no longer available."
+            return
+        }
+        runCatching {
+            val uris = files.map { file ->
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }
+            val intent = if (uris.size == 1) {
+                Intent(Intent.ACTION_SEND)
+                    .setType("application/octet-stream")
+                    .putExtra(Intent.EXTRA_STREAM, uris.single())
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE)
+                    .setType("application/octet-stream")
+                    .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            }
+            context.startActivity(Intent.createChooser(
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                title
+            ))
+        }.onFailure {
+            foregroundRecoveryMessage = "Unable to share the created archive."
+        }
+    }
+
     fun startRepackaging(entries: List<ArchiveEntrySummary>, sourcePassword: String? = null) {
         val archive = importedArchive ?: return
         repackagingSelectedEntries = entries
@@ -408,6 +465,11 @@ private fun ZManagerApp(
             CreateArchiveFormat.TZAP -> "repackaged.tzap"
         }
         repackagingState = ArchiveRepackagingUiState.Planning
+        val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
+            .getOrElse { error ->
+                repackagingState = ArchiveRepackagingUiState.Failed(error.message ?: "Invalid split volume size.")
+                return
+            }
         scope.launch {
             val planned = withContext(Dispatchers.IO) {
                 runCatching {
@@ -417,6 +479,7 @@ private fun ZManagerApp(
                             selectedPaths = selectedPaths,
                             destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
                             format = createFormat,
+                            volumeSize = volumeSize,
                             sourcePassword = sourcePassword ?: repackagingPasswordInput.takeIf { it.isNotEmpty() },
                             destinationPassword = createPasswordInput.takeIf { it.isNotEmpty() }
                         )
@@ -471,27 +534,64 @@ private fun ZManagerApp(
             CreateArchiveFormat.TAR_ZST -> "archive.tar.zst"
             CreateArchiveFormat.TZAP -> "archive.tzap"
         }
+        val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
+            .getOrElse { error ->
+                creationState = ArchiveCreationUiState.Failed(error.message ?: "Invalid split volume size.")
+                return
+            }
         creationState = ArchiveCreationUiState.Planning
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    creationCoordinator.plan(
-                            ArchiveCreationRequest(
+                    val password = createPasswordInput.takeIf { it.isNotEmpty() }
+                    if (createSeparateItems && staged.sourcePaths.size > 1) {
+                        val requests = ArchiveSeparateCreationPlanner.requests(
                             sourcePaths = staged.sourcePaths,
-                            destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
+                            destinationDirectory = creationCoordinator.appStorageDirectory().absolutePath,
                             format = createFormat,
-                            password = createPasswordInput.takeIf { it.isNotEmpty() }
+                            password = password,
+                            volumeSize = volumeSize
                         )
-                    )
+                        separateCreationCoordinator.plan(requests)
+                    } else {
+                        creationCoordinator.plan(
+                            ArchiveCreationRequest(
+                                sourcePaths = staged.sourcePaths,
+                                destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
+                                format = createFormat,
+                                password = password,
+                                volumeSize = volumeSize
+                            )
+                        )
+                    }
                 }
             }
             creationState = result.fold(
                 onSuccess = { review ->
-                    if (review.plan.canStart) ArchiveCreationUiState.Review(review)
-                    else ArchiveCreationUiState.Failed(
-                        review.plan.warnings.firstOrNull()?.message
-                            ?: "This creation plan cannot be started."
-                    )
+                    when (review) {
+                        is ArchiveCreationReview -> {
+                            if (review.plan.canStart) ArchiveCreationUiState.Review(review)
+                            else {
+                                creationCoordinator.discard(review)
+                                ArchiveCreationUiState.Failed(
+                                    review.plan.warnings.firstOrNull()?.message
+                                        ?: "This creation plan cannot be started."
+                                )
+                            }
+                        }
+                        is ArchiveSeparateCreationReview -> {
+                            val blocked = review.items.firstOrNull { !it.plan.canStart }
+                            if (blocked == null) ArchiveCreationUiState.SeparateReview(review)
+                            else {
+                                separateCreationCoordinator.discard(review)
+                                ArchiveCreationUiState.Failed(
+                                    blocked.plan.warnings.firstOrNull()?.message
+                                        ?: "One of the separate creation plans cannot be started."
+                                )
+                            }
+                        }
+                        else -> ArchiveCreationUiState.Failed("Unable to prepare archive creation.")
+                    }
                 },
                 onFailure = { error -> ArchiveCreationUiState.Failed(error.message ?: "Unable to plan archive creation.") }
             )
@@ -505,6 +605,36 @@ private fun ZManagerApp(
                 runCatching { creationSourceStager.stageDebugFixture() }
             }.onSuccess(::planCreation)
                 .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage creation fixture.") }
+        }
+    }
+
+    fun stageDebugSplitCreationFixture() {
+        if (!BuildConfig.DEBUG) return
+        createVolumeSizeInput = "64k"
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { creationSourceStager.stageDebugSplitFixture() }
+            }.onSuccess(::planCreation)
+                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage split creation fixture.") }
+        }
+    }
+
+    fun stageDebugSeparateCreationFixture() {
+        if (!BuildConfig.DEBUG) return
+        createSeparateItems = true
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { creationSourceStager.stageDebugSeparateFixture() }
+            }.onSuccess { staged ->
+                // The debug fixture is intentionally repeatable. Remove only
+                // the fixed outputs owned by this fixture so a second E2E run
+                // cannot inherit an unverified archive from an earlier run.
+                listOf("one.zip", "two.zip").forEach { outputName ->
+                    File(creationCoordinator.appStorageDirectory(), outputName).delete()
+                }
+                planCreation(staged)
+            }
+                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage separate creation fixture.") }
         }
     }
 
@@ -529,6 +659,27 @@ private fun ZManagerApp(
         }
     }
 
+    fun startSeparateCreation(review: ArchiveSeparateCreationReview) {
+        createPasswordInput = ""
+        creationState = ArchiveCreationUiState.StartingSeparate(review)
+        runCatching {
+            val token = ArchiveJobForegroundService.submit(
+                context,
+                ArchiveForegroundRequest.CreateSeparately(review.items.map { it.request })
+            )
+            separateCreationCoordinator.discard(review)
+            val stateReview = ArchiveSeparateCreationReview(
+                review.items.map { it.copy(request = it.request.copy(password = null)) }
+            )
+            creationState = ArchiveCreationUiState.RunningSeparate(stateReview, token, "Creating separate archives")
+        }.onFailure { error ->
+            separateCreationCoordinator.discard(review)
+            stagedCreationSources?.let(creationSourceStager::discard)
+            stagedCreationSources = null
+            creationState = ArchiveCreationUiState.Failed(error.message ?: "Unable to create separate archives.")
+        }
+    }
+
     fun planExtraction(
         archive: ImportedArchive,
         entries: List<ArchiveEntrySummary>,
@@ -546,8 +697,9 @@ private fun ZManagerApp(
                     extractionCoordinator.plan(
                         archive = archive,
                         // An empty selection means every entry. Preserve that
-                        // contract so full extraction reaches the format's
-                        // native backend instead of the per-entry fallback.
+                        // contract so full extraction uses the engine's
+                        // whole-archive operation instead of selected-entry
+                        // calls.
                         selectedPaths = selectedPaths,
                         destination = destination,
                         password = password,
@@ -1179,6 +1331,14 @@ private fun ZManagerApp(
                     }) {
                         Text("Reset default destination")
                     }
+                    TextButton(
+                        onClick = { showHelpDialog = true },
+                        modifier = Modifier.semantics {
+                            contentDescription = "About and help"
+                        }
+                    ) {
+                        Text("About & help")
+                    }
                     if (BuildConfig.DEBUG) {
                         OutlinedButton(
                             enabled = !isImporting,
@@ -1195,10 +1355,32 @@ private fun ZManagerApp(
                         OutlinedButton(
                             enabled = creationState !is ArchiveCreationUiState.Planning &&
                                 creationState !is ArchiveCreationUiState.Starting &&
-                                creationState !is ArchiveCreationUiState.Running,
+                                creationState !is ArchiveCreationUiState.StartingSeparate &&
+                                creationState !is ArchiveCreationUiState.Running &&
+                                creationState !is ArchiveCreationUiState.RunningSeparate,
                             onClick = ::stageDebugCreationFixture
                         ) {
                             Text("Create debug folder archive")
+                        }
+                        OutlinedButton(
+                            enabled = creationState !is ArchiveCreationUiState.Planning &&
+                                creationState !is ArchiveCreationUiState.Starting &&
+                                creationState !is ArchiveCreationUiState.StartingSeparate &&
+                                creationState !is ArchiveCreationUiState.Running &&
+                                creationState !is ArchiveCreationUiState.RunningSeparate,
+                            onClick = ::stageDebugSplitCreationFixture
+                        ) {
+                            Text("Create debug split archive")
+                        }
+                        OutlinedButton(
+                            enabled = creationState !is ArchiveCreationUiState.Planning &&
+                                creationState !is ArchiveCreationUiState.Starting &&
+                                creationState !is ArchiveCreationUiState.StartingSeparate &&
+                                creationState !is ArchiveCreationUiState.Running &&
+                                creationState !is ArchiveCreationUiState.RunningSeparate,
+                            onClick = ::stageDebugSeparateCreationFixture
+                        ) {
+                            Text("Create debug separate archives")
                         }
                         OutlinedButton(
                             enabled = batchExtractionState !is BatchExtractionUiState.Planning &&
@@ -1297,17 +1479,31 @@ private fun ZManagerApp(
                         state = creationState,
                         format = createFormat,
                         password = createPasswordInput,
+                        volumeSizeInput = createVolumeSizeInput,
+                        separateItems = createSeparateItems,
                         onPasswordChanged = { createPasswordInput = it },
+                        onVolumeSizeChanged = { createVolumeSizeInput = it },
+                        onSeparateItemsChanged = { createSeparateItems = it },
                         onFormatChanged = { createFormat = it },
                         onChooseFiles = { creationFilesPicker.launch(arrayOf("*/*")) },
                         onChooseFolder = { creationFolderPicker.launch(null) },
                         onStart = ::startCreation,
+                        onStartSeparate = ::startSeparateCreation,
+                        onShareOutput = { outcome ->
+                            shareOutputFiles(
+                                outcome.outputPaths.ifEmpty { listOf(outcome.outputPath) }
+                            )
+                        },
                         onCancel = { state ->
                             when (state) {
                                 is ArchiveCreationUiState.Running -> scope.launch(Dispatchers.IO) {
                                     ArchiveJobForegroundService.cancel(context, state.jobId)
                                 }
+                                is ArchiveCreationUiState.RunningSeparate -> scope.launch(Dispatchers.IO) {
+                                    ArchiveJobForegroundService.cancel(context, state.jobId)
+                                }
                                 is ArchiveCreationUiState.Review -> clearCreationState()
+                                is ArchiveCreationUiState.SeparateReview -> clearCreationState()
                                 else -> Unit
                             }
                         }
@@ -1449,6 +1645,9 @@ private fun ZManagerApp(
                         repackagingPasswordInput = repackagingPasswordInput,
                         onRepackagingPasswordInputChanged = { repackagingPasswordInput = it },
                         onRepackageEntries = ::startRepackaging,
+                        onShareRepackagedOutput = { outputPaths ->
+                            shareOutputFiles(outputPaths, "Share repackaged archive")
+                        },
                         onRetryRepackagingWithPassword = { entries ->
                             val password = repackagingPasswordInput.takeIf { it.isNotEmpty() }
                             repackagingPasswordInput = ""
@@ -1500,7 +1699,9 @@ private fun ZManagerApp(
                     OutlinedButton(
                         enabled = creationState !is ArchiveCreationUiState.Planning &&
                             creationState !is ArchiveCreationUiState.Starting &&
-                            creationState !is ArchiveCreationUiState.Running,
+                            creationState !is ArchiveCreationUiState.StartingSeparate &&
+                            creationState !is ArchiveCreationUiState.Running &&
+                            creationState !is ArchiveCreationUiState.RunningSeparate,
                         onClick = { creationFilesPicker.launch(arrayOf("*/*")) }
                     ) {
                         Text("Create archive")
@@ -1508,7 +1709,9 @@ private fun ZManagerApp(
                     OutlinedButton(
                         enabled = creationState !is ArchiveCreationUiState.Planning &&
                             creationState !is ArchiveCreationUiState.Starting &&
-                            creationState !is ArchiveCreationUiState.Running,
+                            creationState !is ArchiveCreationUiState.StartingSeparate &&
+                            creationState !is ArchiveCreationUiState.Running &&
+                            creationState !is ArchiveCreationUiState.RunningSeparate,
                         onClick = { creationFolderPicker.launch(null) }
                     ) {
                         Text("Create folder archive")
@@ -1586,14 +1789,20 @@ private fun ZManagerApp(
                     }
                     Button(
                         enabled = !isImporting,
-                        onClick = { documentPicker.launch(arrayOf("*/*")) }
+                        onClick = { documentPicker.launch(arrayOf("*/*")) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Open Archive"
+                        }
                     ) {
                         Text(if (isImporting) "Importing" else "Open Archive")
                     }
                     OutlinedButton(
                         enabled = batchExtractionState !is BatchExtractionUiState.Planning &&
                             batchExtractionState !is BatchExtractionUiState.Running,
-                        onClick = { batchArchivePicker.launch(arrayOf("*/*")) }
+                        onClick = { batchArchivePicker.launch(arrayOf("*/*")) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Batch extract"
+                        }
                     ) {
                         Text("Batch extract")
                     }
@@ -1645,6 +1854,23 @@ private fun ZManagerApp(
                 }
             )
         }
+        if (showHelpDialog) {
+            AlertDialog(
+                onDismissRequest = { showHelpDialog = false },
+                title = { Text("About ZManager") },
+                text = {
+                    Text(
+                        "ZManager keeps archive listing, extraction, verification, and creation in the Rust core. " +
+                            "Choose an archive to inspect it, select entries to extract or repackage, and use " +
+                            "Share on local network for LocalSend-compatible transfers. Passwords are transient " +
+                            "and are not included in operation reports."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showHelpDialog = false }) { Text("Close") }
+                }
+            )
+        }
     }
 }
 
@@ -1659,11 +1885,17 @@ private fun ArchiveCreationPanel(
     state: ArchiveCreationUiState,
     format: CreateArchiveFormat,
     password: String,
+    volumeSizeInput: String,
+    separateItems: Boolean,
     onPasswordChanged: (String) -> Unit,
+    onVolumeSizeChanged: (String) -> Unit,
+    onSeparateItemsChanged: (Boolean) -> Unit,
     onFormatChanged: (CreateArchiveFormat) -> Unit,
     onChooseFiles: () -> Unit,
     onChooseFolder: () -> Unit,
     onStart: (ArchiveCreationReview) -> Unit,
+    onStartSeparate: (ArchiveSeparateCreationReview) -> Unit,
+    onShareOutput: (ArchiveCreationOutcome.Completed) -> Unit,
     onCancel: (ArchiveCreationUiState) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1682,6 +1914,20 @@ private fun ArchiveCreationPanel(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        if (ArchiveVolumeSupport.supportsVolumeSize(format)) {
+            OutlinedTextField(
+                value = volumeSizeInput,
+                onValueChange = onVolumeSizeChanged,
+                label = { Text("Optional split volume size (for example 4m)") },
+                supportingText = { Text("Creates a numbered volume set; leave blank for one archive.") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = separateItems, onCheckedChange = onSeparateItemsChanged)
+            Text("Archive each selected item separately")
+        }
         when (state) {
             ArchiveCreationUiState.Idle -> Text("Choose files or a folder to begin.")
             ArchiveCreationUiState.Planning -> Text("Preparing creation plan")
@@ -1695,14 +1941,42 @@ private fun ArchiveCreationPanel(
                     TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
                 }
             }
+            is ArchiveCreationUiState.SeparateReview -> {
+                val entries = state.review.items.sumOf { it.plan.totalEntries }
+                val bytes = state.review.items.sumOf { it.plan.totalBytes }
+                Text("${state.review.items.size} archives, $entries entries, $bytes bytes")
+                Text("Each selected item will become its own ${format.name} archive.")
+                state.review.items.forEach { item ->
+                    Text(File(item.request.destinationArchivePath).name, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onStartSeparate(state.review) }) { Text("Start separate archives") }
+                    TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
+                }
+            }
             is ArchiveCreationUiState.Starting -> Text("Starting archive creation")
+            is ArchiveCreationUiState.StartingSeparate -> Text("Starting separate archive creation")
             is ArchiveCreationUiState.Running -> {
                 Text(state.message)
                 TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
             }
+            is ArchiveCreationUiState.RunningSeparate -> {
+                Text(state.message)
+                TextButton(onClick = { onCancel(state) }) { Text("Cancel") }
+            }
             is ArchiveCreationUiState.Completed -> {
-                Text("Created ${state.outcome.outputPath}")
-                if (state.outcome.verified) Text("Verified")
+                if (state.outcome.outputPaths.size > 1) {
+                    Text("${state.outcome.outputPaths.size} output files committed")
+                    Text(
+                        "Additional output files are stored beside the archive.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(if (state.outcome.verified) "Verified" else "Created without verification")
+                Text("Created ${File(state.outcome.outputPath).name}")
+                OutlinedButton(onClick = { onShareOutput(state.outcome) }) {
+                    Text("Share output")
+                }
             }
             ArchiveCreationUiState.Cancelled -> Text("Archive creation cancelled")
             is ArchiveCreationUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)
@@ -1914,6 +2188,7 @@ private fun ArchiveListingPanel(
     repackagingPasswordInput: String,
     onRepackagingPasswordInputChanged: (String) -> Unit,
     onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onShareRepackagedOutput: (List<String>) -> Unit,
     onStartRepackaging: (ArchiveRepackagingUiState) -> Unit,
     onRetryRepackagingWithPassword: (List<ArchiveEntrySummary>) -> Unit,
     onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
@@ -1961,6 +2236,7 @@ private fun ArchiveListingPanel(
             repackagingPasswordInput = repackagingPasswordInput,
             onRepackagingPasswordInputChanged = onRepackagingPasswordInputChanged,
             onRepackageEntries = onRepackageEntries,
+            onShareRepackagedOutput = onShareRepackagedOutput,
             onStartRepackaging = onStartRepackaging,
             onRetryRepackagingWithPassword = onRetryRepackagingWithPassword,
             onCancelRepackaging = onCancelRepackaging
@@ -2045,6 +2321,7 @@ private fun ArchiveListingReadyPanel(
     repackagingPasswordInput: String,
     onRepackagingPasswordInputChanged: (String) -> Unit,
     onRepackageEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onShareRepackagedOutput: (List<String>) -> Unit,
     onStartRepackaging: (ArchiveRepackagingUiState) -> Unit,
     onRetryRepackagingWithPassword: (List<ArchiveEntrySummary>) -> Unit,
     onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
@@ -2144,6 +2421,7 @@ private fun ArchiveListingReadyPanel(
         onPasswordInputChanged = onRepackagingPasswordInputChanged,
         onStart = onStartRepackaging,
         onRetryWithPassword = onRetryRepackagingWithPassword,
+        onShareOutput = onShareRepackagedOutput,
         onCancel = onCancelRepackaging
     )
     ArchivePreviewPanel(
@@ -2234,6 +2512,7 @@ private fun ArchiveRepackagingPanel(
     onPasswordInputChanged: (String) -> Unit,
     onStart: (ArchiveRepackagingUiState) -> Unit,
     onRetryWithPassword: (List<ArchiveEntrySummary>) -> Unit,
+    onShareOutput: (List<String>) -> Unit,
     onCancel: (ArchiveRepackagingUiState) -> Unit
 ) {
     when (state) {
@@ -2274,7 +2553,15 @@ private fun ArchiveRepackagingPanel(
         }
         is ArchiveRepackagingUiState.Completed -> {
             Text("Created ${state.outcome.outputPath}")
+            if (state.outcome.outputPaths.size > 1) {
+                Text("${state.outcome.outputPaths.size} volumes committed")
+            }
             Text(if (state.outcome.verified) "Verified" else "Created without verification")
+            OutlinedButton(onClick = {
+                onShareOutput(state.outcome.outputPaths.ifEmpty { listOf(state.outcome.outputPath) })
+            }) {
+                Text("Share output")
+            }
         }
         ArchiveRepackagingUiState.Cancelled -> Text("Repackaging cancelled")
         is ArchiveRepackagingUiState.Failed -> Text(state.message, color = MaterialTheme.colorScheme.error)

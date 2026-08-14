@@ -5,6 +5,9 @@ appId: org.tzap.zmanager.mobile
 - launchApp:
     clearState: true
 - assertVisible: "ZManager"
+- scrollUntilVisible:
+    element: "Receive files"
+    direction: DOWN
 - tapOn: "Receive files"
 - extendedWaitUntil:
     visible: ".*Receiving LocalSend files.*"

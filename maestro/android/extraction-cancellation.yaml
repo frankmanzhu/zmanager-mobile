@@ -9,10 +9,9 @@ appId: org.tzap.zmanager.mobile
     element: "Run cancellable extraction"
     direction: DOWN
 - tapOn: "Run cancellable extraction"
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 500
+- scrollUntilVisible:
+    element: "Review extraction"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 15000
@@ -22,10 +21,9 @@ appId: org.tzap.zmanager.mobile
     duration: 500
 - assertVisible: "Start extraction"
 - tapOn: "Start extraction"
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 500
+- scrollUntilVisible:
+    element: "Extracting archive"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "Extracting archive"
     timeout: 15000

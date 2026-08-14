@@ -11,11 +11,7 @@ import android.provider.DocumentsProvider
 import java.io.File
 import java.io.FileNotFoundException
 
-/**
- * A small provider-backed filesystem used only by instrumentation tests. It
- * exercises ContentResolver and DocumentFile without relying on a device's
- * installed cloud/storage providers.
- */
+/** A provider-backed filesystem used only by debug instrumentation tests. */
 class TestDocumentsProvider : DocumentsProvider() {
     companion object {
         const val AUTHORITY = "org.tzap.zmanager.mobile.test.documents"
@@ -52,8 +48,8 @@ class TestDocumentsProvider : DocumentsProvider() {
             Root.COLUMN_MIME_TYPES
         )
         return MatrixCursor(columns).apply {
-            addRow(columns.map { column ->
-                when (column) {
+            addRow(Array<Any?>(columns.size) { index ->
+                when (columns[index]) {
                     Root.COLUMN_ROOT_ID -> ROOT_ID
                     Root.COLUMN_DOCUMENT_ID -> ROOT_ID
                     Root.COLUMN_TITLE -> "Test documents"
@@ -61,7 +57,7 @@ class TestDocumentsProvider : DocumentsProvider() {
                     Root.COLUMN_MIME_TYPES -> "*/*"
                     else -> null
                 }
-            }.toTypedArray())
+            })
         }
     }
 
@@ -132,6 +128,9 @@ class TestDocumentsProvider : DocumentsProvider() {
     override fun getDocumentType(documentId: String): String =
         if (resolve(documentId).isDirectory) Document.MIME_TYPE_DIR else "application/octet-stream"
 
+    override fun isChildDocument(parentDocumentId: String, documentId: String): Boolean =
+        documentId == parentDocumentId || documentId.startsWith("$parentDocumentId/")
+
     private fun resolve(documentId: String): File {
         if (documentId == ROOT_ID) return root
         require(documentId.startsWith("$ROOT_ID/")) { "Unknown document" }
@@ -152,16 +151,18 @@ class TestDocumentsProvider : DocumentsProvider() {
     }
 
     private fun documentRow(file: File, columns: Array<String>): Array<Any?> =
-        columns.map { column ->
-            when (column) {
+        Array(columns.size) { index ->
+            when (columns[index]) {
                 Document.COLUMN_DOCUMENT_ID -> if (file == root) ROOT_ID else documentId(file)
                 Document.COLUMN_DISPLAY_NAME -> if (file == root) "Test documents" else file.name
                 Document.COLUMN_MIME_TYPE -> if (file.isDirectory) Document.MIME_TYPE_DIR else "application/octet-stream"
                 Document.COLUMN_SIZE -> if (file.isFile) file.length() else 0L
-                Document.COLUMN_FLAGS -> Document.FLAG_SUPPORTS_WRITE or
-                    Document.FLAG_SUPPORTS_DELETE
+                Document.COLUMN_FLAGS -> if (file.isDirectory) {
+                    Document.FLAG_DIR_SUPPORTS_CREATE or Document.FLAG_SUPPORTS_DELETE
+                } else {
+                    Document.FLAG_SUPPORTS_WRITE or Document.FLAG_SUPPORTS_DELETE
+                }
                 else -> null
             }
-        }.toTypedArray()
-
+        }
 }

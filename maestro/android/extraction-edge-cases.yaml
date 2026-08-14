@@ -18,6 +18,9 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
 - tapOn: "Start extraction"
 - extendedWaitUntil:
     visible: ".*Extraction complete:.*"
@@ -29,6 +32,9 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
 - tapOn: "Start extraction"
 - extendedWaitUntil:
     visible: ".*already exists in the destination.*"

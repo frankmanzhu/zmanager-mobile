@@ -24,6 +24,20 @@ both the explicit `full` (`--features auth`) and `offline`
 (`--no-default-features`) profiles. Set `ZMANAGER_DIR` and `ZMANAGER_COMMIT`
 explicitly when validating another checked-out revision.
 
+During the ZManager architecture cleanup, use the current-root override for
+cross-repository verification until the cleanup revision is published:
+
+```sh
+ZMANAGER_DIR=/absolute/path/to/zmanager \
+ZMANAGER_COMMIT="$(git -C /absolute/path/to/zmanager rev-parse HEAD)" \
+scripts/check-rust.sh
+```
+
+The committed Android format snapshot follows the cleaned engine contract. The
+default pinned checkout remains the predecessor until the cleanup revision is
+available at a consumable commit; advance the pin and rerun the Android/iOS
+bridge checks before treating the migration as release-complete.
+
 ## Android
 
 Open `android/` in Android Studio, or run the local check script:

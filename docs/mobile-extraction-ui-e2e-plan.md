@@ -9,9 +9,10 @@ The app now implements the app-private extraction vertical slice on both platfor
 ## Current status and remaining gap
 
 - Android and iOS have extraction methods, plan review, app-private destination staging, cancellation, completion, cleanup, and stable accessibility labels.
-- Android SAF and iOS security-scoped external-folder commits now retain redacted native recovery records when a commit fails, with Retry/Export/Discard actions. Provider permission instrumentation and native picker instrumentation remain to be completed.
+- Android SAF and iOS security-scoped external-folder commits now retain redacted native recovery records when a commit fails, with Retry/Export/Discard actions. Android provider permission instrumentation is covered by the debug-only DocumentsProvider fixture; iOS security-scoped lifetime instrumentation now covers successful and failed staging, while native picker/device behavior remains to be completed.
 - Maestro happy-path extraction flows now exist at `maestro/android/extraction-happy-path.yaml` and `maestro/ios/extraction-happy-path.yaml`; they verify the user-visible completion path. Deterministic cancellation flows exist at `maestro/android/extraction-cancellation.yaml` and `maestro/ios/extraction-cancellation.yaml`; they hold a debug-only paced Rust job, cancel it through the native shell, and verify the cancelled state. Native tests remain the source of truth for bridge and commit edge cases.
 - Creation happy-path flows exist at `maestro/android/creation-happy-path.yaml` and `maestro/ios/creation-happy-path.yaml`; the iOS flow uses the platform-specific `Start creation` label and passes on the simulator alongside the native UI test.
+- Split-volume creation flows exist at `maestro/android/creation-split.yaml` and `maestro/ios/creation-split.yaml`; both assert completion status and a committed volume count. Verification is asserted when the pinned bridge reports it and otherwise surfaced as an explicit "Created without verification" state.
 - The bridge contract provides `ExtractionPlan`, `ExtractionPlanEntry`, collision policies, job events, terminal summaries, and job polling. Generated bindings are pinned to the approved `.cache/zmanager` checkout and must be regenerated only from that checkout.
 
 ## Target user flow

@@ -14,6 +14,13 @@ only ZIP, 7z, TAR+Zstd, and TZAP. Read/list support is driven by the generated
 bridge and the pinned format contract snapshot at
 `android/app/src/test/resources/format-capabilities.json`.
 
+The committed snapshot has been refreshed to the cleaned engine contract: it
+contains the expanded current format registry and no engine `Unknown` row. The
+default pinned bridge remains the predecessor revision until the corresponding
+ZManager cleanup changes are committed and published. Until that pin advances,
+the snapshot check is expected to pass only with an explicit current-root
+override (`ZMANAGER_DIR` plus its matching `ZMANAGER_COMMIT`).
+
 | Format family | List/read | Extract | Create | Android evidence | iOS evidence | UI status / limitation |
 |---|---|---|---|---|---|---|
 | ZIP | verified | verified | verified, including encrypted ZIP | JVM, instrumentation, Maestro | XCTest/UI, Maestro | exposed |
@@ -22,7 +29,7 @@ bridge and the pinned format contract snapshot at
 | TZAP | registry-backed | fixture/listing coverage | verified through create DTO | JVM/fixture | XCTest/fixture | exposed; recovery-oriented copy is still limited |
 | TAR, gzip, bzip2, xz, zstd streams | registry-backed | bridge capability required per format | blocked by pinned create enum | snapshot/conformance only | generated bridge only | read/extract capability must be separately gated |
 | RAR / multipart RAR | registry-backed | extraction-only and volume-grouping evidence required | intentionally absent | split fixtures/conformance | split fixtures/conformance | no single-file nested claim; no create/repair |
-| split ZIP / split 7z | registry-backed | volume-set handling required | volume creation not in pinned DTO | fixtures only | fixtures only | not launch-complete |
+| split ZIP / split 7z | registry-backed | volume-set handling verified | verified through pinned `volume_size` DTO | JVM, Maestro split-create/extract | XCTest, Maestro split-create/extract | exposed with companion-volume guidance |
 | AppleArchive / AAR | registry-backed | pinned bridge/platform gate required | pinned create enum lacks AAR | fixture only | fixture only | blocked pending bridge/core evidence |
 | XIP | core may identify it | current mobile nesting excludes it | not applicable | explicit unsupported nesting test | explicit unsupported nesting test | not exposed as nested archive |
 | ISO, DMG, CAB, CPIO, RPM, XAR, PKG, LHA, AR, WARC, MTREE, DEB | registry-backed where listed | per-format bridge fixture and safety evidence required | not in create DTO | contract snapshot only unless fixture listed | contract snapshot only unless fixture listed | not launch-complete |

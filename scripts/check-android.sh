@@ -5,6 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_DIR="$ROOT_DIR/android"
 JBR_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
+restore_generated_fixtures() {
+  git -C "$ROOT_DIR" restore --source=HEAD -- android/app/src/debug/assets ios/ZManagerMobile/ZManagerMobile/MaestroFixtures
+}
+
+trap restore_generated_fixtures EXIT
+
 # The format contract snapshot must match the pinned zmanager contract
 # (secondary gate; the byte-compare test in zmanager-cli is the primary one).
 ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"

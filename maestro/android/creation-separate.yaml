@@ -1,0 +1,18 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn: "Create debug separate archives"
+- scrollUntilVisible:
+    element: "Start separate archives"
+    direction: DOWN
+- assertVisible: ".*2 archives.*entries.*"
+- tapOn: "Start separate archives"
+- extendedWaitUntil:
+    visible: "Created .*"
+    timeout: 60000
+- assertVisible: "Verified"
+- assertVisible: ".*output files committed.*"

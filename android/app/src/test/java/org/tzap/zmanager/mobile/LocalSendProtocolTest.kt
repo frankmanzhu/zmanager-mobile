@@ -87,6 +87,24 @@ class LocalSendProtocolTest {
     }
 
     @Test
+    fun httpsPeersUseCertificateFingerprintNormalization() {
+        val device = LocalSendDevice(
+            address = "192.0.2.1",
+            port = 53317,
+            protocol = "https",
+            alias = "LocalSend",
+            version = "2.1",
+            deviceModel = "macOS",
+            deviceType = "desktop",
+            fingerprint = "AA:bb-cc dd",
+            download = false
+        )
+
+        assertEquals("https://192.0.2.1:53317", device.baseUrl)
+        assertEquals("AABBCCDD", LocalSendTls.normalizeFingerprint(device.fingerprint!!))
+    }
+
+    @Test
     fun pinRequiredUsesLocalSendUnauthorizedStatus() {
         assertTrue(LocalSendProtocol.isPinRequiredStatus(401))
         assertTrue(!LocalSendProtocol.isPinRequiredStatus(403))

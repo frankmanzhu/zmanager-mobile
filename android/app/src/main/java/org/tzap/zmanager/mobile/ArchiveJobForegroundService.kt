@@ -21,6 +21,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.tzap.zmanager.mobile.bridge.generated.ZmanagerGuiException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 sealed interface ArchiveForegroundRequest {
     data class Extract(val request: ArchiveExtractionRequest) : ArchiveForegroundRequest
     data class Create(val request: ArchiveCreationRequest) : ArchiveForegroundRequest
+    data class CreateSeparately(val requests: List<ArchiveCreationRequest>) : ArchiveForegroundRequest
     data class BatchExtract(val request: ArchiveBatchExtractionRequest) : ArchiveForegroundRequest
 }
 
@@ -38,6 +40,7 @@ data class ArchiveForegroundResult(
     val status: String,
     val message: String? = null,
     val outputPath: String? = null,
+    val outputPaths: List<String> = emptyList(),
     val verified: Boolean? = null,
     val writtenEntries: ULong? = null,
     val recoveryId: String? = null
@@ -56,6 +59,7 @@ object ArchiveJobForegroundService {
     private const val EXTRA_STATUS = "status"
     private const val EXTRA_MESSAGE = "message"
     private const val EXTRA_OUTPUT_PATH = "outputPath"
+    private const val EXTRA_OUTPUT_PATHS = "outputPaths"
     private const val EXTRA_VERIFIED = "verified"
     private const val EXTRA_WRITTEN_ENTRIES = "writtenEntries"
     private const val EXTRA_RECOVERY_ID = "recoveryId"
@@ -63,6 +67,7 @@ object ArchiveJobForegroundService {
     private const val EXTRA_CANCEL_TOKEN = "cancelToken"
     private const val KIND_EXTRACT = "extract"
     private const val KIND_CREATE = "create"
+    private const val KIND_CREATE_SEPARATELY = "create-separately"
     private const val KIND_BATCH_EXTRACT = "batch-extract"
     private const val CHANNEL_ID = "archive_jobs"
     private const val NOTIFICATION_ID = 0x5A4D
@@ -141,6 +146,9 @@ object ArchiveJobForegroundService {
             status = intent.getStringExtra(EXTRA_STATUS) ?: return null,
             message = intent.getStringExtra(EXTRA_MESSAGE),
             outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH),
+            outputPaths = intent.getStringArrayListExtra(EXTRA_OUTPUT_PATHS).orEmpty().ifEmpty {
+                intent.getStringExtra(EXTRA_OUTPUT_PATH)?.let(::listOf).orEmpty()
+            },
             verified = if (intent.hasExtra(EXTRA_VERIFIED)) intent.getBooleanExtra(EXTRA_VERIFIED, false) else null,
             writtenEntries = intent.getStringExtra(EXTRA_WRITTEN_ENTRIES)?.toULongOrNull(),
             recoveryId = intent.getStringExtra(EXTRA_RECOVERY_ID)
@@ -165,6 +173,13 @@ object ArchiveJobForegroundService {
                 status = status,
                 message = preferences.getString("$RESULT_PREFIX$token.message", null),
                 outputPath = preferences.getString("$RESULT_PREFIX$token.outputPath", null),
+                outputPaths = preferences.getString("$RESULT_PREFIX$token.outputPaths", null)
+                    ?.let(::JSONArray)
+                    ?.let { paths -> List(paths.length()) { index -> paths.optString(index) }.filter(String::isNotEmpty) }
+                    .orEmpty()
+                    .ifEmpty {
+                        preferences.getString("$RESULT_PREFIX$token.outputPath", null)?.let(::listOf).orEmpty()
+                    },
                 verified = if (preferences.contains("$RESULT_PREFIX$token.verified")) {
                     preferences.getBoolean("$RESULT_PREFIX$token.verified", false)
                 } else null,
@@ -179,6 +194,7 @@ object ArchiveJobForegroundService {
                     remove("$RESULT_PREFIX${result.token}.status")
                     remove("$RESULT_PREFIX${result.token}.message")
                     remove("$RESULT_PREFIX${result.token}.outputPath")
+                    remove("$RESULT_PREFIX${result.token}.outputPaths")
                     remove("$RESULT_PREFIX${result.token}.verified")
                     remove("$RESULT_PREFIX${result.token}.writtenEntries")
                     remove("$RESULT_PREFIX${result.token}.recoveryId")
@@ -197,6 +213,9 @@ object ArchiveJobForegroundService {
             .apply {
                 result.message?.let { putExtra(EXTRA_MESSAGE, it) }
                 result.outputPath?.let { putExtra(EXTRA_OUTPUT_PATH, it) }
+                result.outputPaths.takeIf { it.isNotEmpty() }?.let {
+                    putStringArrayListExtra(EXTRA_OUTPUT_PATHS, ArrayList(it))
+                }
                 result.verified?.let { putExtra(EXTRA_VERIFIED, it) }
                 result.writtenEntries?.let { putExtra(EXTRA_WRITTEN_ENTRIES, it.toString()) }
                 result.recoveryId?.let { putExtra(EXTRA_RECOVERY_ID, it) }
@@ -208,6 +227,10 @@ object ArchiveJobForegroundService {
             putString("$RESULT_PREFIX${result.token}.status", result.status)
             result.message?.let { putString("$RESULT_PREFIX${result.token}.message", it) }
             result.outputPath?.let { putString("$RESULT_PREFIX${result.token}.outputPath", it) }
+            putString(
+                "$RESULT_PREFIX${result.token}.outputPaths",
+                JSONArray(result.outputPaths.ifEmpty { result.outputPath?.let(::listOf).orEmpty() }).toString()
+            )
             result.verified?.let { putBoolean("$RESULT_PREFIX${result.token}.verified", it) }
             result.writtenEntries?.let { putString("$RESULT_PREFIX${result.token}.writtenEntries", it.toString()) }
             result.recoveryId?.let { putString("$RESULT_PREFIX${result.token}.recoveryId", it) }
@@ -265,6 +288,7 @@ object ArchiveJobForegroundService {
                         when (request) {
                             is ArchiveForegroundRequest.Extract -> runExtraction(token, request.request)
                             is ArchiveForegroundRequest.Create -> runCreation(token, request.request)
+                            is ArchiveForegroundRequest.CreateSeparately -> runCreationSeparately(token, request.requests)
                             is ArchiveForegroundRequest.BatchExtract -> runBatchExtraction(token, request.request)
                         }
                     }
@@ -406,12 +430,81 @@ object ArchiveJobForegroundService {
             }
             when (outcome) {
                 is ArchiveCreationOutcome.Completed -> sendResult(
-                    ArchiveForegroundResult(token, KIND_CREATE, "COMPLETED", outputPath = outcome.outputPath, verified = outcome.verified)
+                    ArchiveForegroundResult(
+                        token,
+                        KIND_CREATE,
+                        "COMPLETED",
+                        outputPath = outcome.outputPath,
+                        outputPaths = outcome.outputPaths,
+                        verified = outcome.verified
+                    )
                 )
                 ArchiveCreationOutcome.Cancelled -> sendResult(ArchiveForegroundResult(token, KIND_CREATE, "CANCELLED"))
                 is ArchiveCreationOutcome.Failed -> sendResult(
                     ArchiveForegroundResult(token, KIND_CREATE, "FAILED", outcome.message)
                 )
+            }
+        }
+
+        private suspend fun runCreationSeparately(token: String, requests: List<ArchiveCreationRequest>) {
+            val coordinator = ArchiveCreationCoordinator(applicationContext)
+            val completedOutputs = mutableListOf<String>()
+            var verified = true
+            try {
+                requests.forEachIndexed { index, request ->
+                    val review = coordinator.plan(request)
+                    val jobId = coordinator.start(review)
+                    cancelActive = { runCatching { coordinator.cancel(jobId) } }
+                    val outcome = coordinator.awaitCompletion(review, jobId) {
+                        updateNotification("Creating archive ${index + 1} of ${requests.size}")
+                    }
+                    when (outcome) {
+                        is ArchiveCreationOutcome.Completed -> {
+                            completedOutputs += outcome.outputPaths
+                            verified = verified && outcome.verified
+                        }
+                        ArchiveCreationOutcome.Cancelled -> {
+                            sendResult(
+                                ArchiveForegroundResult(
+                                    token,
+                                    KIND_CREATE_SEPARATELY,
+                                    "CANCELLED",
+                                    "Separate archive creation cancelled after ${completedOutputs.size} output file(s).",
+                                    outputPath = completedOutputs.firstOrNull(),
+                                    outputPaths = completedOutputs,
+                                    verified = completedOutputs.takeIf { it.isNotEmpty() }?.let { verified }
+                                )
+                            )
+                            return
+                        }
+                        is ArchiveCreationOutcome.Failed -> {
+                            sendResult(
+                                ArchiveForegroundResult(
+                                    token,
+                                    KIND_CREATE_SEPARATELY,
+                                    "FAILED",
+                                    outcome.message,
+                                    outputPath = completedOutputs.firstOrNull(),
+                                    outputPaths = completedOutputs,
+                                    verified = completedOutputs.takeIf { it.isNotEmpty() }?.let { verified }
+                                )
+                            )
+                            return
+                        }
+                    }
+                }
+                sendResult(
+                    ArchiveForegroundResult(
+                        token,
+                        KIND_CREATE_SEPARATELY,
+                        "COMPLETED",
+                        outputPath = completedOutputs.firstOrNull(),
+                        outputPaths = completedOutputs,
+                        verified = verified
+                    )
+                )
+            } finally {
+                cancelActive = null
             }
         }
 
@@ -506,6 +599,7 @@ object ArchiveJobForegroundService {
     private fun kindOf(request: ArchiveForegroundRequest): String = when (request) {
         is ArchiveForegroundRequest.Extract -> KIND_EXTRACT
         is ArchiveForegroundRequest.Create -> KIND_CREATE
+        is ArchiveForegroundRequest.CreateSeparately -> KIND_CREATE_SEPARATELY
         is ArchiveForegroundRequest.BatchExtract -> KIND_BATCH_EXTRACT
     }
 

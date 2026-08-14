@@ -9,10 +9,9 @@ appId: org.tzap.zmanager.mobile
     element: "Run timed-out extraction"
     direction: DOWN
 - tapOn: "Run timed-out extraction"
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 500
+- scrollUntilVisible:
+    element: "Review extraction"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "Review extraction"
     timeout: 15000
@@ -21,10 +20,9 @@ appId: org.tzap.zmanager.mobile
     end: 50%, 25%
     duration: 500
 - tapOn: "Start extraction"
-- swipe:
-    start: 50%, 80%
-    end: 50%, 25%
-    duration: 500
+- scrollUntilVisible:
+    element: "The archive job exceeded the Android background time limit. Retry it in the app."
+    direction: DOWN
 - extendedWaitUntil:
     visible: "The archive job exceeded the Android background time limit. Retry it in the app."
     timeout: 20000

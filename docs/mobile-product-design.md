@@ -22,7 +22,7 @@ The product goal is not "a file manager that also does archives." It is "the arc
 
 ## Product Assumption
 
-ZManager Mobile depends on ZManager-Core for archive compression and decompression. The design assumes ZManager-Core already covers the supported archive types and that archive parsing, extraction safety, creation, testing, and format-specific behavior stay in Rust. Platform shells must not call AppleArchive, XIP, `aa`, `xip`, libarchive, or other archive engines directly.
+ZManager Mobile depends on ZManager-Core for archive compression and decompression. The design assumes ZManager-Core already covers the supported archive types and that archive parsing, extraction safety, creation, testing, and format-specific behavior stay behind the Rust engine/session contract. Platform shells must not call AppleArchive, XIP, `aa`, `xip`, or other archive engines directly.
 
 Implementation requirements are tracked in [mobile-launch-spec.md](mobile-launch-spec.md).
 

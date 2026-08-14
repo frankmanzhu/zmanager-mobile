@@ -9,8 +9,17 @@ appId: org.tzap.zmanager.mobile
 - extendedWaitUntil:
     visible: ".*entries.*bytes.*"
     timeout: 15000
-- tapOn: "Start creation"
+- scrollUntilVisible:
+    element: "Start creation"
+    direction: DOWN
+- swipe:
+    start: 50%, 80%
+    end: 50%, 45%
+    duration: 500
+- tapOn:
+    id: "startCreation"
 - extendedWaitUntil:
     visible: "Created .*"
     timeout: 30000
 - assertVisible: "Verified"
+- assertVisible: "Share output"

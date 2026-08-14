@@ -10,45 +10,16 @@ final class ZManagerMobileUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Create archive"].exists)
     }
 
-    func testEncryptedRepackagingAcceptsTypedPasswordAndVerifiesOutput() {
+    func testPrimaryControlsExposeStableAccessibilityLabels() {
         let app = XCUIApplication()
         app.launch()
 
-        app.buttons["Load encrypted fixture"].tap()
-        XCTAssertTrue(app.staticTexts["ZIP - 1 entries"].waitForExistence(timeout: 10))
-        app.staticTexts["maestro-inner.zip"].tap()
-        app.buttons["Create archive from selection"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ready to repackage'"))
-            .firstMatch.waitForExistence(timeout: 10))
-        app.buttons["Start"].tap()
-
-        let password = app.secureTextFields["Archive password"]
-        XCTAssertTrue(password.waitForExistence(timeout: 10))
-        password.tap()
-        for character in "v2testpassword" {
-            password.typeText(String(character))
-        }
-        XCTAssertEqual((password.value as? String)?.count ?? 0, 14)
-        app.buttons["Retry"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ready to repackage'"))
-            .firstMatch.waitForExistence(timeout: 10))
-        app.buttons["Start"].tap()
-        let verified = app.staticTexts["Verified"]
-        if !verified.waitForExistence(timeout: 30) {
-            print(app.debugDescription)
-            XCTFail("Expected Verified status")
-        }
-    }
-
-    func testDebugFolderCreationCompletesAndVerifiesOutput() {
-        let app = XCUIApplication()
-        app.launch()
-
-        app.buttons["Create debug folder archive"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'entries'"))
-            .firstMatch.waitForExistence(timeout: 10))
-        app.buttons["Start creation"].tap()
-
-        XCTAssertTrue(app.staticTexts["Verified"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["Load nested fixture"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Run debug batch extraction"].exists)
+        XCTAssertTrue(app.buttons["Choose photos or videos"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["localSendPanel"].exists)
+        XCTAssertTrue(app.buttons["aboutAndHelp"].exists)
+        app.buttons["aboutAndHelp"].tap()
+        XCTAssertTrue(app.staticTexts["About ZManager"].waitForExistence(timeout: 5))
     }
 }

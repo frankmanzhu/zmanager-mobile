@@ -17,9 +17,18 @@ appId: org.tzap.zmanager.mobile
 - assertVisible: "manifest.json"
 - assertVisible: "cover.svg"
 - assertVisible: "release-notes.md"
+- scrollUntilVisible:
+    element: "summary.pdf"
+    direction: DOWN
 - assertVisible: "summary.pdf"
 - tapOn: "Select Visible"
+- scrollUntilVisible:
+    element: "5 selected"
+    direction: UP
 - assertVisible: "5 selected"
+- scrollUntilVisible:
+    element: "Test"
+    direction: UP
 - tapOn: "Test"
 - extendedWaitUntil:
     visible: "Archive verified"

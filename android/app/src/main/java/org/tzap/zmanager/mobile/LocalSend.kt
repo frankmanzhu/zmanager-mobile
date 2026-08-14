@@ -15,6 +15,7 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.net.ssl.HttpsURLConnection
 
 data class LocalSendDevice(
     val address: String,
@@ -263,15 +264,22 @@ class LocalSendClient(
     fun discoverHttp(hosts: Iterable<String>): List<LocalSendDevice> {
         val found = linkedMapOf<String, LocalSendDevice>()
         hosts.forEach { host ->
-            runCatching {
-                val response = request(
-                    LocalSendDevice(host, port, "http", "", "", null, null, null, false),
-                    "POST",
-                    "/api/localsend/v2/register",
-                    LocalSendProtocol.announcement(alias, fingerprint, port).put("announce", false).toString().toByteArray()
-                )
-                parseDevice(host, response.toByteArray(), response.length)?.let { device ->
-                    if (device.fingerprint != fingerprint) found["${device.address}:${device.port}"] = device
+            listOf("http", "https").forEach { protocol ->
+                runCatching {
+                    val response = requestDetailed(
+                        LocalSendDevice(host, port, protocol, "", "", null, null, null, false),
+                        "POST",
+                        "/api/localsend/v2/register",
+                        LocalSendProtocol.announcement(alias, fingerprint, port).put("announce", false).toString().toByteArray(),
+                        allowUntrustedTls = protocol == "https"
+                    )
+                    parseDevice(host, response.body.toByteArray(), response.body.length)?.let { device ->
+                        if (device.fingerprint != fingerprint &&
+                            (protocol != "https" || response.certificateFingerprint == device.fingerprint?.let(LocalSendTls::normalizeFingerprint))
+                        ) {
+                            found["${device.address}:${device.port}"] = device
+                        }
+                    }
                 }
             }
         }
@@ -338,8 +346,22 @@ class LocalSendClient(
         }
     }
 
-    private fun request(device: LocalSendDevice, method: String, path: String, body: ByteArray): String {
-        val connection = open(device, path, method)
+    private data class LocalSendResponse(
+        val body: String,
+        val certificateFingerprint: String?
+    )
+
+    private fun request(device: LocalSendDevice, method: String, path: String, body: ByteArray): String =
+        requestDetailed(device, method, path, body).body
+
+    private fun requestDetailed(
+        device: LocalSendDevice,
+        method: String,
+        path: String,
+        body: ByteArray,
+        allowUntrustedTls: Boolean = false
+    ): LocalSendResponse {
+        val connection = open(device, path, method, allowUntrustedTls)
         try {
             connection.doOutput = body.isNotEmpty()
             if (body.isNotEmpty()) {
@@ -353,18 +375,29 @@ class LocalSendClient(
                 }
                 throw LocalSendRequestException(connection.responseCode)
             }
-            return response?.bufferedReader()?.use { it.readText() }.orEmpty()
+            return LocalSendResponse(
+                body = response?.bufferedReader()?.use { it.readText() }.orEmpty(),
+                certificateFingerprint = (connection as? HttpsURLConnection)?.let(LocalSendTls::certificateFingerprint)
+            )
         } finally {
             connection.disconnect()
         }
     }
 
-    private fun open(device: LocalSendDevice, path: String, method: String): HttpURLConnection {
+    private fun open(
+        device: LocalSendDevice,
+        path: String,
+        method: String,
+        allowUntrustedTls: Boolean = false
+    ): HttpURLConnection {
         return (URL(device.baseUrl + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 5_000
             readTimeout = 30_000
             setRequestProperty("Accept", "application/json")
+            if (this is HttpsURLConnection) {
+                LocalSendTls.configure(this, device.fingerprint, allowUntrustedTls)
+            }
         }
     }
 
