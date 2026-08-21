@@ -1,0 +1,33 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- scrollUntilVisible:
+    element: "Load TAR.LZ4 fixture"
+    direction: DOWN
+- tapOn:
+    id: "debugLoadTarLz4"
+- scrollUntilVisible:
+    element: "TAR.LZ4 - 5 entries"
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "TAR.LZ4 - 5 entries"
+    timeout: 30000
+- scrollUntilVisible:
+    element: "Extract"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*Extraction complete: 5 files saved to App storage.*"
+    timeout: 30000

@@ -1,0 +1,26 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- scrollUntilVisible:
+    element: "Load test fixture"
+    direction: DOWN
+- tapOn: "Load test fixture"
+- scrollUntilVisible:
+    element: "MTREE fixture"
+    direction: DOWN
+- tapOn: "MTREE fixture"
+- extendedWaitUntil:
+    visible: "MTREE - 2 entries"
+    timeout: 30000
+- scrollUntilVisible:
+    element: "Test"
+    direction: DOWN
+- tapOn: "Test"
+- extendedWaitUntil:
+    visible: "Archive verified"
+    timeout: 30000
+

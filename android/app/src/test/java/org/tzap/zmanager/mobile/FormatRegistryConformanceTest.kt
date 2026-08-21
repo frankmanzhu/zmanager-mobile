@@ -43,7 +43,8 @@ class FormatRegistryConformanceTest {
         val kinds = (0 until rows().length()).map { rows().getJSONObject(it).getString("kind") }.toSet()
         for (expected in listOf(
             "Zip", "SevenZ", "Rar", "TarZst", "TarGz", "Tar", "TarBz2", "TarXz",
-            "Tzap", "AppleArchive", "Deb", "RawStream", "SplitZip"
+            "Tzap", "AppleArchive", "Deb", "RawStream", "SplitZip", "Iso", "Cab", "Cpio",
+            "Rpm", "Xar", "Pkg", "Dmg", "Lha", "Ar", "Warc", "Mtree", "Msi", "Vhd", "Vmdk", "Udf"
         )) {
             assertTrue("snapshot is missing kind $expected", expected in kinds)
         }

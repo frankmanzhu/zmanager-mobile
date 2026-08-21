@@ -8,12 +8,16 @@ appId: org.tzap.zmanager.mobile
     element: "Load DEB fixture"
     direction: DOWN
 - tapOn: "Load DEB fixture"
+- scrollUntilVisible:
+    element: "DEB - 3 entries"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "DEB - 3 entries"
     timeout: 30000
 - scrollUntilVisible:
     element: "Extract"
     direction: DOWN
+    centerElement: true
 - tapOn: "Extract"
 - extendedWaitUntil:
     visible: "Review extraction"

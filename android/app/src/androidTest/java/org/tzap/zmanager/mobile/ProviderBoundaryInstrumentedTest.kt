@@ -38,6 +38,30 @@ class ProviderBoundaryInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val resolver = context.contentResolver
 
+    private fun listDebugFixture(assetName: String, expectedFormat: ArchiveFormat) {
+        val archive = File(context.cacheDir, "bridge-${UUID.randomUUID()}-$assetName")
+        context.assets.open(assetName).use { input -> archive.outputStream().use(input::copyTo) }
+        try {
+            val listing = GeneratedArchiveBridgeGateway().listArchive(archive.absolutePath, null)
+            assertEquals(expectedFormat, listing.format)
+            assertTrue("$assetName should list entries", listing.entryCount > 0UL)
+        } finally {
+            archive.delete()
+        }
+    }
+
+    @Test
+    fun pinnedNativeBridgeListsRpmFixture() = listDebugFixture("maestro-files.rpm", ArchiveFormat.RPM)
+
+    @Test
+    fun pinnedNativeBridgeListsLhaFixture() = listDebugFixture("maestro-files.lha", ArchiveFormat.LHA)
+
+    @Test
+    fun pinnedNativeBridgeListsWarcFixture() = listDebugFixture("maestro-files.warc", ArchiveFormat.WARC)
+
+    @Test
+    fun pinnedNativeBridgeListsMtreeFixture() = listDebugFixture("maestro-files.mtree", ArchiveFormat.MTREE)
+
     @Test
     fun archiveImporterReadsARealContentUriAndCleansItsCacheCopy() {
         val name = "provider-import-${UUID.randomUUID()}.zip"
@@ -75,10 +99,49 @@ class ProviderBoundaryInstrumentedTest {
         val bridge = GeneratedArchiveBridgeGateway()
         listOf(
             "maestro-files.deb" to ArchiveFormat.DEB,
-            "maestro-files.cab" to ArchiveFormat.CAB
+            "maestro-files.cab" to ArchiveFormat.CAB,
+            "maestro-files.tar.bz2" to ArchiveFormat.TAR_BZ2,
+            "maestro-files.tar.xz" to ArchiveFormat.TAR_XZ,
+            "maestro-files.tar.lzma" to ArchiveFormat.TAR_LZMA,
+            "maestro-files.tar.lz" to ArchiveFormat.TAR_LZ,
+            "maestro-files.tar.lzo" to ArchiveFormat.TAR_LZO,
+            "maestro-files.tar.z" to ArchiveFormat.TAR_COMPRESS,
+            "maestro-files.tar.lz4" to ArchiveFormat.TAR_LZ4,
+            "maestro-files.tar.uu" to ArchiveFormat.TAR_UU,
+            "maestro-stream.gz" to ArchiveFormat.GZIP,
+            "maestro-stream.bz2" to ArchiveFormat.BZIP2,
+            "maestro-stream.xz" to ArchiveFormat.XZ,
+            "maestro-stream.lzma" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.lz" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.lzo" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.Z" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.lz4" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.zst" to ArchiveFormat.ZSTD,
+            "maestro-stream.br" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.uu" to ArchiveFormat.RAW_STREAM,
+            "maestro-stream.b64" to ArchiveFormat.RAW_STREAM,
+            "maestro-files.cpio" to ArchiveFormat.CPIO,
+            "maestro-files.xar" to ArchiveFormat.XAR,
+            "maestro-files.iso" to ArchiveFormat.ISO,
+            "maestro-files.pkg" to ArchiveFormat.PKG,
+            "maestro-files.msi" to ArchiveFormat.MSI
+            ,"maestro-files.ar" to ArchiveFormat.AR
+            ,"maestro-files.dmg" to ArchiveFormat.DMG
+            ,"maestro-files.vhd" to ArchiveFormat.VHD
+            ,"maestro-files.vmdk" to ArchiveFormat.VMDK
+            ,"maestro-files.udf" to ArchiveFormat.UDF
+            ,"maestro-files.rpm" to ArchiveFormat.RPM
+            ,"maestro-files.lha" to ArchiveFormat.LHA
+            ,"maestro-files.warc" to ArchiveFormat.WARC
+            ,"maestro-files.mtree" to ArchiveFormat.MTREE
         ).forEach { (assetName, expectedFormat) ->
-            val archive = File.createTempFile("bridge-${assetName.substringBeforeLast('.')}-", ".${assetName.substringAfterLast('.')}", context.cacheDir)
-            context.assets.open(assetName).use { input -> archive.outputStream().use(input::copyTo) }
+            val archive = File(context.cacheDir, "bridge-${UUID.randomUUID()}-$assetName")
+            val sourceAssetName = if (assetName == "maestro-stream.gz") {
+                "maestro-stream.gz.fixture"
+            } else {
+                assetName
+            }
+            context.assets.open(sourceAssetName).use { input -> archive.outputStream().use(input::copyTo) }
             try {
                 val listing = bridge.listArchive(archive.absolutePath, null)
                 assertEquals(expectedFormat, listing.format)
@@ -86,6 +149,24 @@ class ProviderBoundaryInstrumentedTest {
             } finally {
                 archive.delete()
             }
+        }
+    }
+
+    @Test
+    fun archiveImporterPreservesProductionGzipNameForNeutralAsset() {
+        val imported = ArchiveImporter(context).importAssets(
+            primaryAssetName = "maestro-stream.gz.fixture",
+            assetNames = listOf("maestro-stream.gz.fixture"),
+            displayNames = listOf("maestro-stream.gz")
+        )
+        try {
+            assertEquals("maestro-stream.gz", imported.displayName)
+            assertEquals(
+                ArchiveFormat.GZIP,
+                GeneratedArchiveBridgeGateway().listArchive(imported.localPath, null).format
+            )
+        } finally {
+            File(imported.localPath).parentFile?.deleteRecursively()
         }
     }
 

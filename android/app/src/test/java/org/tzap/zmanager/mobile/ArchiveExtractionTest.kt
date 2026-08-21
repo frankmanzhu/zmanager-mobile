@@ -3,6 +3,7 @@ package org.tzap.zmanager.mobile
 import org.json.JSONObject
 import android.net.Uri
 import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -43,6 +44,23 @@ class ArchiveExtractionTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             ExtractionPathSafety.relativePath(java.io.File("/tmp/outside.txt"), root)
+        }
+    }
+
+    @Test
+    fun stagedRelativePathsPreserveSymlinkLeafName() {
+        val root = Files.createTempDirectory("zmanager-staging-root").toFile()
+        try {
+            val payload = File(root, "payload").apply { mkdirs() }
+            File(payload, "README.txt").writeText("readme")
+            Files.createSymbolicLink(File(payload, "readme-link.txt").toPath(), java.nio.file.Path.of("README.txt"))
+
+            assertEquals(
+                "payload/readme-link.txt",
+                ExtractionPathSafety.relativePath(File(payload, "readme-link.txt"), root)
+            )
+        } finally {
+            root.deleteRecursively()
         }
     }
     @Test

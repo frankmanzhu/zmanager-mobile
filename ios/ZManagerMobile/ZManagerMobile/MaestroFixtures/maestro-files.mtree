@@ -1,0 +1,3 @@
+#mtree
+./docs type=dir
+./docs/readme.txt type=file size=101

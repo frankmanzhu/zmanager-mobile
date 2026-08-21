@@ -182,6 +182,30 @@ struct ContentView: View {
                 }
                 .accessibilityIdentifier("aboutAndHelp")
 #if DEBUG
+                Button("Load UDF fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.udf")
+                }
+                .accessibilityIdentifier("debugLoadUdfTop")
+                Button("Load VMDK fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.vmdk")
+                }
+                .accessibilityIdentifier("debugLoadVmdkTop")
+                Button("Load RPM fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.rpm")
+                }
+                .accessibilityIdentifier("debugLoadRpmTop")
+                Button("Load LHA fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.lha")
+                }
+                .accessibilityIdentifier("debugLoadLhaTop")
+                Button("Load WARC fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.warc")
+                }
+                .accessibilityIdentifier("debugLoadWarcTop")
+                Button("Load MTREE fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.mtree")
+                }
+                .accessibilityIdentifier("debugLoadMtreeTop")
                 Button("Load nested fixture") {
                     importModel.importMaestroFixture(named: "maestro-nested.zip")
                 }
@@ -209,6 +233,62 @@ struct ContentView: View {
                 Button("Load CAB fixture") {
                     importModel.importMaestroFixture(named: "maestro-files.cab")
                 }
+                Button("Load TAR.LZ4 fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.tar.lz4")
+                }
+                .accessibilityIdentifier("debugLoadTarLz4")
+                Button("Load UU stream fixture") {
+                    importModel.importMaestroFixture(named: "maestro-stream.uu")
+                }
+                .accessibilityIdentifier("debugLoadUuStream")
+                Button("Load B64 stream fixture") {
+                    importModel.importMaestroFixture(named: "maestro-stream.b64")
+                }
+                .accessibilityIdentifier("debugLoadB64Stream")
+                Button("Load XAR fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.xar")
+                }
+                .accessibilityIdentifier("debugLoadXar")
+                Button("Load ISO fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.iso")
+                }
+                .accessibilityIdentifier("debugLoadIso")
+                Button("Load PKG fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.pkg")
+                }
+                .accessibilityIdentifier("debugLoadPkg")
+                Button("Load MSI fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.msi")
+                }
+                .accessibilityIdentifier("debugLoadMsi")
+                Button("Load DMG fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.dmg")
+                }
+                .accessibilityIdentifier("debugLoadDmg")
+                Button("Load VHD fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.vhd")
+                }
+                .accessibilityIdentifier("debugLoadVhd")
+                Button("Load VMDK fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.vmdk")
+                }
+                .accessibilityIdentifier("debugLoadVmdk")
+                Button("Load RPM fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.rpm")
+                }
+                .accessibilityIdentifier("debugLoadRpm")
+                Button("Load LHA fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.lha")
+                }
+                .accessibilityIdentifier("debugLoadLha")
+                Button("Load WARC fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.warc")
+                }
+                .accessibilityIdentifier("debugLoadWarc")
+                Button("Load MTREE fixture") {
+                    importModel.importMaestroFixture(named: "maestro-files.mtree")
+                }
+                .accessibilityIdentifier("debugLoadMtree")
 #endif
             }
 
@@ -382,6 +462,7 @@ struct ContentView: View {
                 }
                 .disabled(importModel.isImporting)
                 Menu("Load test fixture") {
+                    Button("Load test fixture") {}
                     Button("ZIP fixture") {
                         importModel.importMaestroFixture(named: "maestro-files.zip")
                     }
@@ -396,6 +477,67 @@ struct ContentView: View {
                     }
                     Button("TZAP fixture") {
                         importModel.importMaestroFixture(named: "maestro-files.tzap")
+                    }
+                    Button("TAR.BZ2 fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.bz2")
+                    }
+                    Button("TAR.XZ fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.xz")
+                    }
+                    Button("TAR.LZMA fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.lzma")
+                    }
+                    Button("TAR.LZ fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.lz")
+                    }
+                    Button("TAR.LZO fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.lzo")
+                    }
+                    Button("TAR.Z fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.z")
+                    }
+                    Button("TAR.LZ4 fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.lz4")
+                    }
+                    .accessibilityIdentifier("maestroFixtureTarLz4")
+                    Button("TAR.UU fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.tar.uu")
+                    }
+                    Button("GZIP stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.gz")
+                    }
+                    Button("BZIP2 stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.bz2")
+                    }
+                    Button("XZ stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.xz")
+                    }
+                    Button("LZMA stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.lzma")
+                    }
+                    Button("Lzip stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.lz")
+                    }
+                    Button("LZO stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.lzo")
+                    }
+                    Button("Unix compress stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.Z")
+                    }
+                    Button("LZ4 stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.lz4")
+                    }
+                    Button("Zstd stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.zst")
+                    }
+                    Button("Brotli stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.br")
+                    }
+                    Button("UU stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.uu")
+                    }
+                    Button("B64 stream fixture") {
+                        importModel.importMaestroFixture(named: "maestro-stream.b64")
                     }
                     Button("Nested ZIP fixture") {
                         importModel.importMaestroFixture(named: "maestro-nested.zip")
@@ -446,6 +588,48 @@ struct ContentView: View {
                     }
                     Button("CAB fixture") {
                         importModel.importMaestroFixture(named: "maestro-files.cab")
+                    }
+                    Button("CPIO fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.cpio")
+                    }
+                    Button("XAR fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.xar")
+                    }
+                    Button("ISO fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.iso")
+                    }
+                    Button("PKG fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.pkg")
+                    }
+                    Button("MSI fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.msi")
+                    }
+                    Button("AR fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.ar")
+                    }
+                    Button("DMG fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.dmg")
+                    }
+                    Button("VHD fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.vhd")
+                    }
+                    Button("VMDK fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.vmdk")
+                    }
+                    Button("UDF fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.udf")
+                    }
+                    Button("RPM fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.rpm")
+                    }
+                    Button("LHA fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.lha")
+                    }
+                    Button("WARC fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.warc")
+                    }
+                    Button("MTREE fixture") {
+                        importModel.importMaestroFixture(named: "maestro-files.mtree")
                     }
                 }
                 .disabled(importModel.isImporting)
@@ -2657,14 +2841,24 @@ final class ArchiveImportModel: ObservableObject {
         if pendingAction != .extract {
             debugExtractionDelayNanoseconds = 0
         }
-        let fixtureURLs = ([fixtureName] + companionNames).compactMap {
-            Bundle.main.url(forResource: $0, withExtension: nil)
-        }
+        let fixtureURLs = ([fixtureName] + companionNames).compactMap(Self.maestroFixtureURL)
         guard fixtureURLs.count == companionNames.count + 1 else {
             errorMessage = "The Maestro fixture is not available in this build."
             return
         }
         importExternalURLs(fixtureURLs, pendingAction: pendingAction)
+    }
+
+    private static func maestroFixtureURL(named fixtureName: String) -> URL? {
+        if let url = Bundle.main.url(forResource: fixtureName, withExtension: nil) {
+            return url
+        }
+        // Foundation can fail to resolve bundle resources whose names contain
+        // multiple compression suffixes (for example `tar.lz4`). The fixture
+        // names are fixed DEBUG resources, so an exact bundle-root fallback is
+        // safe and avoids silently turning a supported format into a no-op.
+        let exactURL = Bundle.main.bundleURL.appendingPathComponent(fixtureName)
+        return FileManager.default.fileExists(atPath: exactURL.path) ? exactURL : nil
     }
 
     func startDebugCancellableExtraction() {
@@ -4215,12 +4409,18 @@ struct ExtractionReview {
 enum ExtractionPathSafety {
     static func relativePath(for file: URL, under root: URL) throws -> String {
         let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
-        let resolvedFile = file.resolvingSymlinksInPath().standardizedFileURL
+        // Standardize the final path lexically without resolving its final
+        // component. Safe staged symlinks must retain their archive path.
+        let normalizedFile = file.standardizedFileURL
         let rootPath = resolvedRoot.path.hasSuffix("/") ? resolvedRoot.path : resolvedRoot.path + "/"
-        guard resolvedFile.path.hasPrefix(rootPath) else {
+        guard normalizedFile.path.hasPrefix(rootPath) else {
             throw ArchiveExtractionError.unsafePath
         }
-        let relative = String(resolvedFile.path.dropFirst(rootPath.count))
+        let parent = normalizedFile.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL
+        guard parent.path == resolvedRoot.path || parent.path.hasPrefix(rootPath) else {
+            throw ArchiveExtractionError.unsafePath
+        }
+        let relative = String(normalizedFile.path.dropFirst(rootPath.count))
         guard !relative.isEmpty,
               relative != ".",
               relative.split(separator: "/", omittingEmptySubsequences: false)
@@ -5502,7 +5702,9 @@ enum NestedArchiveSupport {
     // canList=false for it, so nesting into an .xip always fails.
     static let archiveExtensions: Set<String> = [
         "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz",
-        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
+        "zst", "tzst", "lzma", "tlzma", "lz", "lzo", "z", "lz4", "uu", "b64",
+        "cpio", "cpgz", "xar", "pkg", "iso", "dmg", "msi", "vhd", "vmdk", "udf",
+        "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
     ]
 
     static func canOpen(_ entry: ArchiveEntrySummary) -> Bool {

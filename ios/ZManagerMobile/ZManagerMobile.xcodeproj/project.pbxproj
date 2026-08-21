@@ -40,6 +40,40 @@
 		01A00000000000000000001E /* ZManagerMobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000123 /* ZManagerMobileUITests.swift */; };
 		01A000000000000000000020 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000126 /* ShareViewController.swift */; };
 		01A000000000000000000021 /* ZManagerMobileShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000128 /* ZManagerMobileShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		01A000000000000000000030 /* maestro-files.tar.bz2 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000130 /* maestro-files.tar.bz2 */; };
+		01A000000000000000000031 /* maestro-files.tar.xz in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000131 /* maestro-files.tar.xz */; };
+		01A000000000000000000032 /* maestro-files.tar.lzma in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000132 /* maestro-files.tar.lzma */; };
+		01A000000000000000000033 /* maestro-files.tar.lz in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000133 /* maestro-files.tar.lz */; };
+		01A000000000000000000034 /* maestro-files.tar.lzo in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000134 /* maestro-files.tar.lzo */; };
+		01A000000000000000000035 /* maestro-files.tar.z in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000135 /* maestro-files.tar.z */; };
+		01A000000000000000000036 /* maestro-files.tar.lz4 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000136 /* maestro-files.tar.lz4 */; };
+		01A000000000000000000037 /* maestro-files.tar.uu in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000137 /* maestro-files.tar.uu */; };
+		01A000000000000000000038 /* maestro-stream.gz in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000138 /* maestro-stream.gz */; };
+		01A000000000000000000039 /* maestro-stream.bz2 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000139 /* maestro-stream.bz2 */; };
+		01A00000000000000000003A /* maestro-stream.xz in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013A /* maestro-stream.xz */; };
+		01A00000000000000000003B /* maestro-stream.lzma in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013B /* maestro-stream.lzma */; };
+		01A00000000000000000003C /* maestro-stream.lz in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013C /* maestro-stream.lz */; };
+		01A00000000000000000003D /* maestro-stream.lzo in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013D /* maestro-stream.lzo */; };
+		01A00000000000000000003E /* maestro-stream.Z in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013E /* maestro-stream.Z */; };
+		01A00000000000000000003F /* maestro-stream.lz4 in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000013F /* maestro-stream.lz4 */; };
+		01A000000000000000000040 /* maestro-stream.zst in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000140 /* maestro-stream.zst */; };
+		01A000000000000000000041 /* maestro-stream.br in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000141 /* maestro-stream.br */; };
+		01A000000000000000000042 /* maestro-stream.uu in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000142 /* maestro-stream.uu */; };
+		01A000000000000000000043 /* maestro-stream.b64 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000143 /* maestro-stream.b64 */; };
+		01A000000000000000000044 /* maestro-files.cpio in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000144 /* maestro-files.cpio */; };
+		01A000000000000000000045 /* maestro-files.xar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000145 /* maestro-files.xar */; };
+		01A000000000000000000046 /* maestro-files.iso in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000146 /* maestro-files.iso */; };
+		01A000000000000000000047 /* maestro-files.pkg in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000147 /* maestro-files.pkg */; };
+		01A000000000000000000048 /* maestro-files.msi in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000148 /* maestro-files.msi */; };
+		01A000000000000000000049 /* maestro-files.ar in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000149 /* maestro-files.ar */; };
+		01A00000000000000000004A /* maestro-files.dmg in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014A /* maestro-files.dmg */; };
+		01A00000000000000000004B /* maestro-files.vhd in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014B /* maestro-files.vhd */; };
+		01A00000000000000000004C /* maestro-files.vmdk in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014C /* maestro-files.vmdk */; };
+		01A00000000000000000004D /* maestro-files.udf in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014D /* maestro-files.udf */; };
+		01A00000000000000000004E /* maestro-files.rpm in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014E /* maestro-files.rpm */; };
+		01A00000000000000000004F /* maestro-files.lha in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014F /* maestro-files.lha */; };
+		01A000000000000000000050 /* maestro-files.warc in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000150 /* maestro-files.warc */; };
+		01A000000000000000000051 /* maestro-files.mtree in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000151 /* maestro-files.mtree */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +127,40 @@
 		01A000000000000000000126 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		01A000000000000000000127 /* Share Extension Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		01A000000000000000000128 /* ZManagerMobileShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = ZManagerMobileShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		01A000000000000000000130 /* maestro-files.tar.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.bz2; sourceTree = "<group>"; };
+		01A000000000000000000131 /* maestro-files.tar.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.xz; sourceTree = "<group>"; };
+		01A000000000000000000132 /* maestro-files.tar.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lzma; sourceTree = "<group>"; };
+		01A000000000000000000133 /* maestro-files.tar.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lz; sourceTree = "<group>"; };
+		01A000000000000000000134 /* maestro-files.tar.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lzo; sourceTree = "<group>"; };
+		01A000000000000000000135 /* maestro-files.tar.z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.z; sourceTree = "<group>"; };
+		01A000000000000000000136 /* maestro-files.tar.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lz4; sourceTree = "<group>"; };
+		01A000000000000000000137 /* maestro-files.tar.uu */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.uu; sourceTree = "<group>"; };
+		01A000000000000000000138 /* maestro-stream.gz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = MaestroFixtures/maestro-stream.gz; sourceTree = "<group>"; };
+		01A000000000000000000139 /* maestro-stream.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.bz2; sourceTree = "<group>"; };
+		01A00000000000000000013A /* maestro-stream.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.xz; sourceTree = "<group>"; };
+		01A00000000000000000013B /* maestro-stream.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lzma; sourceTree = "<group>"; };
+		01A00000000000000000013C /* maestro-stream.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lz; sourceTree = "<group>"; };
+		01A00000000000000000013D /* maestro-stream.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lzo; sourceTree = "<group>"; };
+		01A00000000000000000013E /* maestro-stream.Z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.Z; sourceTree = "<group>"; };
+		01A00000000000000000013F /* maestro-stream.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lz4; sourceTree = "<group>"; };
+		01A000000000000000000140 /* maestro-stream.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.zst; sourceTree = "<group>"; };
+		01A000000000000000000141 /* maestro-stream.br */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.br; sourceTree = "<group>"; };
+		01A000000000000000000142 /* maestro-stream.uu */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-stream.uu; sourceTree = "<group>"; };
+		01A000000000000000000143 /* maestro-stream.b64 */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-stream.b64; sourceTree = "<group>"; };
+		01A000000000000000000144 /* maestro-files.cpio */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.cpio; sourceTree = "<group>"; };
+		01A000000000000000000145 /* maestro-files.xar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.xar; sourceTree = "<group>"; };
+		01A000000000000000000146 /* maestro-files.iso */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.iso; sourceTree = "<group>"; };
+		01A000000000000000000147 /* maestro-files.pkg */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.pkg; sourceTree = "<group>"; };
+		01A000000000000000000148 /* maestro-files.msi */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.msi; sourceTree = "<group>"; };
+		01A000000000000000000149 /* maestro-files.ar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.ar; sourceTree = "<group>"; };
+		01A00000000000000000014A /* maestro-files.dmg */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.dmg; sourceTree = "<group>"; };
+		01A00000000000000000014B /* maestro-files.vhd */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.vhd; sourceTree = "<group>"; };
+		01A00000000000000000014C /* maestro-files.vmdk */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.vmdk; sourceTree = "<group>"; };
+		01A00000000000000000014D /* maestro-files.udf */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.udf; sourceTree = "<group>"; };
+		01A00000000000000000014E /* maestro-files.rpm */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.rpm; sourceTree = "<group>"; };
+		01A00000000000000000014F /* maestro-files.lha */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.lha; sourceTree = "<group>"; };
+		01A000000000000000000150 /* maestro-files.warc */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.warc; sourceTree = "<group>"; };
+		01A000000000000000000151 /* maestro-files.mtree */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-files.mtree; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -170,6 +238,40 @@
 				01A000000000000000000121 /* maestro-split.zip */,
 				01A000000000000000000122 /* maestro-nested.zip */,
 				01A000000000000000000125 /* maestro-encrypted.zip */,
+				01A000000000000000000130 /* maestro-files.tar.bz2 */,
+				01A000000000000000000131 /* maestro-files.tar.xz */,
+				01A000000000000000000132 /* maestro-files.tar.lzma */,
+				01A000000000000000000133 /* maestro-files.tar.lz */,
+				01A000000000000000000134 /* maestro-files.tar.lzo */,
+				01A000000000000000000135 /* maestro-files.tar.z */,
+				01A000000000000000000136 /* maestro-files.tar.lz4 */,
+				01A000000000000000000137 /* maestro-files.tar.uu */,
+				01A000000000000000000138 /* maestro-stream.gz */,
+				01A000000000000000000139 /* maestro-stream.bz2 */,
+				01A00000000000000000013A /* maestro-stream.xz */,
+				01A00000000000000000013B /* maestro-stream.lzma */,
+				01A00000000000000000013C /* maestro-stream.lz */,
+				01A00000000000000000013D /* maestro-stream.lzo */,
+				01A00000000000000000013E /* maestro-stream.Z */,
+				01A00000000000000000013F /* maestro-stream.lz4 */,
+				01A000000000000000000140 /* maestro-stream.zst */,
+				01A000000000000000000141 /* maestro-stream.br */,
+				01A000000000000000000142 /* maestro-stream.uu */,
+				01A000000000000000000143 /* maestro-stream.b64 */,
+				01A000000000000000000144 /* maestro-files.cpio */,
+				01A000000000000000000145 /* maestro-files.xar */,
+				01A000000000000000000146 /* maestro-files.iso */,
+				01A000000000000000000147 /* maestro-files.pkg */,
+				01A000000000000000000148 /* maestro-files.msi */,
+				01A000000000000000000149 /* maestro-files.ar */,
+				01A00000000000000000014A /* maestro-files.dmg */,
+				01A00000000000000000014B /* maestro-files.vhd */,
+				01A00000000000000000014C /* maestro-files.vmdk */,
+				01A00000000000000000014D /* maestro-files.udf */,
+				01A00000000000000000014E /* maestro-files.rpm */,
+				01A00000000000000000014F /* maestro-files.lha */,
+				01A000000000000000000150 /* maestro-files.warc */,
+				01A000000000000000000151 /* maestro-files.mtree */,
 				01A000000000000000000605 /* Bridge */,
 			);
 			path = ZManagerMobile;
@@ -365,6 +467,40 @@
 				01A00000000000000000000B /* maestro-files.aar in Resources */,
 				01A00000000000000000000C /* maestro-files.cab in Resources */,
 				01A00000000000000000000D /* maestro-files.deb in Resources */,
+				01A000000000000000000030 /* maestro-files.tar.bz2 in Resources */,
+				01A000000000000000000031 /* maestro-files.tar.xz in Resources */,
+				01A000000000000000000032 /* maestro-files.tar.lzma in Resources */,
+				01A000000000000000000033 /* maestro-files.tar.lz in Resources */,
+				01A000000000000000000034 /* maestro-files.tar.lzo in Resources */,
+				01A000000000000000000035 /* maestro-files.tar.z in Resources */,
+				01A000000000000000000036 /* maestro-files.tar.lz4 in Resources */,
+				01A000000000000000000037 /* maestro-files.tar.uu in Resources */,
+				01A000000000000000000038 /* maestro-stream.gz in Resources */,
+				01A000000000000000000039 /* maestro-stream.bz2 in Resources */,
+				01A00000000000000000003A /* maestro-stream.xz in Resources */,
+				01A00000000000000000003B /* maestro-stream.lzma in Resources */,
+				01A00000000000000000003C /* maestro-stream.lz in Resources */,
+				01A00000000000000000003D /* maestro-stream.lzo in Resources */,
+				01A00000000000000000003E /* maestro-stream.Z in Resources */,
+				01A00000000000000000003F /* maestro-stream.lz4 in Resources */,
+				01A000000000000000000040 /* maestro-stream.zst in Resources */,
+				01A000000000000000000041 /* maestro-stream.br in Resources */,
+				01A000000000000000000042 /* maestro-stream.uu in Resources */,
+				01A000000000000000000043 /* maestro-stream.b64 in Resources */,
+				01A000000000000000000044 /* maestro-files.cpio in Resources */,
+				01A000000000000000000045 /* maestro-files.xar in Resources */,
+				01A000000000000000000046 /* maestro-files.iso in Resources */,
+				01A000000000000000000047 /* maestro-files.pkg in Resources */,
+				01A000000000000000000048 /* maestro-files.msi in Resources */,
+				01A000000000000000000049 /* maestro-files.ar in Resources */,
+				01A00000000000000000004A /* maestro-files.dmg in Resources */,
+				01A00000000000000000004B /* maestro-files.vhd in Resources */,
+				01A00000000000000000004C /* maestro-files.vmdk in Resources */,
+				01A00000000000000000004D /* maestro-files.udf in Resources */,
+				01A00000000000000000004E /* maestro-files.rpm in Resources */,
+				01A00000000000000000004F /* maestro-files.lha in Resources */,
+				01A000000000000000000050 /* maestro-files.warc in Resources */,
+				01A000000000000000000051 /* maestro-files.mtree in Resources */,
 				01A00000000000000000000E /* maestro-split-rar.part1.rar in Resources */,
 				01A00000000000000000000F /* maestro-split-rar.part2.rar in Resources */,
 				01A000000000000000000010 /* maestro-split-rar.part3.rar in Resources */,

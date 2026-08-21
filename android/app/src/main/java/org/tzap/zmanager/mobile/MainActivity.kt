@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
@@ -979,7 +980,8 @@ private fun ZManagerApp(
     fun startMaestroFixtureImport(
         assetName: String = "maestro-files.zip",
         companionAssetNames: List<String> = emptyList(),
-        automationAction: ArchiveAutomationAction? = null
+        automationAction: ArchiveAutomationAction? = null,
+        displayAssetNames: List<String> = listOf(assetName) + companionAssetNames
     ) {
         if (automationAction != ArchiveAutomationAction.EXTRACT) {
             debugExtractionDelayMillis = 0L
@@ -1004,7 +1006,13 @@ private fun ZManagerApp(
         selectedEntryIds = emptySet()
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { importer.importAssets(assetName, listOf(assetName) + companionAssetNames) }
+                runCatching {
+                    importer.importAssets(
+                        assetName,
+                        listOf(assetName) + companionAssetNames,
+                        displayAssetNames
+                    )
+                }
             }
             if (currentImportRequestId != importRequestId) {
                 return@launch
@@ -1732,12 +1740,36 @@ private fun ZManagerApp(
                                 expanded = showFixtureMenu,
                                 onDismissRequest = { showFixtureMenu = false }
                             ) {
-                                listOf(
+                                val fixtureOptions = listOf(
                                     MaestroFixture("ZIP fixture", "maestro-files.zip"),
                                     MaestroFixture("7z fixture", "maestro-files.7z"),
                                     MaestroFixture("TGZ fixture", "maestro-files.tgz"),
                                     MaestroFixture("TAR.ZST fixture", "maestro-files.tar.zst"),
                                     MaestroFixture("TZAP fixture", "maestro-files.tzap"),
+                                    MaestroFixture("TAR.BZ2 fixture", "maestro-files.tar.bz2"),
+                                    MaestroFixture("TAR.XZ fixture", "maestro-files.tar.xz"),
+                                    MaestroFixture("TAR.LZMA fixture", "maestro-files.tar.lzma"),
+                                    MaestroFixture("TAR.LZ fixture", "maestro-files.tar.lz"),
+                                    MaestroFixture("TAR.LZO fixture", "maestro-files.tar.lzo"),
+                                    MaestroFixture("TAR.Z fixture", "maestro-files.tar.z"),
+                                    MaestroFixture("TAR.LZ4 fixture", "maestro-files.tar.lz4"),
+                                    MaestroFixture("TAR.UU fixture", "maestro-files.tar.uu"),
+                                    MaestroFixture(
+                                        "GZIP stream fixture",
+                                        "maestro-stream.gz.fixture",
+                                        displayAssetNames = listOf("maestro-stream.gz")
+                                    ),
+                                    MaestroFixture("BZIP2 stream fixture", "maestro-stream.bz2"),
+                                    MaestroFixture("XZ stream fixture", "maestro-stream.xz"),
+                                    MaestroFixture("LZMA stream fixture", "maestro-stream.lzma"),
+                                    MaestroFixture("Lzip stream fixture", "maestro-stream.lz"),
+                                    MaestroFixture("LZO stream fixture", "maestro-stream.lzo"),
+                                    MaestroFixture("Unix compress stream fixture", "maestro-stream.Z"),
+                                    MaestroFixture("LZ4 stream fixture", "maestro-stream.lz4"),
+                                    MaestroFixture("Zstd stream fixture", "maestro-stream.zst"),
+                                    MaestroFixture("Brotli stream fixture", "maestro-stream.br"),
+                                    MaestroFixture("UU stream fixture", "maestro-stream.uu"),
+                                    MaestroFixture("B64 stream fixture", "maestro-stream.b64"),
                                     MaestroFixture("Nested ZIP fixture", "maestro-nested.zip"),
                                     MaestroFixture("Encrypted ZIP fixture", "maestro-encrypted.zip"),
                                     MaestroFixture(
@@ -1772,15 +1804,40 @@ private fun ZManagerApp(
                                         )
                                     ),
                                     MaestroFixture("DEB fixture", "maestro-files.deb"),
-                                    MaestroFixture("CAB fixture", "maestro-files.cab")
-                                ).forEach { fixture ->
-                                    DropdownMenuItem(
-                                        text = { Text(fixture.label) },
-                                        onClick = {
-                                            showFixtureMenu = false
-                                            startMaestroFixtureImport(fixture.assetName, fixture.companionAssetNames)
+                                    MaestroFixture("CAB fixture", "maestro-files.cab"),
+                                    MaestroFixture("CPIO fixture", "maestro-files.cpio"),
+                                    MaestroFixture("XAR fixture", "maestro-files.xar"),
+                                    MaestroFixture("ISO fixture", "maestro-files.iso"),
+                                    MaestroFixture("PKG fixture", "maestro-files.pkg"),
+                                    MaestroFixture("MSI fixture", "maestro-files.msi"),
+                                    MaestroFixture("AR fixture", "maestro-files.ar"),
+                                    MaestroFixture("DMG fixture", "maestro-files.dmg"),
+                                    MaestroFixture("VHD fixture", "maestro-files.vhd"),
+                                    MaestroFixture("VMDK fixture", "maestro-files.vmdk"),
+                                    MaestroFixture("UDF fixture", "maestro-files.udf"),
+                                    MaestroFixture("RPM fixture", "maestro-files.rpm"),
+                                    MaestroFixture("LHA fixture", "maestro-files.lha"),
+                                    MaestroFixture("WARC fixture", "maestro-files.warc"),
+                                    MaestroFixture("MTREE fixture", "maestro-files.mtree")
+                                )
+                                Box(modifier = Modifier.width(360.dp).height(600.dp)) {
+                                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                        fixtureOptions.forEach { fixture ->
+                                            DropdownMenuItem(
+                                                text = { Text(fixture.label) },
+                                                onClick = {
+                                                    showFixtureMenu = false
+                                                    startMaestroFixtureImport(
+                                                        fixture.assetName,
+                                                        fixture.companionAssetNames,
+                                                        displayAssetNames = fixture.displayAssetNames.ifEmpty {
+                                                            listOf(fixture.assetName) + fixture.companionAssetNames
+                                                        }
+                                                    )
+                                                }
+                                            )
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -1881,7 +1938,8 @@ private fun ZManagerApp(
 private data class MaestroFixture(
     val label: String,
     val assetName: String,
-    val companionAssetNames: List<String> = emptyList()
+    val companionAssetNames: List<String> = emptyList(),
+    val displayAssetNames: List<String> = emptyList()
 )
 
 @Composable

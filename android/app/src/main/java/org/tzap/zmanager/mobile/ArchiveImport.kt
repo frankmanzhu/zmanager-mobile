@@ -49,13 +49,18 @@ class ArchiveImporter(context: Context) {
     }
 
     @Throws(IOException::class)
-    fun importAssets(primaryAssetName: String, assetNames: List<String>): ImportedArchive {
-        val inputs = assetNames.map { assetName ->
-            ArchiveImportInput(assetName, null) {
+    fun importAssets(
+        primaryAssetName: String,
+        assetNames: List<String>,
+        displayNames: List<String> = assetNames
+    ): ImportedArchive {
+        require(assetNames.size == displayNames.size) { "Asset and display name counts must match." }
+        val inputs = assetNames.zip(displayNames).map { (assetName, displayName) ->
+            ArchiveImportInput(displayName, null) {
                 appContext.assets.open(assetName)
             }
         }
-        return importGroup(inputs, primaryName = primaryAssetName)
+        return importGroup(inputs, primaryName = displayNames.first())
     }
 
     @Throws(IOException::class)

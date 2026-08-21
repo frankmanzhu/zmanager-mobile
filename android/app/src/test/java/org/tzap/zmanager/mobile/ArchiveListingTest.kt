@@ -30,7 +30,8 @@ class ArchiveListingTest {
                             isDir = false,
                             size = 12UL,
                             compressedSize = null,
-                            modifiedAt = null
+                            modifiedAt = null,
+                            linkTarget = null
                         )
                     ),
                     entryCount = 1UL,

@@ -8,6 +8,9 @@ appId: org.tzap.zmanager.mobile
     element: "Load test fixture"
     direction: DOWN
 - tapOn: "Load test fixture"
+- scrollUntilVisible:
+    element: "Multipart RAR fixture"
+    direction: DOWN
 - tapOn: "Multipart RAR fixture"
 - extendedWaitUntil:
     visible: "Multipart RAR - 6 entries"

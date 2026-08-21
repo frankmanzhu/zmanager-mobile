@@ -1,0 +1,30 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn:
+    id: "debugLoadLhaTop"
+- scrollUntilVisible:
+    element: "LHA - 3 entries"
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "LHA - 3 entries"
+    timeout: 30000
+- scrollUntilVisible:
+    element: "Extract"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Extract"
+- extendedWaitUntil:
+    visible: "Review extraction"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Start extraction"
+    direction: DOWN
+- tapOn: "Start extraction"
+- extendedWaitUntil:
+    visible: ".*Extraction complete: 3 files saved to App storage.*"
+    timeout: 60000

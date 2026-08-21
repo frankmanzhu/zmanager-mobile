@@ -8,12 +8,16 @@ appId: org.tzap.zmanager.mobile
     element: "Load CAB fixture"
     direction: DOWN
 - tapOn: "Load CAB fixture"
+- scrollUntilVisible:
+    element: "CAB - 5 entries"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "CAB - 5 entries"
     timeout: 30000
 - scrollUntilVisible:
     element: "Extract"
     direction: DOWN
+    centerElement: true
 - tapOn: "Extract"
 - extendedWaitUntil:
     visible: "Review extraction"

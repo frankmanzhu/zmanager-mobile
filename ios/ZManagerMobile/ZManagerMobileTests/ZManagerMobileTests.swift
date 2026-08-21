@@ -177,6 +177,24 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(scopeEvents, ["start:source.zip", "stop:source.zip"])
     }
 
+    func testArchiveImportAndBridgeListTarXzFixture() throws {
+        let appBundle = try XCTUnwrap(Bundle(identifier: "org.tzap.zmanager.mobile"))
+        let fixture = try XCTUnwrap(appBundle.url(forResource: "maestro-files.tar.xz", withExtension: nil))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let imported = try ArchiveImportStore(
+            fileManager: .default,
+            cacheRoot: root
+        ).importArchive(from: fixture)
+        let bridge = GeneratedArchiveBridgeClient()
+        let detection = try bridge.detectArchiveMetadata(path: imported.localPath)
+        XCTAssertTrue(detection.canList)
+        let listing = try bridge.listArchiveContents(path: imported.localPath, password: nil)
+        XCTAssertEqual(listing.entryCount, 5)
+    }
+
     func testArchiveImportChoosesTheFirstMultipartVolume() {
         XCTAssertEqual(
             ArchiveImportStore.primaryArchiveName(["payload.vol002.tzap", "payload.vol000.tzap"]),
@@ -208,7 +226,8 @@ final class ZManagerMobileTests: XCTestCase {
                             isDir: false,
                             size: 12,
                             compressedSize: nil,
-                            modifiedAt: nil
+                            modifiedAt: nil,
+                            linkTarget: nil
                         )
                     ],
                     entryCount: 1,
@@ -1164,6 +1183,80 @@ final class ZManagerMobileTests: XCTestCase {
         }
         XCTAssertTrue(terminal)
         XCTAssertTrue(fileManager.fileExists(atPath: root.appendingPathComponent("output/maestro-inner.zip").path))
+    }
+
+    func testPinnedBridgeListsExpandedFixtureFamilies() throws {
+        let appBundle = try XCTUnwrap(Bundle(identifier: "org.tzap.zmanager.mobile"))
+        let cases: [(String, ArchiveFormat)] = [
+            ("maestro-files.tar.bz2", .tarBz2),
+            ("maestro-files.tar.xz", .tarXz),
+            ("maestro-files.tar.lzma", .tarLzma),
+            ("maestro-files.tar.lz", .tarLz),
+            ("maestro-files.tar.lzo", .tarLzo),
+            ("maestro-files.tar.z", .tarCompress),
+            ("maestro-files.tar.lz4", .tarLz4),
+            ("maestro-files.tar.uu", .tarUu),
+            ("maestro-stream.gz", .gzip),
+            ("maestro-stream.bz2", .bzip2),
+            ("maestro-stream.xz", .xz),
+            ("maestro-stream.lzma", .rawStream),
+            ("maestro-stream.lz", .rawStream),
+            ("maestro-stream.lzo", .rawStream),
+            ("maestro-stream.Z", .rawStream),
+            ("maestro-stream.lz4", .rawStream),
+            ("maestro-stream.zst", .zstd),
+            ("maestro-stream.br", .rawStream),
+            ("maestro-stream.uu", .rawStream),
+            ("maestro-stream.b64", .rawStream),
+            ("maestro-files.cpio", .cpio),
+            ("maestro-files.xar", .xar),
+            ("maestro-files.iso", .iso),
+            ("maestro-files.pkg", .pkg),
+            ("maestro-files.msi", .msi),
+            ("maestro-files.ar", .ar),
+            ("maestro-files.dmg", .dmg),
+            ("maestro-files.vhd", .vhd),
+            ("maestro-files.vmdk", .vmdk),
+            ("maestro-files.udf", .udf),
+            ("maestro-files.rpm", .rpm),
+            ("maestro-files.lha", .lha),
+            ("maestro-files.warc", .warc),
+            ("maestro-files.mtree", .mtree),
+        ]
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let bridge = GeneratedArchiveBridgeClient()
+        for (fixtureName, expectedFormat) in cases {
+            let fixture = try XCTUnwrap(appBundle.url(forResource: fixtureName, withExtension: nil), fixtureName)
+            let archive = root.appendingPathComponent(fixtureName)
+            try fileManager.copyItem(at: fixture, to: archive)
+            let detection = try bridge.detectArchiveMetadata(path: archive.path)
+            XCTAssertTrue(detection.canList, fixtureName)
+            let listing = try bridge.listArchiveContents(path: archive.path, password: nil)
+            XCTAssertEqual(listing.format, expectedFormat, fixtureName)
+            XCTAssertGreaterThan(listing.entryCount, 0, fixtureName)
+        }
+    }
+
+    func testArchiveImportStoreAndBridgeListTarLz4Fixture() throws {
+        let appBundle = try XCTUnwrap(Bundle(identifier: "org.tzap.zmanager.mobile"))
+        let fixture = try XCTUnwrap(appBundle.url(forResource: "maestro-files.tar.lz4", withExtension: nil))
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let imported = try ArchiveImportStore(fileManager: fileManager, cacheRoot: root)
+            .importArchive(from: fixture)
+        let listing = try GeneratedArchiveBridgeClient().listArchiveContents(
+            path: imported.localPath,
+            password: nil
+        )
+        XCTAssertEqual(listing.format, .tarLz4)
+        XCTAssertEqual(listing.entryCount, 5)
     }
 
     func testPinnedRepackagingCanDiscardPasswordFailureAndRetryWithPassword() async throws {

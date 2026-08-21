@@ -8,6 +8,9 @@ appId: org.tzap.zmanager.mobile
     element: "Load test fixture"
     direction: DOWN
 - tapOn: "Load test fixture"
+- scrollUntilVisible:
+    element: "Apple Archive fixture"
+    direction: DOWN
 - tapOn: "Apple Archive fixture"
 - extendedWaitUntil:
     visible: "AppleArchive / AAR - 5 entries"

@@ -33,11 +33,12 @@ temporary pinned build, regenerate the snapshot and bindings from the
 | TZAP | registry-backed | fixture/listing coverage | verified through create DTO | JVM/fixture | XCTest/fixture | exposed; recovery-oriented copy is still limited |
 | TAR, TAR.BZ2, TAR.XZ, TAR.LZMA, TAR.LZ, TAR.LZO, TAR.Z, TAR.LZ4, TAR.UU | registry-backed | registry-backed | no core create adapter | snapshot/conformance | snapshot/conformance | dedicated bridge types; read/extract only |
 | GZIP, BZIP2, XZ, Zstd streams | registry-backed | registry-backed | no core create adapter | snapshot/conformance | snapshot/conformance | dedicated bridge types; read/extract only |
-| RAR / multipart RAR | registry-backed | extraction-only and volume-grouping evidence required | intentionally absent | split fixtures/conformance | split fixtures/conformance | no single-file nested claim; no create/repair |
-| split ZIP / split 7z | registry-backed | volume-set handling verified | verified through pinned `volume_size` DTO | JVM, Maestro split-create/extract | XCTest, Maestro split-create/extract | exposed with companion-volume guidance |
+| RAR / multipart RAR | verified | verified, including grouped five-part extraction | intentionally absent | bridge + Maestro multipart flow | bridge + Maestro multipart flow | extraction-only; no create/repair |
+| split ZIP / split 7z | verified | volume-set handling verified | verified through pinned `volume_size` DTO | JVM, connected, Maestro split-create/extract | XCTest, Maestro split-create/extract | exposed with companion-volume guidance |
 | AppleArchive / AAR | registry-backed | registry-backed where platform backend is available | core create adapter exposed | capability snapshot/fixture | capability snapshot/fixture | dedicated bridge type; target availability remains explicit |
 | XIP | core may identify it | current mobile nesting excludes it | not applicable | explicit unsupported nesting test | explicit unsupported nesting test | not exposed as nested archive |
-| ISO, CAB, CPIO, RPM, XAR, PKG, DMG, LHA, AR, WARC, MTREE, DEB, MSI, VHD, VMDK, UDF | registry-backed | registry-backed (MTREE is list/test-only) | no core create adapter | capability snapshot plus format fixtures | capability snapshot plus format fixtures | dedicated bridge types; read/extract only unless registry says otherwise |
+| ISO, CAB, CPIO, RPM, XAR, PKG, DMG, LHA, AR, WARC, DEB, MSI, VHD, VMDK, UDF | verified | verified on Android and iOS | no core create adapter | bridge + connected + Maestro | bridge + XCTest + Maestro | dedicated bridge types; read/extract only |
+| MTREE | verified | intentionally unavailable in the core registry | no core create adapter | bridge + connected + Maestro test flow | bridge + XCTest + Maestro test flow | list/test-only capability is explicit, not a mobile gate |
 | JAR, APK, IPA, APPX, XPI | ZIP-family listing path | bridge fixture and mobile file-access evidence required | not separate create formats | registry/conformance | registry/conformance | read-only aliases; not separate create options |
 
 ## Required evidence
@@ -51,3 +52,9 @@ temporary pinned build, regenerate the snapshot and bindings from the
 - Treat `UnsupportedPlatform` and `no registered operation adapter` as explicit
   capability results, never as `Other` or a hidden selector gap.
 - Keep RAR creation and repair absent from code and UI.
+- Treat split ZIP, split 7z, split TZAP, and multipart RAR as volume sets at
+  import time; companion files must be staged and cleaned together.
+- The current device matrix has direct Android and iOS extraction/test flows
+  for every row above, including AppleArchive, DEB, CAB, split archives, and
+  multipart RAR. The E2E harness verifies app-private output counts and removes
+  its temporary fixture/import roots after every flow.

@@ -9,6 +9,7 @@ import org.tzap.zmanager.mobile.bridge.generated.MobileJobStatus
 import org.tzap.zmanager.mobile.bridge.generated.PlanExtractResult
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import java.util.UUID
 
 /**
@@ -19,12 +20,22 @@ import java.util.UUID
 object ExtractionPathSafety {
     fun relativePath(file: File, root: File): String {
         val canonicalRoot = root.canonicalFile
-        val canonicalFile = file.canonicalFile
-        val rootPath = canonicalRoot.path.trimEnd(File.separatorChar) + File.separator
-        require(canonicalFile.path.startsWith(rootPath)) {
+        // Normalize the path lexically, but do not canonicalize the final
+        // component: a safe staged symlink must retain its archive path
+        // instead of resolving to its target and colliding with that target.
+        val lexicalRoot = root.toPath().toAbsolutePath().normalize().toString().trimEnd(File.separatorChar)
+        val lexicalFile = file.toPath().toAbsolutePath().normalize().toString()
+        require(lexicalFile.startsWith(lexicalRoot + File.separator)) {
             "Staged output escaped its private root."
         }
-        val relative = canonicalFile.relativeTo(canonicalRoot).invariantSeparatorsPath
+        val relative = lexicalFile.removePrefix(lexicalRoot + File.separator).replace(File.separatorChar, '/')
+        val rootPath = canonicalRoot.path.trimEnd(File.separatorChar)
+        val normalizedFile = File(canonicalRoot, relative)
+        val filePath = normalizedFile.path
+        val parent = normalizedFile.parentFile?.canonicalFile
+        require(parent != null && (parent.path == rootPath || parent.path.startsWith(rootPath + File.separator))) {
+            "Staged output parent escaped its private root."
+        }
         require(relative.isNotBlank() && relative != ".") {
             "Staged output must be a descendant of its private root."
         }
@@ -285,9 +296,20 @@ class ArchiveExtractionCoordinator(
             if (source == sourceRoot) return@forEach
             val relative = ExtractionPathSafety.relativePath(source, sourceRoot)
             val target = File(targetRoot, relative)
-            if (source.isDirectory) {
+            val sourcePath = source.toPath()
+            if (!Files.isSymbolicLink(sourcePath) && source.isDirectory) {
                 if (target.exists() && !target.isDirectory) resolveFileCollision(target, policy).mkdirs()
                 else target.mkdirs()
+            } else if (Files.isSymbolicLink(sourcePath)) {
+                val resolved = resolveFileCollision(target, policy)
+                resolved.parentFile?.mkdirs()
+                val linkTarget = Files.readSymbolicLink(sourcePath)
+                val resolvedLinkTarget = sourcePath.parent.resolve(linkTarget).normalize()
+                val rootPath = sourceRoot.toPath().toAbsolutePath().normalize().toString().trimEnd(File.separatorChar)
+                require(resolvedLinkTarget.toString() == rootPath || resolvedLinkTarget.toString().startsWith(rootPath + File.separator)) {
+                    "Staged symbolic link escaped its private root."
+                }
+                Files.createSymbolicLink(resolved.toPath(), linkTarget)
             } else {
                 val resolved = resolveFileCollision(target, policy)
                 resolved.parentFile?.mkdirs()

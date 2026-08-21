@@ -1,0 +1,23 @@
+appId: org.tzap.zmanager.mobile
+
+---
+
+- launchApp:
+    clearState: true
+- assertVisible: "ZManager"
+- tapOn:
+    id: "debugLoadMtreeTop"
+- scrollUntilVisible:
+    element: "MTREE - 2 entries"
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "MTREE - 2 entries"
+    timeout: 30000
+- scrollUntilVisible:
+    element: "Test"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Test"
+- extendedWaitUntil:
+    visible: "Archive verified"
+    timeout: 30000

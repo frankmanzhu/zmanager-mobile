@@ -20,6 +20,15 @@ The current implementation checkpoint and remaining launch gates are tracked in
 documents distinguish verified app-private workflows from provider, format,
 and hardware evidence that is still required.
 
+The 2026-08-21 offline V2 checkpoint verifies every registered core read-side
+format through the dedicated mobile bridge, native platform tests, and
+deterministic Android/iOS device flows. Coverage includes TAR/raw compression
+variants, AppleArchive, DEB, CAB, CPIO, AR, XAR, ISO, PKG, MSI, DMG, VHD, VMDK,
+UDF, RPM, LHA, WARC, MTREE, split ZIP/7z/TZAP, and multipart RAR. MTREE is
+explicitly list/test-only because that is the core capability; formats without
+a core create adapter remain read/extract-only, not gated or collapsed into a
+generic type. Online sharing remains outside this offline verification pass.
+
 ## V2 Adoption Scope
 
 ZManager Mobile v2 adopts the full Keka-parity workflow set from the product design. "Must Adopt", "Should Adopt", and "Nice Later" are sequencing labels inside v2, not reasons to leave the behavior out of v2.

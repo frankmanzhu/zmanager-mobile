@@ -55,7 +55,9 @@ object NestedArchiveSupport {
     // reports canList=false for it, so nesting into an .xip always fails.
     internal val archiveExtensions = setOf(
         "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz",
-        "zst", "tzst", "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
+        "zst", "tzst", "lzma", "tlzma", "lz", "lzo", "z", "lz4", "uu", "b64",
+        "cpio", "cpgz", "xar", "pkg", "iso", "dmg", "msi", "vhd", "vmdk", "udf",
+        "tzap", "aar", "cab", "deb", "jar", "apk", "ipa"
     )
 
     fun canOpen(entry: ArchiveEntrySummary): Boolean {

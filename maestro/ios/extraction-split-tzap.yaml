@@ -8,6 +8,9 @@ appId: org.tzap.zmanager.mobile
     element: "Load test fixture"
     direction: DOWN
 - tapOn: "Load test fixture"
+- scrollUntilVisible:
+    element: "Split TZAP fixture"
+    direction: DOWN
 - tapOn: "Split TZAP fixture"
 - extendedWaitUntil:
     visible: "TZAP - 6 entries"

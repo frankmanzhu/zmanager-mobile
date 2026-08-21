@@ -1,6 +1,6 @@
 # Mobile Follow-up Implementation Plan
 
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-21
 
 ## Purpose
 
@@ -50,8 +50,9 @@ concentrated in reverse-transfer compatibility, lifecycle/background behavior,
 format promotion beyond the pinned create DTO, accessibility/device evidence,
 and broader edge-case E2E coverage. The bridge format contract is now aligned
 with every registered core format and every core create adapter; remaining
-format work is fixture/device evidence and explicit platform capability
-reporting, not adding hidden or generic bridge fallbacks. Failed
+format work is now covered by deterministic bridge, platform, and device E2E
+evidence for every registered read-side format, not by adding hidden or generic
+bridge fallbacks. Failed
 native extraction commits now retain redacted recovery records and expose
 Retry/Export/Discard actions on both shells.
 
@@ -79,8 +80,12 @@ Implementation status for the current workstream:
   keeping receiver writes app-staged. LocalSend device fingerprints are now
   stable per app installation, and the user may persist an explicit fingerprint
   approval; every transfer still presents the device identity before sending.
-- Multipart nested entries are explicitly rejected as single-file nested
-  archives until volume grouping is implemented.
+- Top-level split ZIP, split 7z, split TZAP, and five-part RAR volume sets are
+  staged, listed, extracted, verified, and cleaned as grouped imports on both
+  platforms. Nested multipart entries remain explicitly rejected as a single
+  materialized file because the nested session model has one source path; this
+  is surfaced as an unsupported nested action rather than treating an
+  incomplete volume set as a complete archive.
 - Android long extraction and creation jobs now hand off to a non-exported
   `dataSync` foreground service with a notification cancel action, tokenized
   result broadcast, in-process password ownership, and terminal-result
@@ -141,9 +146,15 @@ Implementation status for the current workstream:
   and iOS simulator, leaving no committed final extraction files after a paced
   cancellation. This verifies the app-controlled cleanup path, not every
   production-size or OS-suspended job shape.
-- Android has 52 JVM tests plus eight connected ActivityScenario/provider tests, and
-  the iOS Xcode suite reports 53 passed tests (51 unit/bridge/coordinator plus
-  two stable UI tests).
+- The expanded offline format matrix now has fixtures and device E2E flows for
+  all registered core read-side formats: TAR codec variants, raw streams,
+  AppleArchive, DEB, CAB, CPIO, AR, XAR, ISO, PKG, MSI, DMG, VHD, VMDK, UDF,
+  RPM, LHA, WARC, MTREE, split archives, and multipart RAR. MTREE is explicitly
+  list/test-only because the core registry does not expose extraction for it.
+- Android has the JVM and connected ActivityScenario/provider suites, and the
+  iOS Xcode suite currently reports 57 unit/bridge/coordinator tests plus two
+  stable UI accessibility tests. The current device matrix adds deterministic
+  Maestro extraction/test coverage on both simulators.
   The connected Android suite includes a real provider-backed `ACTION_VIEW`
   archive-import handoff.
   Controlled Android and iOS Maestro flows pass for nested browsing, archive repackaging,

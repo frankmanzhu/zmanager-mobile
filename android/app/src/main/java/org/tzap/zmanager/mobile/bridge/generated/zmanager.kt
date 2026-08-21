@@ -1520,7 +1520,8 @@ data class ArchiveEntry (
     var `isDir`: kotlin.Boolean, 
     var `size`: kotlin.ULong?, 
     var `compressedSize`: kotlin.ULong?, 
-    var `modifiedAt`: kotlin.String?
+    var `modifiedAt`: kotlin.String?, 
+    var `linkTarget`: kotlin.String?
 ) {
     
     companion object
@@ -1538,6 +1539,7 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalULong.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1547,7 +1549,8 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
             FfiConverterBoolean.allocationSize(value.`isDir`) +
             FfiConverterOptionalULong.allocationSize(value.`size`) +
             FfiConverterOptionalULong.allocationSize(value.`compressedSize`) +
-            FfiConverterOptionalString.allocationSize(value.`modifiedAt`)
+            FfiConverterOptionalString.allocationSize(value.`modifiedAt`) +
+            FfiConverterOptionalString.allocationSize(value.`linkTarget`)
     )
 
     override fun write(value: ArchiveEntry, buf: ByteBuffer) {
@@ -1557,6 +1560,7 @@ public object FfiConverterTypeArchiveEntry: FfiConverterRustBuffer<ArchiveEntry>
             FfiConverterOptionalULong.write(value.`size`, buf)
             FfiConverterOptionalULong.write(value.`compressedSize`, buf)
             FfiConverterOptionalString.write(value.`modifiedAt`, buf)
+            FfiConverterOptionalString.write(value.`linkTarget`, buf)
     }
 }
 

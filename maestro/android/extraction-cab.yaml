@@ -8,6 +8,9 @@ appId: org.tzap.zmanager.mobile
     element: "Load test fixture"
     direction: DOWN
 - tapOn: "Load test fixture"
+- scrollUntilVisible:
+    element: "CAB fixture"
+    direction: DOWN
 - tapOn: "CAB fixture"
 - extendedWaitUntil:
     visible: "CAB - 5 entries"
