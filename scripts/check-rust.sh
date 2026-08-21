@@ -5,11 +5,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
+if grep -Eq '^tzap-online[[:space:]]*=' "$ZMANAGER_DIR/crates/zmanager-ffi/Cargo.toml"; then
+  TZAP_FEATURE="tzap-online"
+elif grep -Eq '^auth[[:space:]]*=' "$ZMANAGER_DIR/crates/zmanager-ffi/Cargo.toml"; then
+  TZAP_FEATURE="auth"
+else
+  echo "The zmanager-ffi checkout does not expose a supported full-profile feature." >&2
+  exit 1
+fi
 
 for profile in full offline; do
   profile_args=()
   if [[ "$profile" == "full" ]]; then
-    profile_args=(--no-default-features --features auth)
+    profile_args=(--no-default-features --features "$TZAP_FEATURE")
   else
     profile_args=(--no-default-features)
   fi

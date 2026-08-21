@@ -11,7 +11,7 @@ restore_generated_fixtures() {
 
 trap restore_generated_fixtures EXIT
 
-# The format contract snapshot must match the pinned zmanager contract
+# The format contract snapshot must match the resolved zmanager contract
 # (secondary gate; the byte-compare test in zmanager-cli is the primary one).
 ZMANAGER_DIR="$($ROOT_DIR/scripts/resolve-zmanager-source.sh)"
 CONTRACT="$ZMANAGER_DIR/crates/zmanager-cli/contracts/archive-formats.json"

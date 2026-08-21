@@ -10,9 +10,18 @@ ANDROID_API_LEVEL="${ANDROID_API_LEVEL:-35}"
 TARGET="aarch64-linux-android"
 ABI="arm64-v8a"
 TZAP_PROFILE_ARGS=()
+TZAP_FEATURE=""
+if grep -Eq '^tzap-online[[:space:]]*=' "$ZMANAGER_DIR/crates/zmanager-ffi/Cargo.toml"; then
+  TZAP_FEATURE="tzap-online"
+elif grep -Eq '^auth[[:space:]]*=' "$ZMANAGER_DIR/crates/zmanager-ffi/Cargo.toml"; then
+  TZAP_FEATURE="auth"
+else
+  echo "The zmanager-ffi checkout does not expose a supported full-profile feature." >&2
+  exit 1
+fi
 case "${ZMANAGER_TZAP_PROFILE:-offline}" in
   full)
-    TZAP_PROFILE_ARGS=(--no-default-features --features auth)
+    TZAP_PROFILE_ARGS=(--no-default-features --features "$TZAP_FEATURE")
     ;;
   offline)
     TZAP_PROFILE_ARGS=(--no-default-features)

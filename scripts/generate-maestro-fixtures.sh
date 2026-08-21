@@ -127,7 +127,7 @@ copy_fixture "$temp_dir/maestro-nested.zip"
 
 # A password-bearing ZIP keeps the password-required and wrong-password flows
 # deterministic without putting a password in production code or diagnostics.
-# Use the pinned Rust CLI so both mobile bridges exercise the same encrypted
+# Use the resolved Rust CLI so both mobile bridges exercise the same encrypted
 # ZIP implementation instead of depending on host `zip` encryption details.
 (
   cd "$nested_dir"

@@ -83,12 +83,12 @@ ios/
     ZManagerMobile.xcodeproj/
     ZManagerMobile/
 
-.cache/zmanager/
+../zmanager/
   crates/zmanager-ffi/
   crates/zmanager-core/
 ```
 
 The mobile checkout keeps the generated UniFFI bindings under the Android and
-iOS source trees; it does not contain a Rust workspace. See
+iOS source trees; it consumes the sibling `zmanager` Rust workspace by default. See
 `scripts/check-rust.sh` and `docs/local-development.md` for the sibling-repo
 build and binding-regeneration commands.

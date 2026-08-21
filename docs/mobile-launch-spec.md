@@ -171,6 +171,15 @@ The current evidence matrix is maintained in
 formats as blocked when the pinned bridge or native evidence is insufficient;
 registry presence alone is not launch exposure.
 
+Against the current sibling bridge checkout (`6f8641f`), the core registry
+contains CAB and other native readers, but the FFI currently classifies those
+formats through its generic `Other` variant and reports listing/extraction as
+unavailable. Mobile must continue to honor those Rust capability flags; CAB
+and the other affected formats remain explicit launch blockers until the FFI
+promotes their capabilities or the selected bridge revision is changed. The
+temporary `f65d233` cache remains a compatibility reproduction only and is not
+the default mobile dependency.
+
 ZManager-Core may support more formats than the mobile app launch exposes. Mobile UI must expose every format operation listed in this section after it passes the launch quality gates on both Android and iOS. A failing format gate blocks launch until fixed, or until this spec is explicitly changed.
 
 Read/list/extract exposure:

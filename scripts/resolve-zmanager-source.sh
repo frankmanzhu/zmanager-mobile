@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Resolve the Rust bridge source used by this checkout.
 #
-# The default is intentionally a separate detached checkout. This keeps a
-# moving or dirty sibling ../zmanager worktree from changing mobile builds.
-# Set ZMANAGER_DIR only when an existing checkout is already at ZMANAGER_COMMIT.
+# The default follows the current sibling checkout. Set ZMANAGER_RELATIVE_DIR
+# and ZMANAGER_COMMIT together to use a detached cache checkout instead.
+# Set ZMANAGER_DIR only when an existing checkout is already at the selected
+# ZMANAGER_COMMIT.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

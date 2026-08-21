@@ -262,6 +262,11 @@ RustBuffer uniffi_zmanager_ffi_fn_func_clearsensitivestate(RustCallStatus *_Nonn
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_CLOSEARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_CLOSEARCHIVESESSION
+RustBuffer uniffi_zmanager_ffi_fn_func_closearchivesession(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_CREATETZAPSELFSIGNEDIDENTITY
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_CREATETZAPSELFSIGNEDIDENTITY
 RustBuffer uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(RustBuffer identity_path, RustBuffer public_certificate_path, RustBuffer common_name, RustBuffer password, RustCallStatus *_Nonnull out_status
@@ -270,6 +275,11 @@ RustBuffer uniffi_zmanager_ffi_fn_func_createtzapselfsignedidentity(RustBuffer i
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_DETECTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_DETECTARCHIVE
 RustBuffer uniffi_zmanager_ffi_fn_func_detectarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_EXTRACTARCHIVESESSIONENTRY
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_EXTRACTARCHIVESESSIONENTRY
+RustBuffer uniffi_zmanager_ffi_fn_func_extractarchivesessionentry(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_HEALTHCHECK
@@ -293,6 +303,11 @@ RustBuffer uniffi_zmanager_ffi_fn_func_inspecttzapx509signer(RustBuffer archive_
 RustBuffer uniffi_zmanager_ffi_fn_func_listarchive(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTARCHIVESESSION
+RustBuffer uniffi_zmanager_ffi_fn_func_listarchivesession(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTFORMATS
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_LISTFORMATS
 RustBuffer uniffi_zmanager_ffi_fn_func_listformats(RustCallStatus *_Nonnull out_status
@@ -302,6 +317,11 @@ RustBuffer uniffi_zmanager_ffi_fn_func_listformats(RustCallStatus *_Nonnull out_
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_MATERIALIZEPREVIEW
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_MATERIALIZEPREVIEW
 RustBuffer uniffi_zmanager_ffi_fn_func_materializepreview(RustBuffer request, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_OPENARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_OPENARCHIVESESSION
+RustBuffer uniffi_zmanager_ffi_fn_func_openarchivesession(RustBuffer request, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_FN_FUNC_PLANCREATE
@@ -741,6 +761,12 @@ uint16_t uniffi_zmanager_ffi_checksum_func_clearsensitivestate(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_CLOSEARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_CLOSEARCHIVESESSION
+uint16_t uniffi_zmanager_ffi_checksum_func_closearchivesession(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_CREATETZAPSELFSIGNEDIDENTITY
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_CREATETZAPSELFSIGNEDIDENTITY
 uint16_t uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity(void
@@ -750,6 +776,12 @@ uint16_t uniffi_zmanager_ffi_checksum_func_createtzapselfsignedidentity(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_DETECTARCHIVE
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_DETECTARCHIVE
 uint16_t uniffi_zmanager_ffi_checksum_func_detectarchive(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_EXTRACTARCHIVESESSIONENTRY
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_EXTRACTARCHIVESESSIONENTRY
+uint16_t uniffi_zmanager_ffi_checksum_func_extractarchivesessionentry(void
     
 );
 #endif
@@ -777,6 +809,12 @@ uint16_t uniffi_zmanager_ffi_checksum_func_listarchive(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTARCHIVESESSION
+uint16_t uniffi_zmanager_ffi_checksum_func_listarchivesession(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTFORMATS
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_LISTFORMATS
 uint16_t uniffi_zmanager_ffi_checksum_func_listformats(void
@@ -786,6 +824,12 @@ uint16_t uniffi_zmanager_ffi_checksum_func_listformats(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_MATERIALIZEPREVIEW
 #define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_MATERIALIZEPREVIEW
 uint16_t uniffi_zmanager_ffi_checksum_func_materializepreview(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_OPENARCHIVESESSION
+#define UNIFFI_FFIDEF_UNIFFI_ZMANAGER_FFI_CHECKSUM_FUNC_OPENARCHIVESESSION
+uint16_t uniffi_zmanager_ffi_checksum_func_openarchivesession(void
     
 );
 #endif

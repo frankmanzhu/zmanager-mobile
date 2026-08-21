@@ -8,24 +8,22 @@ Run commands from the repository root unless a section says otherwise.
 scripts/check-rust.sh
 ```
 
-The Rust bridge is owned by the `zmanager` repository (`crates/zmanager-ffi`); this repo keeps no Rust workspace. Mobile builds temporarily pin the Rust source to commit `f65d23385ae583462f6d9e68dd84c6fcae1ec89c` through the shared `ZMANAGER_RELATIVE_DIR` path configuration.
+The Rust bridge is owned by the `zmanager` repository (`crates/zmanager-ffi`); this repo keeps no Rust workspace. Local mobile builds use the current sibling checkout by default through the shared `ZMANAGER_RELATIVE_DIR` path configuration.
 
-The default `ZMANAGER_RELATIVE_DIR` is `.cache/zmanager`, while
-`ZMANAGER_COMMIT` pins that checkout to
-`f65d23385ae583462f6d9e68dd84c6fcae1ec89c`. The resolver clones that commit
-into the ignored cache directory when needed and does not read from or modify
-the sibling `../zmanager` checkout. Set
-`ZMANAGER_RELATIVE_DIR` when CI or a later refactor provides the checkout at a
-different mobile-relative location. `ZMANAGER_DIR` is an absolute or
-mobile-relative override; `ZMANAGER_COMMIT`, `ZMANAGER_REPOSITORY`, and
-`ZMANAGER_CACHE_ROOT` are also available for controlled overrides.
-`check-rust.sh` runs the `zmanager-ffi` tests from the resolved checkout in
-both the explicit `full` (`--features auth`) and `offline`
-(`--no-default-features`) profiles. Set `ZMANAGER_DIR` and `ZMANAGER_COMMIT`
-explicitly when validating another checked-out revision.
+The default `ZMANAGER_RELATIVE_DIR` is `../zmanager`; when no explicit
+`ZMANAGER_COMMIT` is supplied, the resolver uses that checkout's current HEAD.
+Set `ZMANAGER_RELATIVE_DIR=.cache/zmanager` and
+`ZMANAGER_COMMIT=b1336fc48fbc2bd1db548b7cb9042c8fbf6f7224` (the `v2.1.0`
+release) to reproduce the temporary pinned build without reading or modifying
+the sibling checkout.
+`ZMANAGER_DIR` is an absolute or mobile-relative override; `ZMANAGER_COMMIT`,
+`ZMANAGER_REPOSITORY`, and `ZMANAGER_CACHE_ROOT` are also available for
+controlled overrides. `check-rust.sh` selects the resolved bridge's supported
+full-profile feature automatically, then runs both the explicit full and
+offline profiles.
 
-During the ZManager architecture cleanup, use the current-root override for
-cross-repository verification until the cleanup revision is published:
+To test a specific sibling revision without changing the default path, use an
+explicit checkout and commit override:
 
 ```sh
 ZMANAGER_DIR=/absolute/path/to/zmanager \
@@ -33,10 +31,9 @@ ZMANAGER_COMMIT="$(git -C /absolute/path/to/zmanager rev-parse HEAD)" \
 scripts/check-rust.sh
 ```
 
-The committed Android format snapshot follows the cleaned engine contract. The
-default pinned checkout remains the predecessor until the cleanup revision is
-available at a consumable commit; advance the pin and rerun the Android/iOS
-bridge checks before treating the migration as release-complete.
+The committed Android format snapshot follows the current engine contract. When
+testing the temporary pinned checkout, regenerate the snapshot and bindings
+from that checkout before treating the migration as release-complete.
 
 ## Android
 
@@ -104,7 +101,7 @@ scripts/check-ios.sh
 
 ## UniFFI Bindings
 
-The UDL and `uniffi.toml` live in the pinned `zmanager` checkout
+The UDL and `uniffi.toml` live in the resolved `zmanager` checkout
 (`crates/zmanager-ffi`). Regenerate bindings after bridge edits:
 
 ```sh
@@ -115,7 +112,7 @@ Generated Android Kotlin is written to `android/app/src/main/java/org/tzap/zmana
 
 Generated iOS Swift/modulemap/header files are written to `ios/ZManagerMobile/ZManagerMobile/Bridge/Generated/`.
 
-The iOS Xcode "Build Rust Bridge" phase invokes `scripts/build-ios-rust-pinned.sh`, which builds the pinned checkout's offline profile by default and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`. Set `ZMANAGER_TZAP_PROFILE=full` for a hosted-auth build.
+The iOS Xcode "Build Rust Bridge" phase invokes `scripts/build-ios-rust-pinned.sh`, which builds the resolved checkout's offline profile by default and copies the fat simulator static library into `ios/ZManagerMobile/build/rust/`. Set `ZMANAGER_TZAP_PROFILE=full` for a hosted-auth build.
 
 Do not check generated native binary artifacts into the repository by default. Platform build integration should build or copy those artifacts explicitly.
 

@@ -90,7 +90,7 @@ class ProviderBoundaryInstrumentedTest {
                     )
                 )
                 val outcome = coordinator.awaitCompletion(review, coordinator.start(review)) {}
-                assertTrue("${source.name} should be verified", outcome is ArchiveCreationOutcome.Completed && outcome.verified)
+                assertTrue("${source.name} should be verified; outcome=$outcome", outcome is ArchiveCreationOutcome.Completed && outcome.verified)
             }
         } finally {
             root.deleteRecursively()

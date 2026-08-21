@@ -3,23 +3,25 @@
 Last reviewed: 2026-08-14
 
 This is an evidence matrix, not a claim that every ZManager-Core format is
-launch-ready. A format is exposed only when the pinned bridge, both native
+launch-ready. A format is exposed only when the selected bridge, both native
 shells, and the relevant UI/E2E evidence agree. `blocked` means the current
-pinned bridge or mobile shell is insufficient; it must not be silently treated
-as supported.
+bridge or mobile shell is insufficient; it must not be silently treated as
+supported.
 
-The mobile bridge pinned by `scripts/zmanager-paths.sh` is
-`f65d23385ae583462f6d9e68dd84c6fcae1ec89c`. Its create DTO currently exposes
+The temporary pinned mobile bridge is
+`b1336fc48fbc2bd1db548b7cb9042c8fbf6f7224` (`v2.1.0`); the default local
+source follows the sibling `../zmanager` checkout at the same release revision.
+The current sibling FFI maps CAB and several other native-reader kinds to its
+generic `Other` capability, which reports list/extract as unavailable. Its
+create DTO currently exposes
 only ZIP, 7z, TAR+Zstd, and TZAP. Read/list support is driven by the generated
-bridge and the pinned format contract snapshot at
+bridge and the format contract snapshot at
 `android/app/src/test/resources/format-capabilities.json`.
 
-The committed snapshot has been refreshed to the cleaned engine contract: it
-contains the expanded current format registry and no engine `Unknown` row. The
-default pinned bridge remains the predecessor revision until the corresponding
-ZManager cleanup changes are committed and published. Until that pin advances,
-the snapshot check is expected to pass only with an explicit current-root
-override (`ZMANAGER_DIR` plus its matching `ZMANAGER_COMMIT`).
+The committed snapshot and generated bindings now follow the current sibling
+engine contract and contain the expanded format registry. When reproducing the
+temporary pinned build, regenerate the snapshot and bindings from the
+`.cache/zmanager` override before relying on its format evidence.
 
 | Format family | List/read | Extract | Create | Android evidence | iOS evidence | UI status / limitation |
 |---|---|---|---|---|---|---|
@@ -37,7 +39,8 @@ override (`ZMANAGER_DIR` plus its matching `ZMANAGER_COMMIT`).
 
 ## Required next evidence
 
-- Refresh this matrix whenever the pinned Rust commit changes.
+- Refresh this matrix whenever the selected Rust commit or generated bridge
+  contract changes.
 - Add one bridge fixture and native destination test for every format promoted
   from `blocked` to `exposed`.
 - Do not add a format selector merely because the Rust registry lists a format;

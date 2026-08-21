@@ -8,7 +8,7 @@ plugins {
 
 val mobileRoot = rootProject.projectDir.parentFile
 val zmanagerRelativeDir = providers.environmentVariable("ZMANAGER_RELATIVE_DIR")
-    .orElse(".cache/zmanager")
+    .orElse("../zmanager")
 val zmanagerRoot = providers.environmentVariable("ZMANAGER_DIR")
     .orElse(mobileRoot.resolve(zmanagerRelativeDir.get()).path)
     .map(mobileRoot::resolve)
