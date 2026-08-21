@@ -1,6 +1,6 @@
 # ZManager Mobile Implementation Plan
 
-Last reviewed: 2026-08-14
+Last reviewed: 2026-08-21
 
 ## Purpose
 
@@ -31,9 +31,19 @@ V2 must adopt:
 - password-required, wrong-password, encrypted-create, test/verify, verify-after-compression, progress, cancellation, and completion states
 - split/multipart detection, native destination choice, collision handling, safe extraction planning, redacted diagnostics, and no platform archive parsing
 
-The pinned bridge now also exposes the safe split-volume create option for ZIP,
-7z, and TZAP. Mobile shells pass the requested size through unchanged and
+The resolved v2.1 bridge also exposes the safe split-volume create option for
+ZIP, 7z, and TZAP. Mobile shells pass the requested size through unchanged and
 report the Rust-created volume set without implementing archive splitting.
+
+`zmanager-core` v2.1 adds a canonical capability registry and native read-side
+adapters for additional TAR compression variants (`TAR.LZMA`, `TAR.LZ`,
+`TAR.LZO`, `TAR.Z`, `TAR.LZ4`, and `TAR.UU`/`TAR.B64`), ISO, CAB, CPIO, RPM,
+XAR, PKG, DMG, LHA, AR, WARC, MTREE, DEB, MSI, VHD, VMDK, and UDF. These are
+engine capabilities, not automatic mobile exposure: `listFormats` can report
+their capability rows, but the current FFI `ArchiveFormat` enum and path
+classifier still lack dedicated variants for these formats and map them to
+`Other`. Mobile must add bridge mappings, fixtures, and Android/iOS evidence
+before promoting any of them into visible UI.
 
 V2 should adopt:
 
@@ -171,7 +181,11 @@ Definition of done:
 
 - Android and iOS can call the same bridge surface.
 - Password-required, wrong-password, unsupported archive, damaged archive, cancellation, and redaction tests pass at the bridge boundary.
-- The sibling bridge can list real ZIP, RAR extraction-supported, 7z, tar-family, AppleArchive / AAR, and XIP fixtures where core support exists.
+- The sibling bridge's `listFormats` capability snapshot reports the canonical
+  v2.1 core registry, including the additional TAR compression, package,
+  container, archive, and disk-image formats described above. Mobile listing,
+  testing, and extraction remain gated by dedicated bridge mappings and native
+  evidence.
 
 ### Track 2: Read-Only Workbench
 
@@ -1262,32 +1276,41 @@ Read/list/extract exposure:
 - BZIP2
 - XZ
 - Zstd
-- TGZ / TBZ2 / TXZ
+- TGZ / TBZ2 / TXZ / TAR.LZMA / TAR.LZ / TAR.LZO / TAR.Z / TAR.LZ4 / TAR.UU
 - split ZIP
 - multipart RAR extraction
 - AppleArchive / AAR where `zmanager-core` exposes support and platform gates pass
-- XIP where `zmanager-core` exposes safe extraction and platform gates pass
+- XIP where the explicit FFI-only XIP policy and platform gates pass
 - JAR
 - APK
 - APPX
 - XPI
 - IPA
 - CPGZ
-- CPT
 
 Additional read/list/extract exposure:
 
 - ISO
-- DMG
 - CAB
-- MSI
-- EXE / self-extracting archive containers
-- PAX
-- LZMA
-- ARJ
-- LHA / LZH
 - CPIO
-- WIM
+- RPM
+- XAR
+- PKG
+- DMG
+- LHA / LZH
+- AR / `.a` / `.lib`
+- WARC
+- MTREE (list/test only; no extraction operation)
+- DEB
+- MSI
+- VHD
+- VMDK
+- UDF
+
+`PAX` remains a TAR alias. ZIP self-extracting executables are compatibility
+inputs detected as ZIP content, not a separate `EXE` format. `CPT`, ARJ, and
+WIM are not registered v2.1 core formats and must not be presented as mobile
+format support without a separate core/bridge contract.
 
 V2 create exposure:
 
@@ -1299,6 +1322,7 @@ V2 create exposure:
 - BZIP2
 - Zstd
 - `.tzst` / tar+zstd
+- TAR.GZ / TGZ where the v2.1 core create adapter is promoted through the bridge
 - `.tzap`
 - AppleArchive / AAR where `zmanager-core` exposes creation support and platform gates pass
 
@@ -1357,17 +1381,16 @@ Recommended additional fixtures:
 - standalone BZIP2
 - standalone XZ
 - standalone Zstd
+- representative v2.1 native readers: TAR.LZMA, TAR.LZ, TAR.LZO, TAR.Z,
+  TAR.LZ4, TAR.UU, ISO, CAB, CPIO, RPM, XAR, PKG, DMG, LHA, AR, WARC, MTREE,
+  DEB, MSI, VHD, VMDK, and UDF
 - JAR
 - APK
 - APPX
 - XPI
 - IPA
 - CPGZ
-- CPT
-- ISO
-- CAB
-- MSI
-- EXE / self-extracting archive container
+- ZIP self-extracting executable (content-detected compatibility input)
 - PAX
 - LZMA
 - TGZ
@@ -1576,7 +1599,10 @@ ZManager Mobile is launch-ready when:
 13. Implement completion summary, saved reports, and cleanup/recovery records.
 14. Implement create planning and create jobs.
 15. Implement encrypted ZIP creation, verify-after-compression, archive-items-separately, split-volume creation, and password redaction tests.
-16. Add AppleArchive / AAR, XIP, and legacy charset exposure after the relevant format gates pass.
+16. Promote the v2.1 core read-side formats through dedicated bridge mappings,
+    fixtures, and Android/iOS gates; then add AppleArchive / AAR, the
+    FFI-only XIP policy, and legacy charset exposure after their relevant gates
+    pass.
 17. Add Photos picker, iPad drag/drop, default destinations, batch extraction, and saved reports.
 18. Add Shortcuts/X-Callback-URL and pause/resume only after request validation and job-state invariants are proven.
 19. Complete provider-specific, background-service, tablet/iPad, multi-window, accessibility, screenshot, and edge-case E2E QA.
