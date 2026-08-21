@@ -167,20 +167,19 @@ Shared:
 ## Format Scope
 
 The current evidence matrix is maintained in
-[mobile-format-matrix.md](mobile-format-matrix.md). It deliberately marks
-formats as blocked when the pinned bridge or native evidence is insufficient;
-registry presence alone is not launch exposure.
+[mobile-format-matrix.md](mobile-format-matrix.md). The mobile bridge mirrors
+every registered `zmanager-core` format with a dedicated `ArchiveFormat` value;
+no registered kind is represented by generic `Other`. `listFormats` and the
+operation DTOs return the core registry's actual list/extract/create
+capabilities, including explicit `UnsupportedPlatform` or unavailable reasons.
+XIP remains a separate unsupported sentinel because it is not a registered
+core format.
 
-Against the current sibling bridge checkout (`6f8641f`), the core registry
-contains CAB and other native readers, but the FFI currently classifies those
-formats through its generic `Other` variant and reports listing/extraction as
-unavailable. Mobile must continue to honor those Rust capability flags; CAB
-and the other affected formats remain explicit launch blockers until the FFI
-promotes their capabilities or the selected bridge revision is changed. The
-temporary `f65d233` cache remains a compatibility reproduction only and is not
-the default mobile dependency.
-
-ZManager-Core may support more formats than the mobile app launch exposes. Mobile UI must expose every format operation listed in this section after it passes the launch quality gates on both Android and iOS. A failing format gate blocks launch until fixed, or until this spec is explicitly changed.
+ZManager-Core may support more formats than the mobile app launch exposes, but
+the bridge must still represent every registered kind. Mobile UI must expose
+every available operation listed in this section after it passes the launch
+quality gates on both Android and iOS. A target-specific unavailable capability
+must be visible and diagnosable; it is not permission to omit the bridge type.
 
 Read/list/extract exposure:
 
@@ -192,7 +191,8 @@ Read/list/extract exposure:
 - BZIP2
 - XZ
 - Zstd
-- TGZ / TBZ2 / TXZ
+- TGZ / TBZ2 / TXZ / TAR.LZMA / TAR.LZ / TAR.LZO / TAR.Z / TAR.LZ4 / TAR.UU
+- raw GZIP / BZIP2 / XZ / Zstd streams
 - split ZIP
 - multipart RAR extraction
 - AppleArchive / AAR where `zmanager-core` exposes support and platform gates pass
@@ -224,13 +224,9 @@ V2 create exposure:
 - ZIP
 - encrypted ZIP, matching `zmanager-cli` behavior
 - 7z
-- TAR
-- GZIP
-- BZIP2
-- Zstd
-- `.tzst` / tar+zstd
+- TAR.GZ / TGZ / `.tzst` / tar+zstd
 - `.tzap`
-- AppleArchive / AAR where `zmanager-core` exposes creation support and platform gates pass
+- AppleArchive / AAR where the core target backend is available
 
 Out of scope:
 

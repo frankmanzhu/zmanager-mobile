@@ -174,7 +174,7 @@ private fun ZManagerApp(
     var showHelpDialog by remember { mutableStateOf(false) }
 
     val localSendReceiver = remember {
-        LocalSendReceiver(onFileCommitted = { received ->
+        LocalSendReceiver(fingerprint = LocalSendIdentity.fingerprint(context), onFileCommitted = { received ->
             val treeUri = receiveDestinationUri ?: return@LocalSendReceiver
             runCatching {
                 val tree = DocumentFile.fromTreeUri(context, treeUri)
@@ -462,7 +462,9 @@ private fun ZManagerApp(
             CreateArchiveFormat.ZIP -> "repackaged.zip"
             CreateArchiveFormat.SEVEN_Z -> "repackaged.7z"
             CreateArchiveFormat.TAR_ZST -> "repackaged.tar.zst"
+            CreateArchiveFormat.TAR_GZ -> "repackaged.tar.gz"
             CreateArchiveFormat.TZAP -> "repackaged.tzap"
+            CreateArchiveFormat.APPLE_ARCHIVE -> "repackaged.aar"
         }
         repackagingState = ArchiveRepackagingUiState.Planning
         val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
@@ -532,7 +534,9 @@ private fun ZManagerApp(
             CreateArchiveFormat.ZIP -> "archive.zip"
             CreateArchiveFormat.SEVEN_Z -> "archive.7z"
             CreateArchiveFormat.TAR_ZST -> "archive.tar.zst"
+            CreateArchiveFormat.TAR_GZ -> "archive.tar.gz"
             CreateArchiveFormat.TZAP -> "archive.tzap"
+            CreateArchiveFormat.APPLE_ARCHIVE -> "archive.aar"
         }
         val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
             .getOrElse { error ->
@@ -1904,7 +1908,9 @@ private fun ArchiveCreationPanel(
             CreateFormatButton("ZIP", CreateArchiveFormat.ZIP, format, onFormatChanged)
             CreateFormatButton("7z", CreateArchiveFormat.SEVEN_Z, format, onFormatChanged)
             CreateFormatButton("TAR.ZST", CreateArchiveFormat.TAR_ZST, format, onFormatChanged)
+            CreateFormatButton("TAR.GZ", CreateArchiveFormat.TAR_GZ, format, onFormatChanged)
             CreateFormatButton("TZAP", CreateArchiveFormat.TZAP, format, onFormatChanged)
+            CreateFormatButton("AAR", CreateArchiveFormat.APPLE_ARCHIVE, format, onFormatChanged)
         }
         OutlinedTextField(
             value = password,

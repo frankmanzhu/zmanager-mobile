@@ -29,7 +29,9 @@ case "$platform" in
       "extraction-split-7z.yaml:6"
       "extraction-split-tzap.yaml:6"
       "extraction-multipart-rar.yaml:6"
-      "extraction-deb.yaml:3"
+      # The Debian fixture has three archive members (the UI count), but its
+      # data member expands to nine committed payload/metadata files.
+      "extraction-deb.yaml:9"
       "extraction-cab.yaml:5"
     )
     reset_destination() {
@@ -59,7 +61,9 @@ case "$platform" in
       "extraction-split-7z.yaml:6"
       "extraction-split-tzap.yaml:6"
       "extraction-multipart-rar.yaml:6"
-      "extraction-deb.yaml:3"
+      # The Debian fixture has three archive members (the UI count), but its
+      # data member expands to nine committed payload/metadata files.
+      "extraction-deb.yaml:9"
       "extraction-cab.yaml:5"
     )
     reset_destination() {

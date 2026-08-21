@@ -4,6 +4,19 @@ import CryptoKit
 @testable import ZManagerMobile
 
 final class ZManagerMobileTests: XCTestCase {
+    func testInboundAndOutboundSessionsUseTheSameStableInstallationFingerprint() {
+        let suiteName = "ZManagerMobileTests.localsend-identity"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let first = LocalSendIdentity.fingerprint(defaults: defaults)
+        let second = LocalSendIdentity.fingerprint(defaults: defaults)
+
+        XCTAssertFalse(first.isEmpty)
+        XCTAssertEqual(first, second)
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
     func testOperationReportStoreRedactsCredentials() throws {
         let report = ArchiveOperationReportStore.save(
             operation: "extract",
@@ -402,6 +415,19 @@ final class ZManagerMobileTests: XCTestCase {
             )
         )
         XCTAssertGreaterThan(bridge.pollCount, 0)
+    }
+
+    func testTarGzUsesTarGzExtensionAndDoesNotOfferSplitVolumes() {
+        XCTAssertFalse(ArchiveVolumeSupport.supportsVolumeSize(.tarGz))
+        XCTAssertEqual(
+            ArchiveVolumeSupport.outputPaths(
+                format: .tarGz,
+                destination: "/files/archive.tar.gz",
+                volumeCount: 3,
+                reportedPaths: []
+            ),
+            ["/files/archive.tar.gz"]
+        )
     }
 
     func testSeparateCreationRequestsUseStableNamesAndUniqueDestinations() {

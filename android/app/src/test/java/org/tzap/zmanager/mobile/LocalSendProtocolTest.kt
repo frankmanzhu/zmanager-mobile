@@ -14,6 +14,17 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class LocalSendProtocolTest {
     @Test
+    fun inboundAndOutboundSessionsUseTheSameStableInstallationFingerprint() {
+        val context = RuntimeEnvironment.getApplication()
+        val first = LocalSendIdentity.fingerprint(context)
+        val second = LocalSendIdentity.fingerprint(context)
+
+        assertTrue(first.isNotBlank())
+        assertEquals(first, second)
+        assertEquals(first, LocalSendClient(context).let { LocalSendIdentity.fingerprint(context) })
+    }
+
+    @Test
     fun trustStorePersistsOnlyExplicitFingerprints() {
         val context = RuntimeEnvironment.getApplication()
         val store = LocalSendTrustStore(context)

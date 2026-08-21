@@ -99,6 +99,20 @@ class ArchiveCreationTest {
         )
     }
 
+    @Test
+    fun tarGzUsesTarGzExtensionAndDoesNotOfferSplitVolumes() {
+        assertTrue(!ArchiveVolumeSupport.supportsVolumeSize(CreateArchiveFormat.TAR_GZ))
+        assertEquals(
+            listOf("/files/archive.tar.gz"),
+            ArchiveVolumeSupport.outputPaths(
+                CreateArchiveFormat.TAR_GZ,
+                "/files/archive.tar.gz",
+                3UL,
+                emptyList()
+            )
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun volumeSizeParserRejectsMalformedInput() {
         ArchiveVolumeSupport.parseVolumeSize("1.5g")

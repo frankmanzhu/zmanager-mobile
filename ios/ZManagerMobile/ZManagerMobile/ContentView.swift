@@ -2737,7 +2737,9 @@ final class ArchiveImportModel: ObservableObject {
         case .zip: suffix = ".zip"
         case .sevenZ: suffix = ".7z"
         case .tarZst: suffix = ".tar.zst"
+        case .tarGz: suffix = ".tar.gz"
         case .tzap: suffix = ".tzap"
+        case .appleArchive: suffix = ".aar"
         }
         let volumeSize: UInt64?
         do {
@@ -3438,7 +3440,9 @@ final class ArchiveImportModel: ObservableObject {
         case .zip: suffix = ".zip"
         case .sevenZ: suffix = ".7z"
         case .tarZst: suffix = ".tar.zst"
+        case .tarGz: suffix = ".tar.gz"
         case .tzap: suffix = ".tzap"
+        case .appleArchive: suffix = ".aar"
         }
         let volumeSize = try ArchiveVolumeSupport.parseVolumeSize(creationVolumeSizeInput)
         creationState = .planning
@@ -3773,7 +3777,9 @@ struct ArchiveCreationPanel: View {
                 Text("ZIP").tag(CreateArchiveFormat.zip)
                 Text("7z").tag(CreateArchiveFormat.sevenZ)
                 Text("TAR.ZST").tag(CreateArchiveFormat.tarZst)
+                Text("TAR.GZ").tag(CreateArchiveFormat.tarGz)
                 Text("TZAP").tag(CreateArchiveFormat.tzap)
+                Text("AAR").tag(CreateArchiveFormat.appleArchive)
             }
             .pickerStyle(.segmented)
             StableSecureInputField("Optional password", text: Binding(
@@ -4873,7 +4879,9 @@ enum ArchiveSeparateCreationPlanner {
         case .zip: suffix = ".zip"
         case .sevenZ: suffix = ".7z"
         case .tarZst: suffix = ".tar.zst"
+        case .tarGz: suffix = ".tar.gz"
         case .tzap: suffix = ".tzap"
+        case .appleArchive: suffix = ".aar"
         }
         var used = Set<String>()
         return sourcePaths.map { sourcePath in
@@ -4925,7 +4933,7 @@ enum ArchiveVolumeSupport {
         switch format {
         case .zip, .sevenZ, .tzap:
             return true
-        case .tarZst:
+        case .tarZst, .tarGz, .appleArchive:
             return false
         }
     }
@@ -4979,7 +4987,7 @@ enum ArchiveVolumeSupport {
             return (0..<Int(count)).map { index in
                 parent.appendingPathComponent("\(stem).vol\(String(format: "%03d", index)).\(extensionName)").path
             }
-        case .tarZst:
+        case .tarZst, .tarGz, .appleArchive:
             return reportedPaths.isEmpty ? [destination] : reportedPaths
         }
     }
@@ -5031,7 +5039,7 @@ enum ArchiveVolumeSupport {
                 case .tzap:
                     return name.hasPrefix("\(stem).vol") &&
                         name.hasSuffix(".\(extensionName)")
-                case .tarZst:
+                case .tarZst, .tarGz, .appleArchive:
                     return false
                 }
             }.map(\.path)
@@ -5541,6 +5549,19 @@ struct LocalSendUploadSession {
     let tokens: [String: String]
 }
 
+enum LocalSendIdentity {
+    private static let key = "org.tzap.zmanager.localsend.fingerprint"
+
+    static func fingerprint(defaults: UserDefaults = .standard) -> String {
+        if let stored = defaults.string(forKey: key) {
+            return stored
+        }
+        let generated = UUID().uuidString
+        defaults.set(generated, forKey: key)
+        return generated
+    }
+}
+
 enum LocalSendUIState {
     case idle
     case receiving(Int)
@@ -5726,16 +5747,7 @@ final class LocalSendClient: @unchecked Sendable {
 
     init(alias: String = "ZManager Mobile", fingerprint: String? = nil, port: Int = LocalSendClient.defaultPort) {
         self.alias = alias
-        let identityKey = "org.tzap.zmanager.localsend.fingerprint"
-        if let fingerprint {
-            self.fingerprint = fingerprint
-        } else if let stored = UserDefaults.standard.string(forKey: identityKey) {
-            self.fingerprint = stored
-        } else {
-            let generated = UUID().uuidString
-            UserDefaults.standard.set(generated, forKey: identityKey)
-            self.fingerprint = generated
-        }
+        self.fingerprint = fingerprint ?? LocalSendIdentity.fingerprint()
         self.port = port
     }
 
@@ -6126,12 +6138,12 @@ final class LocalSendReceiver: @unchecked Sendable {
 
     init(
         alias: String = "ZManager Mobile",
-        fingerprint: String = UUID().uuidString,
+        fingerprint: String? = nil,
         port: UInt16 = UInt16(LocalSendClient.defaultPort),
         fileManager: FileManager = .default
     ) {
         self.alias = alias
-        self.fingerprint = fingerprint
+        self.fingerprint = fingerprint ?? LocalSendIdentity.fingerprint()
         self.port = port
         self.fileManager = fileManager
     }

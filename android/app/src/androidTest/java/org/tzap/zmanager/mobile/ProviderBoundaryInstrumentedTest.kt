@@ -71,6 +71,25 @@ class ProviderBoundaryInstrumentedTest {
     }
 
     @Test
+    fun pinnedNativeBridgeListsDebAndCabFixtures() {
+        val bridge = GeneratedArchiveBridgeGateway()
+        listOf(
+            "maestro-files.deb" to ArchiveFormat.DEB,
+            "maestro-files.cab" to ArchiveFormat.CAB
+        ).forEach { (assetName, expectedFormat) ->
+            val archive = File.createTempFile("bridge-${assetName.substringBeforeLast('.')}-", ".${assetName.substringAfterLast('.')}", context.cacheDir)
+            context.assets.open(assetName).use { input -> archive.outputStream().use(input::copyTo) }
+            try {
+                val listing = bridge.listArchive(archive.absolutePath, null)
+                assertEquals(expectedFormat, listing.format)
+                assertTrue("$assetName should list entries", listing.entryCount > 0UL)
+            } finally {
+                archive.delete()
+            }
+        }
+    }
+
+    @Test
     fun sequentialNativeCreationJobsRemainVerified() = runBlocking {
         val root = File(context.cacheDir, "sequential-create-${UUID.randomUUID()}")
         check(root.mkdirs())

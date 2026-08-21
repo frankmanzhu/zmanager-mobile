@@ -10,7 +10,7 @@ appId: org.tzap.zmanager.mobile
 - tapOn: "Load test fixture"
 - tapOn: "CAB fixture"
 - extendedWaitUntil:
-    visible: "Archive - 5 entries"
+    visible: "CAB - 5 entries"
     timeout: 30000
 - scrollUntilVisible:
     element: "Extract"
@@ -18,11 +18,11 @@ appId: org.tzap.zmanager.mobile
 - tapOn: "Extract"
 - extendedWaitUntil:
     visible: "Review extraction"
-    timeout: 30000
+    timeout: 15000
 - scrollUntilVisible:
     element: "Start extraction"
     direction: DOWN
 - tapOn: "Start extraction"
 - extendedWaitUntil:
     visible: ".*Extraction complete: 5 files saved to App storage.*"
-    timeout: 60000
+    timeout: 30000

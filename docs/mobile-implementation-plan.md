@@ -38,12 +38,13 @@ report the Rust-created volume set without implementing archive splitting.
 `zmanager-core` v2.1 adds a canonical capability registry and native read-side
 adapters for additional TAR compression variants (`TAR.LZMA`, `TAR.LZ`,
 `TAR.LZO`, `TAR.Z`, `TAR.LZ4`, and `TAR.UU`/`TAR.B64`), ISO, CAB, CPIO, RPM,
-XAR, PKG, DMG, LHA, AR, WARC, MTREE, DEB, MSI, VHD, VMDK, and UDF. These are
-engine capabilities, not automatic mobile exposure: `listFormats` can report
-their capability rows, but the current FFI `ArchiveFormat` enum and path
-classifier still lack dedicated variants for these formats and map them to
-`Other`. Mobile must add bridge mappings, fixtures, and Android/iOS evidence
-before promoting any of them into visible UI.
+XAR, PKG, DMG, LHA, AR, WARC, MTREE, DEB, MSI, VHD, VMDK, and UDF. The mobile
+FFI must mirror every row with a dedicated `ArchiveFormat` variant and route
+classification/capabilities through the core registry. No registered core
+kind may fall back to `Other`; platform/backend limitations must be returned as
+explicit capability data. The core create registry is likewise authoritative:
+mobile exposes ZIP, 7z, TAR.ZST, TAR.GZ, TZAP, and AppleArchive creation, while
+formats without a core create adapter remain read/extract-only.
 
 V2 should adopt:
 
@@ -184,8 +185,9 @@ Definition of done:
 - The sibling bridge's `listFormats` capability snapshot reports the canonical
   v2.1 core registry, including the additional TAR compression, package,
   container, archive, and disk-image formats described above. Mobile listing,
-  testing, and extraction remain gated by dedicated bridge mappings and native
-  evidence.
+  testing, and extraction use the dedicated bridge mapping for every row and
+  report target capability status directly from the registry; native evidence
+  remains required for each operation claimed in the UI.
 
 ### Track 2: Read-Only Workbench
 
@@ -332,18 +334,15 @@ Definition of done:
 
 Goal: let users create launch-supported archives with safe planning, progress, cancellation, and export.
 
-V2 create formats:
+V2 create formats (only where the core create registry has an adapter):
 
 - ZIP
 - encrypted ZIP
 - 7z
-- TAR
-- GZIP
-- BZIP2
-- Zstd
 - `.tzst` / tar+zstd
+- TAR.GZ / TGZ
 - `.tzap`
-- AppleArchive / AAR where `zmanager-core` and Apple platform gates support it
+- AppleArchive / AAR where the target backend is available
 
 Create flow:
 
@@ -1599,10 +1598,11 @@ ZManager Mobile is launch-ready when:
 13. Implement completion summary, saved reports, and cleanup/recovery records.
 14. Implement create planning and create jobs.
 15. Implement encrypted ZIP creation, verify-after-compression, archive-items-separately, split-volume creation, and password redaction tests.
-16. Promote the v2.1 core read-side formats through dedicated bridge mappings,
-    fixtures, and Android/iOS gates; then add AppleArchive / AAR, the
-    FFI-only XIP policy, and legacy charset exposure after their relevant gates
-    pass.
+16. Keep the FFI `ArchiveFormat` and generated Android/iOS bindings in lockstep
+    with every `zmanager-core::archive_format::FORMAT_CAPABILITIES` row; add
+    bridge classification/capability assertions for every kind, then add
+    Android/iOS fixtures and device evidence for each available operation.
+    Keep XIP explicitly separate because it is not a registered core kind.
 17. Add Photos picker, iPad drag/drop, default destinations, batch extraction, and saved reports.
 18. Add Shortcuts/X-Callback-URL and pause/resume only after request validation and job-state invariants are proven.
 19. Complete provider-specific, background-service, tablet/iPad, multi-window, accessibility, screenshot, and edge-case E2E QA.

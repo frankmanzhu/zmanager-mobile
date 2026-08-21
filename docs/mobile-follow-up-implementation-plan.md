@@ -48,7 +48,10 @@ explicit trusted-device revocation, deterministic archive creation/extraction
 Maestro flows, and redacted operation reports. The remaining work is
 concentrated in reverse-transfer compatibility, lifecycle/background behavior,
 format promotion beyond the pinned create DTO, accessibility/device evidence,
-and broader edge-case E2E coverage. Failed
+and broader edge-case E2E coverage. The bridge format contract is now aligned
+with every registered core format and every core create adapter; remaining
+format work is fixture/device evidence and explicit platform capability
+reporting, not adding hidden or generic bridge fallbacks. Failed
 native extraction commits now retain redacted recovery records and expose
 Retry/Export/Discard actions on both shells.
 

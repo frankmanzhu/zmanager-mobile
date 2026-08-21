@@ -337,17 +337,21 @@ Required gates:
 
 ## Format Strategy
 
-ZManager-Core owns real format support. ZManager Mobile should expose every launch-scope format once mobile UX, bridge, Android, and iOS gates pass.
+ZManager-Core owns real format support. ZManager Mobile must carry a dedicated
+bridge type and capability row for every format registered by the core
+registry; no registered format may be hidden behind a generic fallback. Mobile
+UI and E2E evidence must expose each operation the target capability row says
+is available. Platform/backend limitations are explicit capability results.
 
-Prioritize by user demand and mobile-shell confidence:
+Prioritize evidence by user demand and mobile-shell confidence:
 
 | Tier | Formats | Behavior |
 | --- | --- | --- |
 | Tier 1 | ZIP, RAR extraction, 7z, TAR, GZIP, BZIP2 | List, test where possible, extract |
 | Tier 2 | XZ, Zstd, TGZ, TBZ2, TXZ, split ZIP, multipart RAR extraction | List/extract with clear limitations |
-| Tier 3 | ISO, DMG, CAB, ARJ, LHA/LZH, CPIO, WIM, XIP, executable/self-extracting archive containers | V2 exposure after ZManager-Core support and mobile-shell gates pass |
+| Tier 3 | TAR codec variants, ISO, CAB, CPIO, RPM, XAR, PKG, DMG, LHA/LZH, AR, WARC, MTREE, DEB, MSI, VHD, VMDK, UDF | V2 bridge type and capability row for every core-registered format; list/extract follows target capability |
 | Apple parity | AppleArchive / AAR, IPA, APPX, APK, JAR, XPI, CPGZ, CPT | Prioritize list/extract where core support exists because these are common in Keka's iOS promise |
-| Create v2 | ZIP, encrypted ZIP, 7z, TAR, GZIP, BZIP2, Zstd, `.tzst` / tar+zstd, `.tzap`, AppleArchive / AAR where ZManager-Core exposes creation support | Create only where bridge support, password/encryption UX, progress, cancellation, verification, and destination commit are polished |
+| Create v2 | ZIP, encrypted ZIP, 7z, `.tzst` / tar+zstd, TAR.GZ/TGZ, `.tzap`, AppleArchive / AAR where ZManager-Core exposes creation support | Create only where the core create registry and mobile bridge carry the operation/options; all other registered kinds remain read/extract-only |
 | Post-v2 candidates | Other writable formats not listed above | Add only through a future scope update after UX and tests cover edge cases |
 | Out of scope | RAR creation, RAR repair | Use tzap for new recovery-aware archives |
 

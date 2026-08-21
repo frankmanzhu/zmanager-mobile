@@ -112,6 +112,19 @@ private object ArchiveImportMetadataForSharing {
 
 data class LocalSendUploadSession(val sessionId: String, val tokens: Map<String, String>)
 
+/** Stable per-installation identity shared by outbound and inbound sessions. */
+object LocalSendIdentity {
+    private const val IDENTITY_PREFS = "localsend_identity"
+    private const val FINGERPRINT_KEY = "fingerprint"
+
+    fun fingerprint(context: Context): String {
+        val preferences = context.getSharedPreferences(IDENTITY_PREFS, Context.MODE_PRIVATE)
+        return preferences.getString(FINGERPRINT_KEY, null) ?: UUID.randomUUID().toString().also {
+            preferences.edit().putString(FINGERPRINT_KEY, it).apply()
+        }
+    }
+}
+
 /** Stores only user-approved LocalSend fingerprints, never addresses or secrets. */
 class LocalSendTrustStore(context: Context) {
     private val preferences = context.getSharedPreferences("localsend_trust", Context.MODE_PRIVATE)
@@ -220,14 +233,8 @@ class LocalSendClient(
     ) : this(alias, stableFingerprint(context), port)
 
     companion object {
-        private const val IDENTITY_PREFS = "localsend_identity"
-        private const val FINGERPRINT_KEY = "fingerprint"
-
         private fun stableFingerprint(context: Context): String {
-            val preferences = context.getSharedPreferences(IDENTITY_PREFS, Context.MODE_PRIVATE)
-            return preferences.getString(FINGERPRINT_KEY, null) ?: UUID.randomUUID().toString().also {
-                preferences.edit().putString(FINGERPRINT_KEY, it).apply()
-            }
+            return LocalSendIdentity.fingerprint(context)
         }
     }
 

@@ -72,7 +72,9 @@ object ArchiveSeparateCreationPlanner {
             CreateArchiveFormat.ZIP -> ".zip"
             CreateArchiveFormat.SEVEN_Z -> ".7z"
             CreateArchiveFormat.TAR_ZST -> ".tar.zst"
+            CreateArchiveFormat.TAR_GZ -> ".tar.gz"
             CreateArchiveFormat.TZAP -> ".tzap"
+            CreateArchiveFormat.APPLE_ARCHIVE -> ".aar"
         }
         val used = mutableSetOf<String>()
         return sourcePaths.map { sourcePath ->
@@ -169,7 +171,9 @@ object ArchiveVolumeSupport {
         CreateArchiveFormat.ZIP,
         CreateArchiveFormat.SEVEN_Z,
         CreateArchiveFormat.TZAP -> true
-        CreateArchiveFormat.TAR_ZST -> false
+        CreateArchiveFormat.TAR_ZST,
+        CreateArchiveFormat.TAR_GZ,
+        CreateArchiveFormat.APPLE_ARCHIVE -> false
     }
 
     /** Parses the bridge/CLI-style binary size syntax without using floating point. */
@@ -217,7 +221,9 @@ object ArchiveVolumeSupport {
                 val extension = name.substringAfterLast('.', "tzap")
                 (0 until count).map { index -> File(parent, "$stem.vol${index.toString().padStart(3, '0')}.$extension").path }
             }
-            CreateArchiveFormat.TAR_ZST -> reportedPaths.ifEmpty { listOf(destination) }
+            CreateArchiveFormat.TAR_ZST,
+            CreateArchiveFormat.TAR_GZ,
+            CreateArchiveFormat.APPLE_ARCHIVE -> reportedPaths.ifEmpty { listOf(destination) }
         }
         return paths
     }
@@ -249,7 +255,9 @@ object ArchiveVolumeSupport {
                     file.name.drop(baseName.length + 1).all(Char::isDigit)
                 CreateArchiveFormat.TZAP -> file.name.startsWith("$stem.vol") &&
                     file.name.endsWith(".$extension")
-                CreateArchiveFormat.TAR_ZST -> false
+                CreateArchiveFormat.TAR_ZST,
+                CreateArchiveFormat.TAR_GZ,
+                CreateArchiveFormat.APPLE_ARCHIVE -> false
             }
         }?.sortedBy(File::getName).orEmpty()
         sidecars.forEach { file ->
