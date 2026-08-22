@@ -3,6 +3,7 @@ package org.tzap.zmanager.mobile
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.DatagramPacket
@@ -105,7 +106,8 @@ class LocalSendReceiver(
         client.use { socket ->
             val input = BufferedInputStream(socket.getInputStream())
             val output = BufferedOutputStream(socket.getOutputStream())
-            val requestLine = readLine(input) ?: return
+            val lineBuffer = ByteArrayOutputStream(INITIAL_HEADER_LINE_CAPACITY)
+            val requestLine = readLine(input, lineBuffer) ?: return
             val request = requestLine.split(' ', limit = 3)
             if (request.size != 3) {
                 respond(output, 400, "Invalid HTTP request")
@@ -113,7 +115,7 @@ class LocalSendReceiver(
             }
             val headers = buildMap {
                 while (true) {
-                    val line = readLine(input) ?: return@buildMap
+                    val line = readLine(input, lineBuffer) ?: return@buildMap
                     if (line.isEmpty()) break
                     val separator = line.indexOf(':')
                     if (separator > 0) put(line.substring(0, separator).lowercase(), line.substring(separator + 1).trim())
@@ -298,15 +300,15 @@ class LocalSendReceiver(
         output.flush()
     }
 
-    private fun readLine(input: BufferedInputStream): String? {
-        val bytes = ArrayList<Byte>()
-        while (bytes.size < MAX_HEADER_LINE) {
+    private fun readLine(input: BufferedInputStream, buffer: ByteArrayOutputStream): String? {
+        buffer.reset()
+        while (buffer.size() < MAX_HEADER_LINE) {
             val value = input.read()
             if (value < 0) return null
             if (value == '\n'.code) break
-            if (value != '\r'.code) bytes += value.toByte()
+            if (value != '\r'.code) buffer.write(value)
         }
-        return bytes.toByteArray().toString(Charsets.ISO_8859_1)
+        return buffer.toString("ISO-8859-1")
     }
 
     private fun readExactly(input: BufferedInputStream, length: Long): ByteArray {
@@ -339,6 +341,7 @@ class LocalSendReceiver(
 
     companion object {
         private const val MAX_HEADER_LINE = 16 * 1024
+        private const val INITIAL_HEADER_LINE_CAPACITY = 256
         private const val MAX_REQUEST_BYTES = 4L * 1024L * 1024L
 
         fun sanitizeIncomingName(raw: String): String {

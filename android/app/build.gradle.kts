@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.Exec
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -14,17 +15,25 @@ val zmanagerRoot = providers.environmentVariable("ZMANAGER_DIR")
     .map(mobileRoot::resolve)
     .map { it.canonicalFile }
     .get()
-val generatedJniDir = project.file("src/main/jniLibs/arm64-v8a")
+// Keep in sync with the default ABI set in scripts/build-android-rust.sh.
+// x86_64 is deliberately not a default: see that script for why it currently
+// fails to link.
+val androidAbis = (System.getenv("ZMANAGER_ANDROID_ABIS") ?: "arm64-v8a").split(" ")
+val jniLibsDir = project.file("src/main/jniLibs")
 
 val buildZmanagerFfi by tasks.registering(Exec::class) {
-    description = "Build the pinned zmanager-ffi Android library."
+    description = "Build the pinned zmanager-ffi Android library for every configured ABI."
     group = "build"
     workingDir(mobileRoot)
     inputs.dir(zmanagerRoot.resolve("crates"))
     inputs.files(zmanagerRoot.resolve("Cargo.toml"), zmanagerRoot.resolve("Cargo.lock"))
     outputs.files(
-        generatedJniDir.resolve("libzmanager_ffi.so"),
-        generatedJniDir.resolve("libc++_shared.so")
+        androidAbis.flatMap { abi ->
+            listOf(
+                jniLibsDir.resolve("$abi/libzmanager_ffi.so"),
+                jniLibsDir.resolve("$abi/libc++_shared.so")
+            )
+        }
     )
     commandLine("bash", mobileRoot.resolve("scripts/build-android-rust.sh").absolutePath)
 }
@@ -32,6 +41,22 @@ val buildZmanagerFfi by tasks.registering(Exec::class) {
 tasks.named("preBuild").configure {
     dependsOn(buildZmanagerFfi)
 }
+
+// Release signing is never checked in. Populate android/local.properties
+// (already gitignored, already the standard per-machine Android config file)
+// with RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS /
+// RELEASE_KEY_PASSWORD, or set the ZMANAGER_RELEASE_* environment variables
+// for CI. Neither present means the release build type is left unsigned
+// rather than failing Gradle configuration.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
+}
+
+fun signingProperty(key: String): String? =
+    localProperties.getProperty("RELEASE_$key") ?: System.getenv("ZMANAGER_RELEASE_$key")
 
 android {
     namespace = "org.tzap.zmanager.mobile"
@@ -44,6 +69,35 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters += androidAbis
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val storeFilePath = signingProperty("STORE_FILE")
+            if (storeFilePath != null) {
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = signingProperty("STORE_PASSWORD")
+                keyAlias = signingProperty("KEY_ALIAS")
+                keyPassword = signingProperty("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (signingConfigs.getByName("release").storeFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     compileOptions {

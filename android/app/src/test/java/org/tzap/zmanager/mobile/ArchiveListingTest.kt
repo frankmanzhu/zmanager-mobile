@@ -52,6 +52,57 @@ class ArchiveListingTest {
     }
 
     @Test
+    fun loadReturnsEveryEntryPastThePreviousFiftyEntryCap() {
+        val entries = (0 until 300).map { index ->
+            ArchiveEntry(
+                path = "file-$index.txt",
+                kind = ArchiveEntryKind.FILE,
+                isDir = false,
+                size = 1UL,
+                compressedSize = null,
+                modifiedAt = null,
+                linkTarget = null
+            )
+        }
+        val repository = ArchiveListingRepository(
+            FakeArchiveBridgeGateway(
+                listing = ListArchiveResult(
+                    archivePath = "/cache/archive.zip",
+                    format = ArchiveFormat.ZIP,
+                    formatLabel = "ZIP",
+                    entries = entries,
+                    entryCount = 300UL,
+                    totalSize = 300UL,
+                    warnings = emptyList()
+                )
+            )
+        )
+
+        val state = repository.load(testImportedArchive(), password = null)
+
+        val summary = (state as ArchiveListingState.Ready).summary
+        assertEquals(300, summary.entries.size)
+        assertEquals("file-250.txt", summary.entries[250].path)
+    }
+
+    @Test
+    fun filteredSortedEntriesSearchesTheFullSetNotJustAWindow() {
+        val entries = (0 until 300).map { index -> testEntry(id = "$index", path = "file-$index.txt") } +
+            testEntry(id = "needle", path = "needle-past-the-window.txt")
+        val summary = ArchiveListingSummary(
+            formatLabel = "ZIP",
+            entryCount = entries.size.toULong(),
+            totalSize = null,
+            entries = entries,
+            warnings = emptyList()
+        )
+
+        val filtered = summary.filteredSortedEntries("needle", ArchiveEntrySort.PATH_ASCENDING)
+
+        assertEquals(listOf("needle-past-the-window.txt"), filtered.map { it.path })
+    }
+
+    @Test
     fun loadMapsPasswordErrorsToPasswordRequiredState() {
         val repository = ArchiveListingRepository(
             FakeArchiveBridgeGateway(

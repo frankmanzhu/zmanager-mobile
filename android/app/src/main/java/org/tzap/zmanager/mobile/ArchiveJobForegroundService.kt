@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -79,18 +80,45 @@ object ArchiveJobForegroundService {
     // newer releases. Stop before that boundary so the app can report a
     // deterministic timeout and clean its Rust staging state.
     private const val JOB_TIMEOUT_MILLIS = 5L * 60L * 60L * 1000L
+    // startForegroundService normally reaches onStartCommand within
+    // milliseconds. This is a defense-in-depth ceiling for the rare case
+    // where the call succeeds but the process is killed before the service
+    // takes its request, not an expected wait.
+    private const val PENDING_REQUEST_GRACE_MILLIS = 30_000L
 
-    private val requests = ConcurrentHashMap<String, ArchiveForegroundRequest>()
+    private data class PendingRequest(val request: ArchiveForegroundRequest, val submittedAtMillis: Long)
+
+    private val requests = ConcurrentHashMap<String, PendingRequest>()
     @Volatile
     private var serviceAlive = false
 
-    fun submit(context: Context, request: ArchiveForegroundRequest): String {
+    /**
+     * [startService] is injectable for tests; production always starts the
+     * real foreground service.
+     */
+    fun submit(
+        context: Context,
+        request: ArchiveForegroundRequest,
+        startService: (Context, Intent) -> Unit = ContextCompat::startForegroundService
+    ): String {
+        sweepStalePendingRequests()
         val token = UUID.randomUUID().toString()
-        requests[token] = request
+        requests[token] = PendingRequest(request, SystemClock.elapsedRealtime())
         val intent = Intent(context, Service::class.java)
             .putExtra(EXTRA_REQUEST_TOKEN, token)
-        ContextCompat.startForegroundService(context, intent)
+        runCatching { startService(context, intent) }.onFailure {
+            // The service never reached onStartCommand, so takeRequest will
+            // never run for this token. Remove the password-bearing request
+            // here instead of leaving it in this process-lifetime map.
+            requests.remove(token)
+            throw it
+        }
         return token
+    }
+
+    private fun sweepStalePendingRequests() {
+        val cutoff = SystemClock.elapsedRealtime() - PENDING_REQUEST_GRACE_MILLIS
+        requests.entries.removeIf { it.value.submittedAtMillis < cutoff }
     }
 
     fun cancel(context: Context, token: String) {
@@ -101,7 +129,7 @@ object ArchiveJobForegroundService {
         )
     }
 
-    internal fun takeRequest(token: String): ArchiveForegroundRequest? = requests.remove(token)
+    internal fun takeRequest(token: String): ArchiveForegroundRequest? = requests.remove(token)?.request
 
     /**
      * Converts a service process death into a visible, retryable terminal
@@ -282,7 +310,7 @@ object ArchiveJobForegroundService {
             serviceScope.launch {
             try {
                     val timeoutMillis = (request as? ArchiveForegroundRequest.Extract)
-                        ?.request?.debugTimeoutMillis
+                        ?.request?.pacer?.timeoutBudgetMillis
                         ?: JOB_TIMEOUT_MILLIS
                     withTimeout(timeoutMillis) {
                         when (request) {
@@ -372,15 +400,13 @@ object ArchiveJobForegroundService {
             )
             try {
                 val jobId = coordinator.start(review)
-                val debugCancellationRequested = AtomicBoolean(false)
+                val cancellationRequestedBeforeStart = AtomicBoolean(false)
                 cancelActive = {
-                    if (request.debugDelayMillis > 0L) debugCancellationRequested.set(true)
+                    cancellationRequestedBeforeStart.set(true)
                     runCatching { coordinator.cancel(jobId) }
                 }
-                if (request.debugDelayMillis > 0L) {
-                    delay(request.debugDelayMillis.coerceIn(0L, 30_000L))
-                }
-                if (debugCancellationRequested.get()) {
+                request.pacer.beforeStart()
+                if (cancellationRequestedBeforeStart.get()) {
                     coordinator.discard(review)
                     sendResult(ArchiveForegroundResult(token, KIND_EXTRACT, "CANCELLED"))
                     return
@@ -388,7 +414,7 @@ object ArchiveJobForegroundService {
                 val outcome = coordinator.awaitCompletion(
                     review,
                     jobId,
-                    debugDelayMillis = request.debugDelayMillis
+                    pacer = request.pacer
                 ) { updateNotification("Extracting archive") }
                 when (outcome) {
                 is ExtractionOutcome.Completed -> sendResult(

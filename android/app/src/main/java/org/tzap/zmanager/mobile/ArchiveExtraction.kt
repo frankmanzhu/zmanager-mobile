@@ -3,7 +3,6 @@ package org.tzap.zmanager.mobile
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import kotlinx.coroutines.delay
 import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
 import org.tzap.zmanager.mobile.bridge.generated.MobileJobStatus
 import org.tzap.zmanager.mobile.bridge.generated.PlanExtractResult
@@ -75,9 +74,7 @@ data class ArchiveExtractionRequest(
     val password: String?,
     val collisionPolicy: ExtractionCollisionPolicy,
     /** Debug/device-E2E pacing only; archive work remains Rust-owned. */
-    val debugDelayMillis: Long = 0L,
-    /** Debug/device-E2E timeout only; production uses the service budget. */
-    val debugTimeoutMillis: Long? = null
+    val pacer: JobPacer = NoOpJobPacer
 )
 
 data class ExtractionProgress(
@@ -132,8 +129,7 @@ class ArchiveExtractionCoordinator(
         destination: ExtractionDestination,
         password: String?,
         collisionPolicy: ExtractionCollisionPolicy = ExtractionCollisionPolicy.REFUSE,
-        debugDelayMillis: Long = 0L,
-        debugTimeoutMillis: Long? = null
+        pacer: JobPacer = NoOpJobPacer
     ): ExtractionReview {
         val id = UUID.randomUUID().toString()
         val stagingRoot = File(context.cacheDir, "extractions/$id/staging")
@@ -147,8 +143,7 @@ class ArchiveExtractionCoordinator(
             destination = destination,
             password = password,
             collisionPolicy = collisionPolicy,
-            debugDelayMillis = debugDelayMillis.coerceIn(0L, 30_000L),
-            debugTimeoutMillis = debugTimeoutMillis?.coerceIn(1L, 30_000L)
+            pacer = pacer
         )
         val plan = bridge.planExtract(
             archivePath = archive.localPath,
@@ -192,15 +187,14 @@ class ArchiveExtractionCoordinator(
     suspend fun awaitCompletion(
         review: ExtractionReview,
         jobId: String,
-        debugDelayMillis: Long = review.request?.debugDelayMillis ?: 0L,
+        pacer: JobPacer = review.request?.pacer ?: NoOpJobPacer,
         onProgress: (ExtractionProgress) -> Unit
     ): ExtractionOutcome {
         val session = sessions[review.id] ?: return ExtractionOutcome.Failed("The extraction session expired.")
-        var cursor = 0UL
-        while (true) {
-            val update = bridge.pollJob(jobId, cursor)
-            cursor = update.nextCursor
-            update.events.lastOrNull()?.let { event ->
+        return pollJobUntilTerminal(
+            poll = { cursor -> bridge.pollJob(jobId, cursor) },
+            pacer = pacer,
+            onEvent = { event ->
                 onProgress(
                     ExtractionProgress(
                         message = event.message ?: event.path ?: "Extracting archive",
@@ -210,12 +204,9 @@ class ArchiveExtractionCoordinator(
                         totalEntries = event.totalEntries
                     )
                 )
-            }
-            if (!update.isTerminal && debugDelayMillis > 0L) {
-                delay(debugDelayMillis.coerceIn(0L, 30_000L))
-            }
-            if (update.isTerminal) {
-                return when (update.status) {
+            },
+            onTerminal = { update ->
+                when (update.status) {
                     MobileJobStatus.COMPLETED -> commitCompletedSession(review, session)
                     MobileJobStatus.CANCELLED -> {
                         discard(review)
@@ -233,8 +224,7 @@ class ArchiveExtractionCoordinator(
                     }
                 }
             }
-            delay(150)
-        }
+        )
     }
 
     fun cancel(jobId: String) {

@@ -3,7 +3,6 @@ package org.tzap.zmanager.mobile
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import kotlinx.coroutines.delay
 import org.tzap.zmanager.mobile.bridge.generated.CreateArchiveFormat
 import org.tzap.zmanager.mobile.bridge.generated.MobileJobStatus
 import org.tzap.zmanager.mobile.bridge.generated.PlanCreateRequest
@@ -487,11 +486,9 @@ class ArchiveCreationCoordinator(
     ): ArchiveCreationOutcome {
         val request = sessions[review.id]
             ?: return ArchiveCreationOutcome.Failed("The creation session expired.")
-        var cursor = 0UL
-        while (true) {
-            val update = bridge.pollJob(jobId, cursor)
-            cursor = update.nextCursor
-            update.events.lastOrNull()?.let { event ->
+        return pollJobUntilTerminal(
+            poll = { cursor -> bridge.pollJob(jobId, cursor) },
+            onEvent = { event ->
                 onProgress(
                     ArchiveCreationProgress(
                         message = event.message ?: event.path ?: "Creating archive",
@@ -501,9 +498,9 @@ class ArchiveCreationCoordinator(
                         totalEntries = event.totalEntries
                     )
                 )
-            }
-            if (update.isTerminal) {
-                return when (update.status) {
+            },
+            onTerminal = { update ->
+                when (update.status) {
                     MobileJobStatus.COMPLETED -> {
                         val verified = request.verifyAfterCreate &&
                             update.terminalSummary?.verified == true
@@ -529,8 +526,7 @@ class ArchiveCreationCoordinator(
                     }
                 }
             }
-            delay(150)
-        }
+        )
     }
 
     fun cancel(jobId: String) {

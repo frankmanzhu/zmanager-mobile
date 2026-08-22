@@ -1,5 +1,6 @@
 package org.tzap.zmanager.mobile
 
+import org.json.JSONArray
 import org.json.JSONObject
 import android.net.Uri
 import java.io.File
@@ -45,6 +46,58 @@ class ArchiveExtractionTest {
         assertThrows(IllegalArgumentException::class.java) {
             ExtractionPathSafety.relativePath(java.io.File("/tmp/outside.txt"), root)
         }
+    }
+
+    @Test
+    fun extractionPathSafetyAgreesWithTheSharedFixtureTable() {
+        val cases = JSONObject(sharedFixtureTableFile().readText()).getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val name = case.getString("name")
+            val root = Files.createTempDirectory("zmanager-path-safety-$name").toFile()
+            try {
+                (if (case.isNull("createFile")) null else case.getString("createFile"))?.let { relative ->
+                    File(root, relative).apply {
+                        parentFile?.mkdirs()
+                        writeText("fixture")
+                    }
+                }
+                case.optJSONObject("symlink")?.let { symlink ->
+                    val link = File(root, symlink.getString("link"))
+                    link.parentFile?.mkdirs()
+                    Files.createSymbolicLink(link.toPath(), java.nio.file.Path.of(symlink.getString("target")))
+                }
+                val input = case.getString("input")
+                val file = when {
+                    input == "@root" -> root
+                    input.startsWith("@sibling/") ->
+                        File(root.parentFile, "zmanager-path-safety-sibling-$name/" + input.removePrefix("@sibling/"))
+                    else -> File(root, input)
+                }
+                val expected = if (case.isNull("expected")) null else case.getString("expected")
+                if (expected == null) {
+                    assertThrows("case '$name' should have been rejected", IllegalArgumentException::class.java) {
+                        ExtractionPathSafety.relativePath(file, root)
+                    }
+                } else {
+                    assertEquals("case '$name'", expected, ExtractionPathSafety.relativePath(file, root))
+                }
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+    }
+
+    private fun sharedFixtureTableFile(): File {
+        var candidate = File(".").absoluteFile.normalize()
+        repeat(6) {
+            val fixture = File(candidate, "fixtures/metadata/extraction-path-safety.json")
+            if (fixture.isFile) return fixture
+            candidate = candidate.parentFile ?: return@repeat
+        }
+        throw IllegalStateException(
+            "Could not find fixtures/metadata/extraction-path-safety.json above ${File(".").absoluteFile}"
+        )
     }
 
     @Test

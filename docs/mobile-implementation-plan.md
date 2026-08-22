@@ -14,6 +14,11 @@ The follow-up plan for nested archive browsing, archive-folder repackaging, and
 LocalSend-compatible local-network sharing is in
 [mobile-follow-up-implementation-plan.md](mobile-follow-up-implementation-plan.md).
 
+Defects and structural debt found in code review, including the LocalSend
+receive-path security gaps, the silent listing truncation, and the Compose and
+SwiftUI state-holder work, are tracked in
+[mobile-code-health-remediation-plan.md](mobile-code-health-remediation-plan.md).
+
 The current implementation checkpoint and remaining launch gates are tracked in
 [mobile-format-matrix.md](mobile-format-matrix.md) and
 [mobile-extraction-ui-e2e-plan.md](mobile-extraction-ui-e2e-plan.md). These

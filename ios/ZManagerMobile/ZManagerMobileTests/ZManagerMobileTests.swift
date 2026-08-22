@@ -101,6 +101,73 @@ final class ZManagerMobileTests: XCTestCase {
         ))
     }
 
+    func testExtractionPathSafetyAgreesWithTheSharedFixtureTable() throws {
+        let fixtureURL = try sharedPathSafetyFixtureTableURL()
+        let table = try JSONDecoder().decode(PathSafetyFixtureTable.self, from: Data(contentsOf: fixtureURL))
+        let fileManager = FileManager.default
+
+        for testCase in table.cases {
+            let root = fileManager.temporaryDirectory
+                .appendingPathComponent("zmanager-path-safety-\(testCase.name)-\(UUID().uuidString)", isDirectory: true)
+            try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? fileManager.removeItem(at: root) }
+
+            if let createFile = testCase.createFile {
+                let target = root.appendingPathComponent(createFile)
+                try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data("fixture".utf8).write(to: target)
+            }
+            if let symlink = testCase.symlink {
+                let link = root.appendingPathComponent(symlink.link)
+                try fileManager.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fileManager.createSymbolicLink(atPath: link.path, withDestinationPath: symlink.target)
+            }
+
+            let fileURL: URL
+            if testCase.input == "@root" {
+                fileURL = root
+            } else if testCase.input.hasPrefix("@sibling/") {
+                let rest = String(testCase.input.dropFirst("@sibling/".count))
+                fileURL = root.deletingLastPathComponent()
+                    .appendingPathComponent("zmanager-path-safety-sibling-\(testCase.name)")
+                    .appendingPathComponent(rest)
+            } else {
+                fileURL = root.appendingPathComponent(testCase.input)
+            }
+
+            if let expected = testCase.expected {
+                let actual = try ExtractionPathSafety.relativePath(for: fileURL, under: root)
+                XCTAssertEqual(actual, expected, "case '\(testCase.name)'")
+            } else {
+                XCTAssertThrowsError(
+                    try ExtractionPathSafety.relativePath(for: fileURL, under: root),
+                    "case '\(testCase.name)' should have been rejected"
+                )
+            }
+        }
+    }
+
+    func testNoOpJobPacerNeverDelays() async {
+        let start = DispatchTime.now()
+        await NoOpJobPacer().beforePoll(isTerminal: false)
+        let elapsedMillis = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+        XCTAssertLessThan(elapsedMillis, 40, "expected no delay, elapsed=\(elapsedMillis)ms")
+    }
+
+    func testDelayingJobPacerDelaysBeforeNonTerminalPollsOnly() async {
+        let pacer = DelayingJobPacer(delayNanoseconds: 50_000_000)
+
+        let nonTerminalStart = DispatchTime.now()
+        await pacer.beforePoll(isTerminal: false)
+        let nonTerminalElapsed = Double(DispatchTime.now().uptimeNanoseconds - nonTerminalStart.uptimeNanoseconds) / 1_000_000
+        XCTAssertGreaterThanOrEqual(nonTerminalElapsed, 40, "expected a non-terminal poll to delay, elapsed=\(nonTerminalElapsed)ms")
+
+        let terminalStart = DispatchTime.now()
+        await pacer.beforePoll(isTerminal: true)
+        let terminalElapsed = Double(DispatchTime.now().uptimeNanoseconds - terminalStart.uptimeNanoseconds) / 1_000_000
+        XCTAssertLessThan(terminalElapsed, 40, "expected a terminal poll not to delay, elapsed=\(terminalElapsed)ms")
+    }
+
     func testLocalSendTrustStorePersistsExplicitFingerprintOnly() {
         let suiteName = "ZManagerMobileTests.localsend-trust"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -246,6 +313,113 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertEqual(summary.entryCount, 1)
         XCTAssertEqual(summary.entries.first?.path, "readme.txt")
         XCTAssertEqual(summary.entries.first?.displayName, "readme.txt")
+    }
+
+    func testArchiveListingLoaderReturnsEveryEntryPastThePreviousFiftyEntryCap() {
+        let entries = (0..<300).map { index in
+            ArchiveEntry(
+                path: "file-\(index).txt",
+                kind: .file,
+                isDir: false,
+                size: 1,
+                compressedSize: nil,
+                modifiedAt: nil,
+                linkTarget: nil
+            )
+        }
+        let loader = ArchiveListingLoader(
+            bridge: FakeArchiveBridgeClient(
+                listing: ListArchiveResult(
+                    archivePath: "/cache/archive.zip",
+                    format: .zip,
+                    formatLabel: "ZIP",
+                    entries: entries,
+                    entryCount: 300,
+                    totalSize: 300,
+                    warnings: []
+                )
+            )
+        )
+
+        let state = loader.load(archive: testImportedArchive(), password: nil)
+
+        guard case .ready(let summary) = state else {
+            return XCTFail("Expected ready listing state.")
+        }
+        XCTAssertEqual(summary.entries.count, 300)
+        XCTAssertEqual(summary.entries[250].path, "file-250.txt")
+    }
+
+    func testFilteredSortedEntriesSearchesTheFullSetNotJustAWindow() {
+        let entries = (0..<300).map { index in testEntry(id: "\(index)", path: "file-\(index).txt") } +
+            [testEntry(id: "needle", path: "needle-past-the-window.txt")]
+        let summary = ArchiveListingSummary(
+            formatLabel: "ZIP",
+            entryCount: UInt64(entries.count),
+            totalSize: nil,
+            entries: entries,
+            warnings: []
+        )
+
+        let filtered = summary.filteredSortedEntries(searchQuery: "needle", sort: .pathAscending)
+
+        XCTAssertEqual(filtered.map(\.path), ["needle-past-the-window.txt"])
+    }
+
+    @MainActor
+    func testExtractionSelectedPathsReturnsEmptyListOnlyAfterSelectEverything() {
+        let session = ArchiveSessionModel()
+        let entries = [testEntry(id: "1", path: "a.txt"), testEntry(id: "2", path: "b.txt")]
+        let summary = ArchiveListingSummary(
+            formatLabel: "ZIP",
+            entryCount: 2,
+            totalSize: nil,
+            entries: entries,
+            warnings: []
+        )
+
+        session.selectEverything(summary)
+
+        XCTAssertTrue(session.selectedEverything)
+        XCTAssertEqual(session.selectedEntryIds, Set(["1", "2"]))
+    }
+
+    @MainActor
+    func testTogglingAnEntryClearsTheSelectEverythingFlag() {
+        let session = ArchiveSessionModel()
+        let entries = [testEntry(id: "1", path: "a.txt"), testEntry(id: "2", path: "b.txt")]
+        let summary = ArchiveListingSummary(
+            formatLabel: "ZIP",
+            entryCount: 2,
+            totalSize: nil,
+            entries: entries,
+            warnings: []
+        )
+        session.selectEverything(summary)
+
+        session.toggleEntrySelected(entries[0])
+
+        XCTAssertFalse(session.selectedEverything)
+        XCTAssertEqual(session.selectedEntryIds, Set(["2"]))
+    }
+
+    @MainActor
+    func testClearSelectionResetsTheSelectEverythingFlag() {
+        let session = ArchiveSessionModel()
+        let entries = [testEntry(id: "1", path: "a.txt")]
+        let summary = ArchiveListingSummary(
+            formatLabel: "ZIP",
+            entryCount: 1,
+            totalSize: nil,
+            entries: entries,
+            warnings: []
+        )
+        session.selectEverything(summary)
+
+        session.clearSelection()
+
+        XCTAssertFalse(session.selectedEverything)
+        XCTAssertTrue(session.selectedEntryIds.isEmpty)
     }
 
     func testArchiveListingLoaderMapsPasswordRequired() {
@@ -498,7 +672,8 @@ final class ZManagerMobileTests: XCTestCase {
                 format: .zip
             )
         )
-        let model = ArchiveImportModel(creationCoordinator: coordinator)
+        let session = ArchiveSessionModel(creationCoordinator: coordinator)
+        let model = ArchiveCreationModel(session: session)
 
         model.startSeparateCreation(review)
         try await Task.sleep(nanoseconds: 800_000_000)
@@ -526,7 +701,8 @@ final class ZManagerMobileTests: XCTestCase {
                 format: .zip
             )
         )
-        let model = ArchiveImportModel(creationCoordinator: coordinator)
+        let session = ArchiveSessionModel(creationCoordinator: coordinator)
+        let model = ArchiveCreationModel(session: session)
         model.creationState = .separateReview(review)
 
         model.handleSceneBackground()
@@ -746,29 +922,46 @@ final class ZManagerMobileTests: XCTestCase {
 
     @MainActor
     func testSceneBackgroundClearsTransientPasswords() {
-        let model = ArchiveImportModel()
-        model.passwordInput = "archive-password"
-        model.previewPasswordInput = "preview-password"
-        model.testPasswordInput = "test-password"
-        model.extractionPasswordInput = "extract-password"
-        model.creationPasswordInput = "create-password"
-        model.repackagingPasswordInput = "repackage-password"
-        model.localSendPinInput = "1234"
+        let session = ArchiveSessionModel()
+        let listing = ArchiveListingModel(session: session)
+        let extraction = ArchiveExtractionModel(session: session)
+        let creation = ArchiveCreationModel(session: session)
+        let repackaging = ArchiveRepackagingModel(session: session, creation: creation)
+        let batchExtraction = ArchiveBatchExtractionModel(session: session)
+        let localSend = ArchiveLocalSendModel(session: session)
 
-        model.handleSceneBackground()
+        session.passwordInput = "archive-password"
+        listing.previewPasswordInput = "preview-password"
+        listing.testPasswordInput = "test-password"
+        extraction.extractionPasswordInput = "extract-password"
+        creation.creationPasswordInput = "create-password"
+        repackaging.repackagingPasswordInput = "repackage-password"
+        localSend.localSendPinInput = "1234"
 
-        XCTAssertTrue(model.passwordInput.isEmpty)
-        XCTAssertTrue(model.previewPasswordInput.isEmpty)
-        XCTAssertTrue(model.testPasswordInput.isEmpty)
-        XCTAssertTrue(model.extractionPasswordInput.isEmpty)
-        XCTAssertTrue(model.creationPasswordInput.isEmpty)
-        XCTAssertTrue(model.repackagingPasswordInput.isEmpty)
-        XCTAssertTrue(model.localSendPinInput.isEmpty)
+        ArchiveSceneBackgroundCoordinator.handle(
+            session: session,
+            listing: listing,
+            extraction: extraction,
+            creation: creation,
+            repackaging: repackaging,
+            batchExtraction: batchExtraction,
+            localSend: localSend
+        )
+
+        XCTAssertTrue(session.passwordInput.isEmpty)
+        XCTAssertTrue(listing.previewPasswordInput.isEmpty)
+        XCTAssertTrue(listing.testPasswordInput.isEmpty)
+        XCTAssertTrue(extraction.extractionPasswordInput.isEmpty)
+        XCTAssertTrue(creation.creationPasswordInput.isEmpty)
+        XCTAssertTrue(repackaging.repackagingPasswordInput.isEmpty)
+        XCTAssertTrue(localSend.localSendPinInput.isEmpty)
     }
 
     @MainActor
     func testSceneBackgroundStopsLocalSendReceiver() {
-        let model = ArchiveImportModel(
+        let session = ArchiveSessionModel()
+        let model = ArchiveLocalSendModel(
+            session: session,
             localSendReceiver: LocalSendReceiver(port: 53318)
         )
         model.startLocalReceive()
@@ -790,7 +983,8 @@ final class ZManagerMobileTests: XCTestCase {
         try Data("temporary transfer".utf8).write(to: source)
         defer { try? FileManager.default.removeItem(at: source) }
 
-        let model = ArchiveImportModel()
+        let session = ArchiveSessionModel()
+        let model = ArchiveLocalSendModel(session: session)
         model.handleLocalSendFilesResult(.success([source]))
         XCTAssertEqual(model.localSendSelectedFileCount, 1)
 
@@ -1172,7 +1366,7 @@ final class ZManagerMobileTests: XCTestCase {
         var cursor: UInt64 = 0
         var terminal = false
         for _ in 0..<100 {
-            let update = try bridge.pollExtractionJob(jobId: job.jobId, cursor: cursor)
+            let update = try bridge.pollJob(jobId: job.jobId, cursor: cursor)
             cursor = update.nextCursor
             if update.isTerminal {
                 XCTAssertEqual(update.status, .completed)
@@ -1319,6 +1513,22 @@ final class ZManagerMobileTests: XCTestCase {
             localPath: "/cache/archive.zip",
             byteSize: 12,
             importedAt: Date(timeIntervalSince1970: 0)
+        )
+    }
+
+    private func sharedPathSafetyFixtureTableURL() throws -> URL {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<8 {
+            let fixture = candidate.appendingPathComponent("fixtures/metadata/extraction-path-safety.json")
+            if FileManager.default.fileExists(atPath: fixture.path) {
+                return fixture
+            }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw NSError(
+            domain: "ZManagerMobileTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Could not find fixtures/metadata/extraction-path-safety.json above \(#filePath)"]
         )
     }
 
@@ -1570,7 +1780,7 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
         return StartJobResult(jobId: "job-id", kind: .zipExtract, status: .running)
     }
 
-    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+    func pollJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
         PollJobEventsResult(
             jobId: jobId,
             kind: .zipExtract,
@@ -1597,7 +1807,7 @@ private final class FakeArchiveBridgeClient: ArchiveBridgeClient {
         )
     }
 
-    func cancelExtractionJob(jobId: String) throws {}
+    func cancelJob(jobId: String) throws {}
 }
 
 private final class CreationFakeBridgeClient: ArchiveBridgeClient {
@@ -1654,7 +1864,7 @@ private final class CreationFakeBridgeClient: ArchiveBridgeClient {
         return StartJobResult(jobId: "create-job", kind: .zipCreate, status: .running)
     }
 
-    func pollExtractionJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
+    func pollJob(jobId: String, cursor: UInt64) throws -> PollJobEventsResult {
         pollCount += 1
         return PollJobEventsResult(
             jobId: jobId,
@@ -1693,4 +1903,21 @@ private final class CreationFakeBridgeClient: ArchiveBridgeClient {
             )
         )
     }
+}
+
+private struct PathSafetyFixtureTable: Decodable {
+    let cases: [PathSafetyFixtureCase]
+}
+
+private struct PathSafetyFixtureCase: Decodable {
+    let name: String
+    let createFile: String?
+    let symlink: PathSafetyFixtureSymlink?
+    let input: String
+    let expected: String?
+}
+
+private struct PathSafetyFixtureSymlink: Decodable {
+    let link: String
+    let target: String
 }

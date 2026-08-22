@@ -3,15 +3,63 @@ package org.tzap.zmanager.mobile
 import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
 
 @RunWith(RobolectricTestRunner::class)
 class ArchiveJobForegroundServiceTest {
+
+    private fun sampleExtractRequest() = ArchiveForegroundRequest.Extract(
+        ArchiveExtractionRequest(
+            archive = ImportedArchive("archive", "archive.zip", "/cache/archive.zip", 1L, "application/zip", 0L),
+            selectedPaths = emptyList(),
+            destination = ExtractionDestination.AppStorage(java.io.File("/cache/out")),
+            password = "super-secret",
+            collisionPolicy = ExtractionCollisionPolicy.REFUSE
+        )
+    )
+
+    @Test
+    fun submitRemovesPendingRequestWhenServiceFailsToStart() {
+        val context = RuntimeEnvironment.getApplication()
+        var capturedToken: String? = null
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            ArchiveJobForegroundService.submit(context, sampleExtractRequest()) { _, intent ->
+                capturedToken = intent.getStringExtra("requestToken")
+                throw IllegalStateException("Foreground service starts not allowed.")
+            }
+        }
+
+        assertEquals("Foreground service starts not allowed.", error.message)
+        assertNotNull("submit should have attempted to start the service", capturedToken)
+        assertNull(
+            "a request whose service failed to start must not remain retrievable",
+            ArchiveJobForegroundService.takeRequest(capturedToken!!)
+        )
+    }
+
+    @Test
+    fun submitReturnsRetrievableTokenWhenServiceStarts() {
+        val context = RuntimeEnvironment.getApplication()
+        val request = sampleExtractRequest()
+
+        val token = ArchiveJobForegroundService.submit(context, request) { _, _ -> }
+
+        assertEquals(request, ArchiveJobForegroundService.takeRequest(token))
+        assertNull(
+            "takeRequest must remove the entry so it cannot be retrieved twice",
+            ArchiveJobForegroundService.takeRequest(token)
+        )
+    }
     @Test
     fun savedOperationReportContainsNoCredentialFields() {
         val context = RuntimeEnvironment.getApplication()

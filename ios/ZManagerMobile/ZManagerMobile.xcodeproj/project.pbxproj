@@ -36,8 +36,8 @@
 		01A00000000000000000001B /* maestro-split.z01 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000120 /* maestro-split.z01 */; };
 		01A00000000000000000001C /* maestro-split.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000121 /* maestro-split.zip */; };
 		01A00000000000000000001D /* maestro-nested.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000122 /* maestro-nested.zip */; };
-		01A00000000000000000001F /* maestro-encrypted.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000125 /* maestro-encrypted.zip */; };
 		01A00000000000000000001E /* ZManagerMobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000123 /* ZManagerMobileUITests.swift */; };
+		01A00000000000000000001F /* maestro-encrypted.zip in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000125 /* maestro-encrypted.zip */; };
 		01A000000000000000000020 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000126 /* ShareViewController.swift */; };
 		01A000000000000000000021 /* ZManagerMobileShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000128 /* ZManagerMobileShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		01A000000000000000000030 /* maestro-files.tar.bz2 in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000130 /* maestro-files.tar.bz2 */; };
@@ -74,6 +74,29 @@
 		01A00000000000000000004F /* maestro-files.lha in Resources */ = {isa = PBXBuildFile; fileRef = 01A00000000000000000014F /* maestro-files.lha */; };
 		01A000000000000000000050 /* maestro-files.warc in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000150 /* maestro-files.warc */; };
 		01A000000000000000000051 /* maestro-files.mtree in Resources */ = {isa = PBXBuildFile; fileRef = 01A000000000000000000151 /* maestro-files.mtree */; };
+		14F511450B812CA16041F306 /* LocalSendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CB152D4313ECB0ADA7DDC21 /* LocalSendClient.swift */; };
+		15E20A90DC270C34D7535A4E /* ContentViewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F1BB2E3D383594C4A554DB /* ContentViewSupport.swift */; };
+		17A096835BDFB8129DC44B76 /* ArchiveRepackagingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BDE493E04534C495E9CD29D /* ArchiveRepackagingModel.swift */; };
+		18DA2915663E049DEC260E19 /* ArchiveListingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF7C1BA6CD998918A098403 /* ArchiveListingModel.swift */; };
+		192D69FDB07B55925B2C7E15 /* ArchiveBatchExtractionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 148952EB86D196A8E71D8CAA /* ArchiveBatchExtractionModel.swift */; };
+		388DE77EA983973C230D0BB0 /* LocalSendTrustStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CE681C776436FDA25865531 /* LocalSendTrustStore.swift */; };
+		3A11885022DECF5E224ED58B /* NestedArchiveNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107901E1907DA96998770CC6 /* NestedArchiveNavigation.swift */; };
+		41F248944C6F8A885DCE4DD1 /* ArchiveExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC149E7A41C7BF3C4DA85AD7 /* ArchiveExtraction.swift */; };
+		44F32C2767CAF2EFA9D4C504 /* ArchiveListing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4E9A76D1DA01AD553F173F /* ArchiveListing.swift */; };
+		4B0C469C1113BAE1CCD33940 /* ArchiveRepackaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745A1551BC6ED3F4BEC7D830 /* ArchiveRepackaging.swift */; };
+		545B22847AC213B08FAE633A /* ArchiveCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39D8866E23046436B200EB09 /* ArchiveCreation.swift */; };
+		62529C0794B44454FFF1CFC3 /* ArchiveRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78787C0AF388C2A7294A2A13 /* ArchiveRecovery.swift */; };
+		7D4C4CA57BE6BC19D7095EB6 /* JobPacer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE2FB3A3A8377BDE1841606 /* JobPacer.swift */; };
+		7E923785391A0D10AFBA6859 /* ArchiveCreationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A9D97DC592613F36ED3DDE /* ArchiveCreationModel.swift */; };
+		8DF0ACEAB9DD255BC946E33A /* ArchiveImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971E41245C23F5E909332EE7 /* ArchiveImport.swift */; };
+		8FEDB2AA78D1D4AEA8EE6127 /* LocalSendReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BCB1BCFC1DDC7424064D50 /* LocalSendReceiver.swift */; };
+		9161CFC2B050C597733D14BA /* JobPollDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B525982A79BDEEB159AA40 /* JobPollDriver.swift */; };
+		92380470C33A0DC372AB2C9D /* ArchiveLocalSendModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC5C911FAE655C2C0B838B8 /* ArchiveLocalSendModel.swift */; };
+		ADE4B341E3BE0DF4B2332C70 /* LocalSendProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB23E1AB724ED10E74A46050 /* LocalSendProtocol.swift */; };
+		B71DBC6A2803A5D4F0F06936 /* LocalSendTls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E75221DEB9394A9FDEBFD4D /* LocalSendTls.swift */; };
+		E4AD132F55606B87E9105B57 /* ArchiveSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 262BC9592A50A4C255060FC1 /* ArchiveSessionModel.swift */; };
+		F4A3098219F7FCDB94DCBDF6 /* ArchiveSceneBackgroundCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141F5021415BC535E48C49CA /* ArchiveSceneBackgroundCoordinator.swift */; };
+		F94F33F8E5D69DE9F0777CAE /* ArchiveExtractionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D3DB03B04DBC45691EF7BBC /* ArchiveExtractionModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,7 +107,35 @@
 			remoteGlobalIDString = 01A000000000000000000401;
 			remoteInfo = ZManagerMobile;
 		};
+		01A000000000000000000203 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 01A000000000000000000301 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 01A000000000000000000401;
+			remoteInfo = ZManagerMobile;
+		};
+		01A000000000000000000205 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 01A000000000000000000301 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 01A000000000000000000404;
+			remoteInfo = ZManagerMobileShareExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		01A000000000000000000906 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				01A000000000000000000021 /* ZManagerMobileShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		01A000000000000000000101 /* ZManagerMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileApp.swift; sourceTree = "<group>"; };
@@ -97,70 +148,93 @@
 		01A000000000000000000108 /* zmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = zmanager.swift; sourceTree = "<group>"; };
 		01A000000000000000000109 /* zmanagerFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = zmanagerFFI.h; sourceTree = "<group>"; };
 		01A00000000000000000010A /* zmanagerFFI.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = zmanagerFFI.modulemap; sourceTree = "<group>"; };
-		01A00000000000000000010B /* maestro-files.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-files.zip; sourceTree = "<group>"; };
-		01A00000000000000000010C /* maestro-files.7z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.7z; sourceTree = "<group>"; };
-		01A00000000000000000010D /* maestro-files.tgz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = MaestroFixtures/maestro-files.tgz; sourceTree = "<group>"; };
-		01A00000000000000000010E /* maestro-files.tar.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.zst; sourceTree = "<group>"; };
-		01A00000000000000000010F /* maestro-files.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tzap; sourceTree = "<group>"; };
-		01A000000000000000000110 /* maestro-files.aar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.aar; sourceTree = "<group>"; };
-		01A000000000000000000111 /* maestro-files.cab */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.cab; sourceTree = "<group>"; };
-		01A000000000000000000112 /* maestro-files.deb */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.deb; sourceTree = "<group>"; };
-		01A000000000000000000113 /* maestro-split-rar.part1.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part1.rar; sourceTree = "<group>"; };
-		01A000000000000000000114 /* maestro-split-rar.part2.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part2.rar; sourceTree = "<group>"; };
-		01A000000000000000000115 /* maestro-split-rar.part3.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part3.rar; sourceTree = "<group>"; };
-		01A000000000000000000116 /* maestro-split-rar.part4.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part4.rar; sourceTree = "<group>"; };
-		01A000000000000000000117 /* maestro-split-rar.part5.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split-rar.part5.rar; sourceTree = "<group>"; };
-		01A000000000000000000118 /* maestro-split.7z.001 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.7z.001; sourceTree = "<group>"; };
-		01A000000000000000000119 /* maestro-split.7z.002 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.7z.002; sourceTree = "<group>"; };
-		01A00000000000000000011A /* maestro-split.vol000.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol000.tzap; sourceTree = "<group>"; };
-		01A00000000000000000011B /* maestro-split.vol001.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol001.tzap; sourceTree = "<group>"; };
-		01A00000000000000000011C /* maestro-split.vol002.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol002.tzap; sourceTree = "<group>"; };
-		01A00000000000000000011D /* maestro-split.vol003.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol003.tzap; sourceTree = "<group>"; };
-		01A00000000000000000011E /* maestro-split.vol004.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol004.tzap; sourceTree = "<group>"; };
-		01A00000000000000000011F /* maestro-split.vol005.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.vol005.tzap; sourceTree = "<group>"; };
-		01A000000000000000000120 /* maestro-split.z01 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-split.z01; sourceTree = "<group>"; };
-		01A000000000000000000121 /* maestro-split.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-split.zip; sourceTree = "<group>"; };
-		01A000000000000000000122 /* maestro-nested.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-nested.zip; sourceTree = "<group>"; };
-		01A000000000000000000125 /* maestro-encrypted.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = MaestroFixtures/maestro-encrypted.zip; sourceTree = "<group>"; };
+		01A00000000000000000010B /* maestro-files.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "MaestroFixtures/maestro-files.zip"; sourceTree = "<group>"; };
+		01A00000000000000000010C /* maestro-files.7z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.7z"; sourceTree = "<group>"; };
+		01A00000000000000000010D /* maestro-files.tgz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = "MaestroFixtures/maestro-files.tgz"; sourceTree = "<group>"; };
+		01A00000000000000000010E /* maestro-files.tar.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.zst"; sourceTree = "<group>"; };
+		01A00000000000000000010F /* maestro-files.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tzap"; sourceTree = "<group>"; };
+		01A000000000000000000110 /* maestro-files.aar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.aar"; sourceTree = "<group>"; };
+		01A000000000000000000111 /* maestro-files.cab */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.cab"; sourceTree = "<group>"; };
+		01A000000000000000000112 /* maestro-files.deb */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.deb"; sourceTree = "<group>"; };
+		01A000000000000000000113 /* maestro-split-rar.part1.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split-rar.part1.rar"; sourceTree = "<group>"; };
+		01A000000000000000000114 /* maestro-split-rar.part2.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split-rar.part2.rar"; sourceTree = "<group>"; };
+		01A000000000000000000115 /* maestro-split-rar.part3.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split-rar.part3.rar"; sourceTree = "<group>"; };
+		01A000000000000000000116 /* maestro-split-rar.part4.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split-rar.part4.rar"; sourceTree = "<group>"; };
+		01A000000000000000000117 /* maestro-split-rar.part5.rar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split-rar.part5.rar"; sourceTree = "<group>"; };
+		01A000000000000000000118 /* maestro-split.7z.001 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.7z.001"; sourceTree = "<group>"; };
+		01A000000000000000000119 /* maestro-split.7z.002 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.7z.002"; sourceTree = "<group>"; };
+		01A00000000000000000011A /* maestro-split.vol000.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol000.tzap"; sourceTree = "<group>"; };
+		01A00000000000000000011B /* maestro-split.vol001.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol001.tzap"; sourceTree = "<group>"; };
+		01A00000000000000000011C /* maestro-split.vol002.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol002.tzap"; sourceTree = "<group>"; };
+		01A00000000000000000011D /* maestro-split.vol003.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol003.tzap"; sourceTree = "<group>"; };
+		01A00000000000000000011E /* maestro-split.vol004.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol004.tzap"; sourceTree = "<group>"; };
+		01A00000000000000000011F /* maestro-split.vol005.tzap */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.vol005.tzap"; sourceTree = "<group>"; };
+		01A000000000000000000120 /* maestro-split.z01 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-split.z01"; sourceTree = "<group>"; };
+		01A000000000000000000121 /* maestro-split.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "MaestroFixtures/maestro-split.zip"; sourceTree = "<group>"; };
+		01A000000000000000000122 /* maestro-nested.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "MaestroFixtures/maestro-nested.zip"; sourceTree = "<group>"; };
 		01A000000000000000000123 /* ZManagerMobileUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZManagerMobileUITests.swift; sourceTree = "<group>"; };
 		01A000000000000000000124 /* ZManagerMobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZManagerMobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		01A000000000000000000125 /* maestro-encrypted.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "MaestroFixtures/maestro-encrypted.zip"; sourceTree = "<group>"; };
 		01A000000000000000000126 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
-		01A000000000000000000127 /* Share Extension Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		01A000000000000000000128 /* ZManagerMobileShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = ZManagerMobileShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		01A000000000000000000130 /* maestro-files.tar.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.bz2; sourceTree = "<group>"; };
-		01A000000000000000000131 /* maestro-files.tar.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.xz; sourceTree = "<group>"; };
-		01A000000000000000000132 /* maestro-files.tar.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lzma; sourceTree = "<group>"; };
-		01A000000000000000000133 /* maestro-files.tar.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lz; sourceTree = "<group>"; };
-		01A000000000000000000134 /* maestro-files.tar.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lzo; sourceTree = "<group>"; };
-		01A000000000000000000135 /* maestro-files.tar.z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.z; sourceTree = "<group>"; };
-		01A000000000000000000136 /* maestro-files.tar.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.lz4; sourceTree = "<group>"; };
-		01A000000000000000000137 /* maestro-files.tar.uu */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.tar.uu; sourceTree = "<group>"; };
-		01A000000000000000000138 /* maestro-stream.gz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = MaestroFixtures/maestro-stream.gz; sourceTree = "<group>"; };
-		01A000000000000000000139 /* maestro-stream.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.bz2; sourceTree = "<group>"; };
-		01A00000000000000000013A /* maestro-stream.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.xz; sourceTree = "<group>"; };
-		01A00000000000000000013B /* maestro-stream.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lzma; sourceTree = "<group>"; };
-		01A00000000000000000013C /* maestro-stream.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lz; sourceTree = "<group>"; };
-		01A00000000000000000013D /* maestro-stream.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lzo; sourceTree = "<group>"; };
-		01A00000000000000000013E /* maestro-stream.Z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.Z; sourceTree = "<group>"; };
-		01A00000000000000000013F /* maestro-stream.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.lz4; sourceTree = "<group>"; };
-		01A000000000000000000140 /* maestro-stream.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.zst; sourceTree = "<group>"; };
-		01A000000000000000000141 /* maestro-stream.br */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-stream.br; sourceTree = "<group>"; };
-		01A000000000000000000142 /* maestro-stream.uu */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-stream.uu; sourceTree = "<group>"; };
-		01A000000000000000000143 /* maestro-stream.b64 */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-stream.b64; sourceTree = "<group>"; };
-		01A000000000000000000144 /* maestro-files.cpio */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.cpio; sourceTree = "<group>"; };
-		01A000000000000000000145 /* maestro-files.xar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.xar; sourceTree = "<group>"; };
-		01A000000000000000000146 /* maestro-files.iso */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.iso; sourceTree = "<group>"; };
-		01A000000000000000000147 /* maestro-files.pkg */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.pkg; sourceTree = "<group>"; };
-		01A000000000000000000148 /* maestro-files.msi */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.msi; sourceTree = "<group>"; };
-		01A000000000000000000149 /* maestro-files.ar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.ar; sourceTree = "<group>"; };
-		01A00000000000000000014A /* maestro-files.dmg */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.dmg; sourceTree = "<group>"; };
-		01A00000000000000000014B /* maestro-files.vhd */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.vhd; sourceTree = "<group>"; };
-		01A00000000000000000014C /* maestro-files.vmdk */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.vmdk; sourceTree = "<group>"; };
-		01A00000000000000000014D /* maestro-files.udf */ = {isa = PBXFileReference; lastKnownFileType = disk; path = MaestroFixtures/maestro-files.udf; sourceTree = "<group>"; };
-		01A00000000000000000014E /* maestro-files.rpm */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.rpm; sourceTree = "<group>"; };
-		01A00000000000000000014F /* maestro-files.lha */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.lha; sourceTree = "<group>"; };
-		01A000000000000000000150 /* maestro-files.warc */ = {isa = PBXFileReference; lastKnownFileType = archive; path = MaestroFixtures/maestro-files.warc; sourceTree = "<group>"; };
-		01A000000000000000000151 /* maestro-files.mtree */ = {isa = PBXFileReference; lastKnownFileType = text; path = MaestroFixtures/maestro-files.mtree; sourceTree = "<group>"; };
+		01A000000000000000000127 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01A000000000000000000128 /* ZManagerMobileShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ZManagerMobileShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		01A000000000000000000130 /* maestro-files.tar.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.bz2"; sourceTree = "<group>"; };
+		01A000000000000000000131 /* maestro-files.tar.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.xz"; sourceTree = "<group>"; };
+		01A000000000000000000132 /* maestro-files.tar.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.lzma"; sourceTree = "<group>"; };
+		01A000000000000000000133 /* maestro-files.tar.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.lz"; sourceTree = "<group>"; };
+		01A000000000000000000134 /* maestro-files.tar.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.lzo"; sourceTree = "<group>"; };
+		01A000000000000000000135 /* maestro-files.tar.z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.z"; sourceTree = "<group>"; };
+		01A000000000000000000136 /* maestro-files.tar.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.lz4"; sourceTree = "<group>"; };
+		01A000000000000000000137 /* maestro-files.tar.uu */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.tar.uu"; sourceTree = "<group>"; };
+		01A000000000000000000138 /* maestro-stream.gz */ = {isa = PBXFileReference; lastKnownFileType = archive.gzip; path = "MaestroFixtures/maestro-stream.gz"; sourceTree = "<group>"; };
+		01A000000000000000000139 /* maestro-stream.bz2 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.bz2"; sourceTree = "<group>"; };
+		01A00000000000000000013A /* maestro-stream.xz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.xz"; sourceTree = "<group>"; };
+		01A00000000000000000013B /* maestro-stream.lzma */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.lzma"; sourceTree = "<group>"; };
+		01A00000000000000000013C /* maestro-stream.lz */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.lz"; sourceTree = "<group>"; };
+		01A00000000000000000013D /* maestro-stream.lzo */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.lzo"; sourceTree = "<group>"; };
+		01A00000000000000000013E /* maestro-stream.Z */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.Z"; sourceTree = "<group>"; };
+		01A00000000000000000013F /* maestro-stream.lz4 */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.lz4"; sourceTree = "<group>"; };
+		01A000000000000000000140 /* maestro-stream.zst */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.zst"; sourceTree = "<group>"; };
+		01A000000000000000000141 /* maestro-stream.br */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-stream.br"; sourceTree = "<group>"; };
+		01A000000000000000000142 /* maestro-stream.uu */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MaestroFixtures/maestro-stream.uu"; sourceTree = "<group>"; };
+		01A000000000000000000143 /* maestro-stream.b64 */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MaestroFixtures/maestro-stream.b64"; sourceTree = "<group>"; };
+		01A000000000000000000144 /* maestro-files.cpio */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.cpio"; sourceTree = "<group>"; };
+		01A000000000000000000145 /* maestro-files.xar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.xar"; sourceTree = "<group>"; };
+		01A000000000000000000146 /* maestro-files.iso */ = {isa = PBXFileReference; lastKnownFileType = disk; path = "MaestroFixtures/maestro-files.iso"; sourceTree = "<group>"; };
+		01A000000000000000000147 /* maestro-files.pkg */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.pkg"; sourceTree = "<group>"; };
+		01A000000000000000000148 /* maestro-files.msi */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.msi"; sourceTree = "<group>"; };
+		01A000000000000000000149 /* maestro-files.ar */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.ar"; sourceTree = "<group>"; };
+		01A00000000000000000014A /* maestro-files.dmg */ = {isa = PBXFileReference; lastKnownFileType = disk; path = "MaestroFixtures/maestro-files.dmg"; sourceTree = "<group>"; };
+		01A00000000000000000014B /* maestro-files.vhd */ = {isa = PBXFileReference; lastKnownFileType = disk; path = "MaestroFixtures/maestro-files.vhd"; sourceTree = "<group>"; };
+		01A00000000000000000014C /* maestro-files.vmdk */ = {isa = PBXFileReference; lastKnownFileType = disk; path = "MaestroFixtures/maestro-files.vmdk"; sourceTree = "<group>"; };
+		01A00000000000000000014D /* maestro-files.udf */ = {isa = PBXFileReference; lastKnownFileType = disk; path = "MaestroFixtures/maestro-files.udf"; sourceTree = "<group>"; };
+		01A00000000000000000014E /* maestro-files.rpm */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.rpm"; sourceTree = "<group>"; };
+		01A00000000000000000014F /* maestro-files.lha */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.lha"; sourceTree = "<group>"; };
+		01A000000000000000000150 /* maestro-files.warc */ = {isa = PBXFileReference; lastKnownFileType = archive; path = "MaestroFixtures/maestro-files.warc"; sourceTree = "<group>"; };
+		01A000000000000000000151 /* maestro-files.mtree */ = {isa = PBXFileReference; lastKnownFileType = text; path = "MaestroFixtures/maestro-files.mtree"; sourceTree = "<group>"; };
+		04A9D97DC592613F36ED3DDE /* ArchiveCreationModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveCreationModel.swift; sourceTree = "<group>"; };
+		0BC5C911FAE655C2C0B838B8 /* ArchiveLocalSendModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveLocalSendModel.swift; sourceTree = "<group>"; };
+		0BDE493E04534C495E9CD29D /* ArchiveRepackagingModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveRepackagingModel.swift; sourceTree = "<group>"; };
+		107901E1907DA96998770CC6 /* NestedArchiveNavigation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NestedArchiveNavigation.swift; sourceTree = "<group>"; };
+		141F5021415BC535E48C49CA /* ArchiveSceneBackgroundCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveSceneBackgroundCoordinator.swift; sourceTree = "<group>"; };
+		148952EB86D196A8E71D8CAA /* ArchiveBatchExtractionModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveBatchExtractionModel.swift; sourceTree = "<group>"; };
+		262BC9592A50A4C255060FC1 /* ArchiveSessionModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveSessionModel.swift; sourceTree = "<group>"; };
+		2D3DB03B04DBC45691EF7BBC /* ArchiveExtractionModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveExtractionModel.swift; sourceTree = "<group>"; };
+		2E75221DEB9394A9FDEBFD4D /* LocalSendTls.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalSendTls.swift; sourceTree = "<group>"; };
+		39D8866E23046436B200EB09 /* ArchiveCreation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveCreation.swift; sourceTree = "<group>"; };
+		3CB152D4313ECB0ADA7DDC21 /* LocalSendClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalSendClient.swift; sourceTree = "<group>"; };
+		56F1BB2E3D383594C4A554DB /* ContentViewSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentViewSupport.swift; sourceTree = "<group>"; };
+		69B525982A79BDEEB159AA40 /* JobPollDriver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JobPollDriver.swift; sourceTree = "<group>"; };
+		745A1551BC6ED3F4BEC7D830 /* ArchiveRepackaging.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveRepackaging.swift; sourceTree = "<group>"; };
+		78787C0AF388C2A7294A2A13 /* ArchiveRecovery.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveRecovery.swift; sourceTree = "<group>"; };
+		7C4E9A76D1DA01AD553F173F /* ArchiveListing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveListing.swift; sourceTree = "<group>"; };
+		7CE681C776436FDA25865531 /* LocalSendTrustStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalSendTrustStore.swift; sourceTree = "<group>"; };
+		8BF7C1BA6CD998918A098403 /* ArchiveListingModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveListingModel.swift; sourceTree = "<group>"; };
+		971E41245C23F5E909332EE7 /* ArchiveImport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveImport.swift; sourceTree = "<group>"; };
+		BEE2FB3A3A8377BDE1841606 /* JobPacer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JobPacer.swift; sourceTree = "<group>"; };
+		CC149E7A41C7BF3C4DA85AD7 /* ArchiveExtraction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArchiveExtraction.swift; sourceTree = "<group>"; };
+		DB23E1AB724ED10E74A46050 /* LocalSendProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalSendProtocol.swift; sourceTree = "<group>"; };
+		F1BCB1BCFC1DDC7424064D50 /* LocalSendReceiver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalSendReceiver.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -185,7 +259,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		01A000000000000000000504 /* Share Extension Frameworks */ = {
+		01A000000000000000000504 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -273,8 +347,46 @@
 				01A000000000000000000150 /* maestro-files.warc */,
 				01A000000000000000000151 /* maestro-files.mtree */,
 				01A000000000000000000605 /* Bridge */,
+				2E50C978876789E039132702 /* Support */,
+				3C0FD34EC399E9AB5BB970DB /* Import */,
+				316F7D98DC17C4FA7B138828 /* Creation */,
+				FD24F97A30819A483664ECE5 /* Listing */,
+				26E95433E860DB61E4D93C4E /* Repackaging */,
+				8AD2ADE1AE81747F18752E64 /* Recovery */,
+				5AAF93CE4513D2B47E2ECA6A /* Extraction */,
+				BA0C74610B19DB4BB58AEB43 /* Nested */,
+				A213201DAA36DAEBF7217841 /* LocalSend */,
+				262BC9592A50A4C255060FC1 /* ArchiveSessionModel.swift */,
+				8BF7C1BA6CD998918A098403 /* ArchiveListingModel.swift */,
+				2D3DB03B04DBC45691EF7BBC /* ArchiveExtractionModel.swift */,
+				148952EB86D196A8E71D8CAA /* ArchiveBatchExtractionModel.swift */,
+				04A9D97DC592613F36ED3DDE /* ArchiveCreationModel.swift */,
+				0BDE493E04534C495E9CD29D /* ArchiveRepackagingModel.swift */,
+				0BC5C911FAE655C2C0B838B8 /* ArchiveLocalSendModel.swift */,
+				141F5021415BC535E48C49CA /* ArchiveSceneBackgroundCoordinator.swift */,
+				69B525982A79BDEEB159AA40 /* JobPollDriver.swift */,
+				BEE2FB3A3A8377BDE1841606 /* JobPacer.swift */,
 			);
 			path = ZManagerMobile;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000603 /* ZManagerMobileTests */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000103 /* ZManagerMobileTests.swift */,
+			);
+			path = ZManagerMobileTests;
+			sourceTree = "<group>";
+		};
+		01A000000000000000000604 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				01A000000000000000000105 /* ZManagerMobile.app */,
+				01A000000000000000000106 /* ZManagerMobileTests.xctest */,
+				01A000000000000000000124 /* ZManagerMobileUITests.xctest */,
+				01A000000000000000000128 /* ZManagerMobileShareExtension.appex */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		01A000000000000000000605 /* Bridge */ = {
@@ -295,14 +407,6 @@
 			path = Generated;
 			sourceTree = "<group>";
 		};
-		01A000000000000000000603 /* ZManagerMobileTests */ = {
-			isa = PBXGroup;
-			children = (
-				01A000000000000000000103 /* ZManagerMobileTests.swift */,
-			);
-			path = ZManagerMobileTests;
-			sourceTree = "<group>";
-		};
 		01A000000000000000000607 /* ZManagerMobileUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -315,20 +419,94 @@
 			isa = PBXGroup;
 			children = (
 				01A000000000000000000126 /* ShareViewController.swift */,
-				01A000000000000000000127 /* Share Extension Info.plist */,
+				01A000000000000000000127 /* Info.plist */,
 			);
 			path = ZManagerMobileShareExtension;
 			sourceTree = "<group>";
 		};
-		01A000000000000000000604 /* Products */ = {
+		26E95433E860DB61E4D93C4E /* Repackaging */ = {
 			isa = PBXGroup;
 			children = (
-				01A000000000000000000105 /* ZManagerMobile.app */,
-				01A000000000000000000106 /* ZManagerMobileTests.xctest */,
-				01A000000000000000000124 /* ZManagerMobileUITests.xctest */,
-				01A000000000000000000128 /* ZManagerMobileShareExtension.appex */,
+				745A1551BC6ED3F4BEC7D830 /* ArchiveRepackaging.swift */,
 			);
-			name = Products;
+			name = Repackaging;
+			path = Repackaging;
+			sourceTree = "<group>";
+		};
+		2E50C978876789E039132702 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				56F1BB2E3D383594C4A554DB /* ContentViewSupport.swift */,
+			);
+			name = Support;
+			path = Support;
+			sourceTree = "<group>";
+		};
+		316F7D98DC17C4FA7B138828 /* Creation */ = {
+			isa = PBXGroup;
+			children = (
+				39D8866E23046436B200EB09 /* ArchiveCreation.swift */,
+			);
+			name = Creation;
+			path = Creation;
+			sourceTree = "<group>";
+		};
+		3C0FD34EC399E9AB5BB970DB /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				971E41245C23F5E909332EE7 /* ArchiveImport.swift */,
+			);
+			name = Import;
+			path = Import;
+			sourceTree = "<group>";
+		};
+		5AAF93CE4513D2B47E2ECA6A /* Extraction */ = {
+			isa = PBXGroup;
+			children = (
+				CC149E7A41C7BF3C4DA85AD7 /* ArchiveExtraction.swift */,
+			);
+			name = Extraction;
+			path = Extraction;
+			sourceTree = "<group>";
+		};
+		8AD2ADE1AE81747F18752E64 /* Recovery */ = {
+			isa = PBXGroup;
+			children = (
+				78787C0AF388C2A7294A2A13 /* ArchiveRecovery.swift */,
+			);
+			name = Recovery;
+			path = Recovery;
+			sourceTree = "<group>";
+		};
+		A213201DAA36DAEBF7217841 /* LocalSend */ = {
+			isa = PBXGroup;
+			children = (
+				DB23E1AB724ED10E74A46050 /* LocalSendProtocol.swift */,
+				3CB152D4313ECB0ADA7DDC21 /* LocalSendClient.swift */,
+				F1BCB1BCFC1DDC7424064D50 /* LocalSendReceiver.swift */,
+				2E75221DEB9394A9FDEBFD4D /* LocalSendTls.swift */,
+				7CE681C776436FDA25865531 /* LocalSendTrustStore.swift */,
+			);
+			name = LocalSend;
+			path = LocalSend;
+			sourceTree = "<group>";
+		};
+		BA0C74610B19DB4BB58AEB43 /* Nested */ = {
+			isa = PBXGroup;
+			children = (
+				107901E1907DA96998770CC6 /* NestedArchiveNavigation.swift */,
+			);
+			name = Nested;
+			path = Nested;
+			sourceTree = "<group>";
+		};
+		FD24F97A30819A483664ECE5 /* Listing */ = {
+			isa = PBXGroup;
+			children = (
+				7C4E9A76D1DA01AD553F173F /* ArchiveListing.swift */,
+			);
+			name = Listing;
+			path = Listing;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -395,7 +573,7 @@
 			buildConfigurationList = 01A000000000000000000704 /* Build configuration list for PBXNativeTarget "ZManagerMobileShareExtension" */;
 			buildPhases = (
 				01A000000000000000000804 /* Sources */,
-				01A000000000000000000504 /* Share Extension Frameworks */,
+				01A000000000000000000504 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -444,7 +622,7 @@
 			productRefGroup = 01A000000000000000000604 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-				targets = (
+			targets = (
 				01A000000000000000000401 /* ZManagerMobile */,
 				01A000000000000000000402 /* ZManagerMobileTests */,
 				01A000000000000000000403 /* ZManagerMobileUITests */,
@@ -537,20 +715,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		01A000000000000000000906 /* Embed App Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				01A000000000000000000021 /* ZManagerMobileShareExtension.appex in Embed App Extensions */,
-			);
-			name = "Embed App Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXShellScriptBuildPhase section */
 		01A000000000000000000903 /* Build Rust Bridge */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -582,6 +746,29 @@
 				01A000000000000000000001 /* ZManagerMobileApp.swift in Sources */,
 				01A000000000000000000002 /* ContentView.swift in Sources */,
 				01A000000000000000000005 /* zmanager.swift in Sources */,
+				15E20A90DC270C34D7535A4E /* ContentViewSupport.swift in Sources */,
+				8DF0ACEAB9DD255BC946E33A /* ArchiveImport.swift in Sources */,
+				545B22847AC213B08FAE633A /* ArchiveCreation.swift in Sources */,
+				44F32C2767CAF2EFA9D4C504 /* ArchiveListing.swift in Sources */,
+				4B0C469C1113BAE1CCD33940 /* ArchiveRepackaging.swift in Sources */,
+				62529C0794B44454FFF1CFC3 /* ArchiveRecovery.swift in Sources */,
+				41F248944C6F8A885DCE4DD1 /* ArchiveExtraction.swift in Sources */,
+				3A11885022DECF5E224ED58B /* NestedArchiveNavigation.swift in Sources */,
+				ADE4B341E3BE0DF4B2332C70 /* LocalSendProtocol.swift in Sources */,
+				14F511450B812CA16041F306 /* LocalSendClient.swift in Sources */,
+				8FEDB2AA78D1D4AEA8EE6127 /* LocalSendReceiver.swift in Sources */,
+				B71DBC6A2803A5D4F0F06936 /* LocalSendTls.swift in Sources */,
+				388DE77EA983973C230D0BB0 /* LocalSendTrustStore.swift in Sources */,
+				E4AD132F55606B87E9105B57 /* ArchiveSessionModel.swift in Sources */,
+				18DA2915663E049DEC260E19 /* ArchiveListingModel.swift in Sources */,
+				F94F33F8E5D69DE9F0777CAE /* ArchiveExtractionModel.swift in Sources */,
+				192D69FDB07B55925B2C7E15 /* ArchiveBatchExtractionModel.swift in Sources */,
+				7E923785391A0D10AFBA6859 /* ArchiveCreationModel.swift in Sources */,
+				17A096835BDFB8129DC44B76 /* ArchiveRepackagingModel.swift in Sources */,
+				92380470C33A0DC372AB2C9D /* ArchiveLocalSendModel.swift in Sources */,
+				F4A3098219F7FCDB94DCBDF6 /* ArchiveSceneBackgroundCoordinator.swift in Sources */,
+				9161CFC2B050C597733D14BA /* JobPollDriver.swift in Sources */,
+				7D4C4CA57BE6BC19D7095EB6 /* JobPacer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -601,7 +788,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		01A000000000000000000804 /* Share Extension Sources */ = {
+		01A000000000000000000804 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -616,20 +803,6 @@
 			isa = PBXTargetDependency;
 			target = 01A000000000000000000401 /* ZManagerMobile */;
 			targetProxy = 01A000000000000000000201 /* PBXContainerItemProxy */;
-		};
-		01A000000000000000000203 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 01A000000000000000000301 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 01A000000000000000000401;
-			remoteInfo = ZManagerMobile;
-		};
-		01A000000000000000000205 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 01A000000000000000000301 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 01A000000000000000000404;
-			remoteInfo = ZManagerMobileShareExtension;
 		};
 		01A000000000000000000204 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -685,16 +858,19 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ZManagerMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
 				);
-					INFOPLIST_FILE = ZManagerMobile/Info.plist;
-					CODE_SIGN_ENTITLEMENTS = ZManagerMobile.entitlements;
+				INFOPLIST_FILE = ZManagerMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/build/rust",
@@ -710,19 +886,12 @@
 					"-liconv",
 					"-lxml2",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
-				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/ZManagerMobile/Bridge/Generated";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -732,16 +901,19 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ZManagerMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
 				);
-					INFOPLIST_FILE = ZManagerMobile/Info.plist;
-					CODE_SIGN_ENTITLEMENTS = ZManagerMobile.entitlements;
+				INFOPLIST_FILE = ZManagerMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/build/rust",
@@ -757,18 +929,11 @@
 					"-liconv",
 					"-lxml2",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/ZManagerMobile/Bridge/Generated";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -786,17 +951,10 @@
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/ZManagerMobile/Bridge/Generated";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
@@ -815,17 +973,10 @@
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 0.1.0;
-				OTHER_SWIFT_FLAGS = (
-					"$(inherited)",
-					"-Xcc",
-					"-fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap",
-				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(SRCROOT)/ZManagerMobile/Bridge/Generated/zmanagerFFI.modulemap";
 				PRODUCT_BUNDLE_IDENTIFIER = org.tzap.zmanager.mobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/ZManagerMobile/Bridge/Generated",
-				);
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(SRCROOT)/ZManagerMobile/Bridge/Generated";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ZManagerMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ZManagerMobile";
@@ -860,7 +1011,7 @@
 			};
 			name = Release;
 		};
-		01A000000000000000000A09 /* Share Extension Debug */ = {
+		01A000000000000000000A09 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ZManagerMobileShareExtension/ZManagerMobileShareExtension.entitlements;
@@ -877,7 +1028,7 @@
 			};
 			name = Debug;
 		};
-		01A000000000000000000A0A /* Share Extension Release */ = {
+		01A000000000000000000A0A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ZManagerMobileShareExtension/ZManagerMobileShareExtension.entitlements;

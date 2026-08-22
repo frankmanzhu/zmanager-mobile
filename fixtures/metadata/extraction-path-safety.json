@@ -1,0 +1,61 @@
+{
+  "description": "Shared test cases for ExtractionPathSafety.relativePath, consumed by both android/app/src/test/java/org/tzap/zmanager/mobile/ArchiveExtractionTest.kt and ios/ZManagerMobile/ZManagerMobileTests/ZManagerMobileTests.swift. Each case constructs a fresh temp root per run; 'root' below is a placeholder for that temp directory. See Track 4 in docs/mobile-code-health-remediation-plan.md.",
+  "cases": [
+    {
+      "name": "normal_nested_path",
+      "createFile": "docs/readme.txt",
+      "input": "docs/readme.txt",
+      "expected": "docs/readme.txt"
+    },
+    {
+      "name": "dot_dot_traversal_escapes_root",
+      "createFile": null,
+      "input": "docs/../../escape.txt",
+      "expected": null
+    },
+    {
+      "name": "absolute_path_outside_root",
+      "createFile": null,
+      "input": "@sibling/outside.txt",
+      "expected": null
+    },
+    {
+      "name": "root_itself_rejected",
+      "createFile": null,
+      "input": "@root",
+      "expected": null
+    },
+    {
+      "name": "symlinked_parent_preserves_archive_path",
+      "createFile": "real/readme.txt",
+      "symlink": { "link": "linked", "target": "real" },
+      "input": "linked/readme.txt",
+      "expected": "linked/readme.txt"
+    },
+    {
+      "name": "symlinked_leaf_preserves_archive_path",
+      "createFile": "docs/real.txt",
+      "symlink": { "link": "docs/link.txt", "target": "real.txt" },
+      "input": "docs/link.txt",
+      "expected": "docs/link.txt"
+    }
+  ],
+  "descoped": [
+    {
+      "name": "empty_component",
+      "reason": "Both java.nio.file.Path and Foundation's URL collapse consecutive separators before ExtractionPathSafety ever sees the string, on both platforms, confirmed by direct probing of both implementations. Not reachable via any real File/URL construction path a caller in this codebase actually uses. The explicit isEmpty check exists on both platforms now as defense-in-depth, but no fixture case can demonstrate divergence."
+    },
+    {
+      "name": "dot_component",
+      "reason": "Same normalization as empty_component; both platforms collapse './' before the check runs."
+    },
+    {
+      "name": "trailing_separator",
+      "reason": "Same normalization as empty_component; both platforms strip a trailing separator before the check runs."
+    },
+    {
+      "name": "case_variant_root_prefix",
+      "reason": "Filesystem case-sensitivity is environment-dependent (case-insensitive by default on macOS/iOS Simulator, case-sensitive on Linux CI runners), so a fixture case here would be non-portable rather than a genuine cross-platform behavioral check."
+    }
+  ]
+}

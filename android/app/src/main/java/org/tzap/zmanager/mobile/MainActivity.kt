@@ -60,7 +60,9 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.tzap.zmanager.mobile.bridge.generated.ExtractionCollisionPolicy
@@ -102,45 +104,65 @@ private fun ZManagerApp(
     onIncomingIntentHandled: (Intent) -> Unit
 ) {
     val context = LocalContext.current
-    val importer = remember(context) { ArchiveImporter(context) }
-    val listingRepository = remember { ArchiveListingRepository() }
-    val extractionCoordinator = remember(context) { ArchiveExtractionCoordinator(context) }
-    val recoveryStore = remember(context) { ArchiveRecoveryStore(context) }
-    val destinationPreferences = remember(context) { ArchiveDestinationPreferences(context) }
-    val batchExtractionCoordinator = remember(context) { BatchExtractionCoordinator(extractionCoordinator) }
-    val creationCoordinator = remember(context) { ArchiveCreationCoordinator(context) }
-    val separateCreationCoordinator = remember(context) { ArchiveSeparateCreationCoordinator(creationCoordinator) }
-    val repackagingCoordinator = remember(context) { ArchiveRepackagingCoordinator(context, extractionCoordinator, creationCoordinator) }
-    val creationSourceStager = remember(context) { ArchiveCreationSourceStager(context) }
+    val session: ArchiveSessionViewModel = viewModel()
+    val listing: ArchiveListingViewModel = viewModel(factory = ArchiveListingViewModel.Factory(session))
+    val extraction: ArchiveExtractionViewModel = viewModel(factory = ArchiveExtractionViewModel.Factory(context, session))
+    val batchExtraction: ArchiveBatchExtractionViewModel = viewModel(
+        factory = ArchiveBatchExtractionViewModel.Factory(context, session.importer, extraction.extractionCoordinator)
+    )
+    val creation: ArchiveCreationViewModel = viewModel(factory = ArchiveCreationViewModel.Factory(context))
+    val repackaging: ArchiveRepackagingViewModel = viewModel(
+        factory = ArchiveRepackagingViewModel.Factory(context, session, extraction, creation)
+    )
     val localSendSourceStager = remember(context) { LocalSendSourceStager(context) }
     val localSendClient = remember(context) { LocalSendClient(context) }
     val localSendTrustStore = remember(context) { LocalSendTrustStore(context) }
     val scope = rememberCoroutineScope()
-    var importedArchive by remember { mutableStateOf<ImportedArchive?>(null) }
-    var listingState by remember { mutableStateOf<ArchiveListingState>(ArchiveListingState.Idle) }
-    var importError by remember { mutableStateOf<String?>(null) }
-    var isImporting by remember { mutableStateOf(false) }
-    var passwordInput by remember { mutableStateOf("") }
-    var previewPasswordInput by remember { mutableStateOf("") }
-    var testPasswordInput by remember { mutableStateOf("") }
-    var entrySearchQuery by remember { mutableStateOf("") }
-    var entrySort by remember { mutableStateOf(ArchiveEntrySort.PATH_ASCENDING) }
-    var entryViewMode by remember { mutableStateOf(ArchiveEntryViewMode.FOLDERS) }
-    var selectedEntryIds by remember { mutableStateOf(emptySet<String>()) }
-    var previewState by remember { mutableStateOf<ArchivePreviewState>(ArchivePreviewState.Idle) }
-    var testState by remember { mutableStateOf<ArchiveTestState>(ArchiveTestState.Idle) }
-    var extractionState by remember { mutableStateOf<ArchiveExtractionUiState>(ArchiveExtractionUiState.Idle) }
-    var batchExtractionState by remember { mutableStateOf<BatchExtractionUiState>(BatchExtractionUiState.Idle) }
-    var extractionPasswordInput by remember { mutableStateOf("") }
-    var repackagingState by remember { mutableStateOf<ArchiveRepackagingUiState>(ArchiveRepackagingUiState.Idle) }
-    var repackagingPasswordInput by remember { mutableStateOf("") }
-    var repackagingSelectedEntries by remember { mutableStateOf(emptyList<ArchiveEntrySummary>()) }
-    var creationState by remember { mutableStateOf<ArchiveCreationUiState>(ArchiveCreationUiState.Idle) }
-    var createFormat by remember { mutableStateOf(CreateArchiveFormat.ZIP) }
-    var createPasswordInput by remember { mutableStateOf("") }
-    var createVolumeSizeInput by remember { mutableStateOf("") }
-    var createSeparateItems by remember { mutableStateOf(false) }
-    var stagedCreationSources by remember { mutableStateOf<StagedCreationSources?>(null) }
+
+    // Rebound under their original names via each ViewModel's exposed
+    // MutableState, so the rest of this composable's rendering code below is
+    // unchanged by the ViewModel move. See Track 7 in
+    // docs/mobile-code-health-remediation-plan.md.
+    var importedArchive by session.importedArchiveState
+    var listingState by session.listingStateState
+    var importError by session.importErrorState
+    var isImporting by session.isImportingState
+    var passwordInput by session.passwordInputState
+    var entrySearchQuery by session.entrySearchQueryState
+    var selectedEntryIds by session.selectedEntryIdsState
+    var nestedNavigationVersion by session.nestedNavigationVersionState
+    var nestedOpenError by session.nestedOpenErrorState
+    var foregroundRecoveryMessage by session.foregroundRecoveryMessageState
+    var operationReportMessage by session.operationReportMessageState
+
+    var previewState by listing.previewStateState
+    var previewPasswordInput by listing.previewPasswordInputState
+    var testState by listing.testStateState
+    var testPasswordInput by listing.testPasswordInputState
+    var entrySort by listing.entrySortState
+    var entryViewMode by listing.entryViewModeState
+    var listingWindowSize by listing.listingWindowSizeState
+
+    var extractionState by extraction.extractionStateState
+    var extractionPasswordInput by extraction.extractionPasswordInputState
+
+    var batchExtractionState by batchExtraction.batchExtractionStateState
+
+    var creationState by creation.creationStateState
+    var createFormat by creation.createFormatState
+    var createPasswordInput by creation.createPasswordInputState
+    var createVolumeSizeInput by creation.createVolumeSizeInputState
+    var createSeparateItems by creation.createSeparateItemsState
+    var stagedCreationSources by creation.stagedCreationSourcesState
+
+    var repackagingState by repackaging.repackagingStateState
+    var repackagingPasswordInput by repackaging.repackagingPasswordInputState
+    var repackagingSelectedEntries by repackaging.repackagingSelectedEntriesState
+
+    val archiveSessions = session.archiveSessions
+    val defaultExtractionDestination = session.defaultExtractionDestination
+    val recoveryRecords = session.recoveryRecords
+
     var localSendState by remember { mutableStateOf<LocalSendUiState>(LocalSendUiState.Idle) }
     var localSendPinInput by remember { mutableStateOf("") }
     var pendingLocalSendDevice by remember { mutableStateOf<LocalSendDevice?>(null) }
@@ -153,24 +175,6 @@ private fun ZManagerApp(
     val trustedLocalSendFingerprints = remember(localSendTrustVersion) {
         localSendTrustStore.fingerprints()
     }
-    val archiveSessions = remember { ArchiveSessionStack() }
-    var nestedNavigationVersion by remember { mutableStateOf(0) }
-    var nestedOpenError by remember { mutableStateOf<String?>(null) }
-    var foregroundRecoveryMessage by remember { mutableStateOf<String?>(null) }
-    var operationReportMessage by remember { mutableStateOf<String?>(null) }
-    var destinationPreferenceVersion by remember { mutableStateOf(0) }
-    var recoveryVersion by remember { mutableStateOf(0) }
-    var debugExtractionDelayMillis by remember { mutableStateOf(0L) }
-    var debugExtractionTimeoutMillis by remember { mutableStateOf<Long?>(null) }
-    val defaultExtractionDestination = remember(destinationPreferenceVersion) {
-        destinationPreferences.defaultExtractionDestination()
-    }
-    val recoveryRecords = remember(recoveryVersion) { recoveryStore.records() }
-    var pendingAutomationAction by remember { mutableStateOf<ArchiveAutomationAction?>(null) }
-    var importRequestId by remember { mutableStateOf(0L) }
-    var listingRequestId by remember { mutableStateOf(0L) }
-    var previewRequestId by remember { mutableStateOf(0L) }
-    var testRequestId by remember { mutableStateOf(0L) }
     var showFixtureMenu by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
 
@@ -211,12 +215,14 @@ private fun ZManagerApp(
     }
 
     fun handleAppBackground() {
-        passwordInput = ""
-        previewPasswordInput = ""
-        testPasswordInput = ""
-        extractionPasswordInput = ""
-        createPasswordInput = ""
-        repackagingPasswordInput = ""
+        // Fans out to each ViewModel's own clearTransientSecrets() rather
+        // than each one observing lifecycle independently, so the password
+        // scrubbing stays auditable in this one place.
+        session.clearSessionSecrets()
+        listing.clearTransientSecrets()
+        extraction.clearTransientSecrets()
+        creation.clearTransientSecrets()
+        repackaging.clearTransientSecrets()
         localSendPinInput = ""
         pendingLocalSendDevice = null
 
@@ -251,36 +257,6 @@ private fun ZManagerApp(
         }
     }
 
-    fun clearPreviewState() {
-        cleanupPreview(previewState)
-        previewState = ArchivePreviewState.Idle
-        previewPasswordInput = ""
-        previewRequestId += 1
-    }
-
-    fun clearTestState() {
-        testState = ArchiveTestState.Idle
-        testPasswordInput = ""
-        testRequestId += 1
-    }
-
-    fun clearExtractionState() {
-        (extractionState as? ArchiveExtractionUiState.Review)?.review?.let(extractionCoordinator::discard)
-        extractionState = ArchiveExtractionUiState.Idle
-        extractionPasswordInput = ""
-    }
-
-    fun clearCreationState() {
-        when (val state = creationState) {
-            is ArchiveCreationUiState.Review -> creationCoordinator.discard(state.review)
-            is ArchiveCreationUiState.SeparateReview -> separateCreationCoordinator.discard(state.review)
-            else -> Unit
-        }
-        stagedCreationSources?.let(creationSourceStager::discard)
-        stagedCreationSources = null
-        creationState = ArchiveCreationUiState.Idle
-    }
-
     fun handleForegroundJobResult(result: ArchiveForegroundResult) {
         when {
             result.kind == "extract" && result.recoveryId != null -> {
@@ -288,7 +264,7 @@ private fun ZManagerApp(
                     result.recoveryId,
                     result.message ?: "The destination commit needs recovery."
                 )
-                recoveryVersion += 1
+                session.recoveryVersion += 1
             }
             result.kind == "create" &&
                 (creationState as? ArchiveCreationUiState.Running)?.jobId == result.token -> {
@@ -307,7 +283,7 @@ private fun ZManagerApp(
                     "CANCELLED" -> ArchiveCreationUiState.Cancelled
                     else -> ArchiveCreationUiState.Failed(result.message ?: "Unable to create archive.")
                 }
-                stagedCreationSources?.let(creationSourceStager::discard)
+                stagedCreationSources?.let(creation.creationSourceStager::discard)
                 stagedCreationSources = null
             }
             result.kind == "create-separately" &&
@@ -324,7 +300,7 @@ private fun ZManagerApp(
                     "CANCELLED" -> ArchiveCreationUiState.Cancelled
                     else -> ArchiveCreationUiState.Failed(result.message ?: "Unable to create separate archives.")
                 }
-                stagedCreationSources?.let(creationSourceStager::discard)
+                stagedCreationSources?.let(creation.creationSourceStager::discard)
                 stagedCreationSources = null
             }
             result.kind == "extract" &&
@@ -384,539 +360,89 @@ private fun ZManagerApp(
         ArchiveJobForegroundService.takePersistedResults(context).forEach(::handleForegroundJobResult)
     }
 
-    fun extractionSelectedPaths(entries: List<ArchiveEntrySummary>): List<String> {
-        val summaryEntries = (listingState as? ArchiveListingState.Ready)?.summary?.entries
-            ?: return entries.map { it.path }
-        return if (entries.mapTo(mutableSetOf()) { it.path } == summaryEntries.mapTo(mutableSetOf()) { it.path }) {
-            emptyList()
-        } else {
-            entries.map { it.path }
-        }
-    }
+    // The functions below are thin wrappers with the exact signatures the
+    // render tree already calls (by name or by ::reference), delegating to
+    // the ViewModel that now owns the behavior. This keeps every call site
+    // below unchanged by the ViewModel move, the same way the state aliases
+    // above do for reads. See Track 7 in
+    // docs/mobile-code-health-remediation-plan.md.
 
-    fun discardRecovery(id: String) {
-        recoveryStore.discard(id)
-        recoveryVersion += 1
-        if ((extractionState as? ArchiveExtractionUiState.RecoveryAvailable)?.recoveryId == id) {
+    fun loadArchiveListing(archive: ImportedArchive, password: String?) =
+        session.loadArchiveListing(archive, password) {
+            listing.clearPreviewState()
+            listing.clearTestState()
+            extraction.clearExtractionState()
+        }
+
+    fun discardRecovery(id: String) = session.discardRecovery(id) { recoveryId ->
+        if ((extractionState as? ArchiveExtractionUiState.RecoveryAvailable)?.recoveryId == recoveryId) {
             extractionState = ArchiveExtractionUiState.Idle
         }
     }
 
-    fun exportRecovery(id: String) {
-        val files = recoveryStore.files(id)
-        if (files.isEmpty()) {
-            foregroundRecoveryMessage = "The retained recovery output is no longer available."
-            return
-        }
-        runCatching {
-            val uris = files.map { file ->
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            }
-            context.startActivity(Intent.createChooser(
-                Intent(Intent.ACTION_SEND_MULTIPLE)
-                    .setType("application/octet-stream")
-                    .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-                "Export retained extraction"
-            ))
-        }.onFailure {
-            foregroundRecoveryMessage = "Unable to export the retained extraction."
-        }
-    }
+    fun exportRecovery(id: String) = session.exportRecovery(id)
 
-    fun shareOutputFiles(paths: List<String>, title: String = "Share created archive") {
-        val files = paths.map(::File).filter { it.isFile }
-        if (files.isEmpty()) {
-            foregroundRecoveryMessage = "The created archive is no longer available."
-            return
-        }
-        runCatching {
-            val uris = files.map { file ->
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            }
-            val intent = if (uris.size == 1) {
-                Intent(Intent.ACTION_SEND)
-                    .setType("application/octet-stream")
-                    .putExtra(Intent.EXTRA_STREAM, uris.single())
-            } else {
-                Intent(Intent.ACTION_SEND_MULTIPLE)
-                    .setType("application/octet-stream")
-                    .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            }
-            context.startActivity(Intent.createChooser(
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-                title
-            ))
-        }.onFailure {
-            foregroundRecoveryMessage = "Unable to share the created archive."
-        }
-    }
-
-    fun startRepackaging(entries: List<ArchiveEntrySummary>, sourcePassword: String? = null) {
-        val archive = importedArchive ?: return
-        repackagingSelectedEntries = entries
-        // Repackaging requires an explicit source selection. An empty list is
-        // reserved by extraction for "the whole archive", which would make
-        // the repackaging coordinator reject a deliberate whole-archive pick.
-        val selectedPaths = entries.map { it.path }
-        val outputName = when (createFormat) {
-            CreateArchiveFormat.ZIP -> "repackaged.zip"
-            CreateArchiveFormat.SEVEN_Z -> "repackaged.7z"
-            CreateArchiveFormat.TAR_ZST -> "repackaged.tar.zst"
-            CreateArchiveFormat.TAR_GZ -> "repackaged.tar.gz"
-            CreateArchiveFormat.TZAP -> "repackaged.tzap"
-            CreateArchiveFormat.APPLE_ARCHIVE -> "repackaged.aar"
-        }
-        repackagingState = ArchiveRepackagingUiState.Planning
-        val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
-            .getOrElse { error ->
-                repackagingState = ArchiveRepackagingUiState.Failed(error.message ?: "Invalid split volume size.")
-                return
-            }
-        scope.launch {
-            val planned = withContext(Dispatchers.IO) {
-                runCatching {
-                    repackagingCoordinator.plan(
-                        ArchiveRepackagingRequest(
-                            sourceArchive = archive,
-                            selectedPaths = selectedPaths,
-                            destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
-                            format = createFormat,
-                            volumeSize = volumeSize,
-                            sourcePassword = sourcePassword ?: repackagingPasswordInput.takeIf { it.isNotEmpty() },
-                            destinationPassword = createPasswordInput.takeIf { it.isNotEmpty() }
-                        )
-                    )
-                }
-            }
-            planned.onSuccess { review ->
-                repackagingState = ArchiveRepackagingUiState.Review(review)
-            }.onFailure { error ->
-                if (error is ZmanagerGuiException.Bridge &&
-                    (error.code == "password_required" || error.code == "invalid_password")
-                ) {
-                    repackagingState = ArchiveRepackagingUiState.PasswordRequired(entries, error.userMessage)
-                } else {
-                    repackagingState = ArchiveRepackagingUiState.Failed(
-                        error.message ?: "Unable to repackage the selection."
-                    )
-                }
-            }
-        }
-    }
-
-    fun runRepackaging(review: ArchiveRepackagingReview) {
-        repackagingState = ArchiveRepackagingUiState.Running(review, "Repackaging selected entries")
-        scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                repackagingCoordinator.run(review) { message ->
-                    scope.launch { repackagingState = ArchiveRepackagingUiState.Running(review, message) }
-                }
-            }
-            repackagingState = when (outcome) {
-                is ArchiveRepackagingOutcome.Completed -> ArchiveRepackagingUiState.Completed(outcome)
-                ArchiveRepackagingOutcome.Cancelled -> ArchiveRepackagingUiState.Cancelled
-                is ArchiveRepackagingOutcome.PasswordRequired -> ArchiveRepackagingUiState.PasswordRequired(
-                    repackagingSelectedEntries,
-                    outcome.message
-                )
-                is ArchiveRepackagingOutcome.Failed -> ArchiveRepackagingUiState.Failed(outcome.message)
-            }
-            passwordInput = ""
-            createPasswordInput = ""
-            repackagingPasswordInput = ""
-        }
-    }
-
-    fun planCreation(staged: StagedCreationSources) {
-        clearCreationState()
-        stagedCreationSources = staged
-        val outputName = when (createFormat) {
-            CreateArchiveFormat.ZIP -> "archive.zip"
-            CreateArchiveFormat.SEVEN_Z -> "archive.7z"
-            CreateArchiveFormat.TAR_ZST -> "archive.tar.zst"
-            CreateArchiveFormat.TAR_GZ -> "archive.tar.gz"
-            CreateArchiveFormat.TZAP -> "archive.tzap"
-            CreateArchiveFormat.APPLE_ARCHIVE -> "archive.aar"
-        }
-        val volumeSize = runCatching { ArchiveVolumeSupport.parseVolumeSize(createVolumeSizeInput) }
-            .getOrElse { error ->
-                creationState = ArchiveCreationUiState.Failed(error.message ?: "Invalid split volume size.")
-                return
-            }
-        creationState = ArchiveCreationUiState.Planning
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val password = createPasswordInput.takeIf { it.isNotEmpty() }
-                    if (createSeparateItems && staged.sourcePaths.size > 1) {
-                        val requests = ArchiveSeparateCreationPlanner.requests(
-                            sourcePaths = staged.sourcePaths,
-                            destinationDirectory = creationCoordinator.appStorageDirectory().absolutePath,
-                            format = createFormat,
-                            password = password,
-                            volumeSize = volumeSize
-                        )
-                        separateCreationCoordinator.plan(requests)
-                    } else {
-                        creationCoordinator.plan(
-                            ArchiveCreationRequest(
-                                sourcePaths = staged.sourcePaths,
-                                destinationArchivePath = creationCoordinator.appStorageOutput(outputName).absolutePath,
-                                format = createFormat,
-                                password = password,
-                                volumeSize = volumeSize
-                            )
-                        )
-                    }
-                }
-            }
-            creationState = result.fold(
-                onSuccess = { review ->
-                    when (review) {
-                        is ArchiveCreationReview -> {
-                            if (review.plan.canStart) ArchiveCreationUiState.Review(review)
-                            else {
-                                creationCoordinator.discard(review)
-                                ArchiveCreationUiState.Failed(
-                                    review.plan.warnings.firstOrNull()?.message
-                                        ?: "This creation plan cannot be started."
-                                )
-                            }
-                        }
-                        is ArchiveSeparateCreationReview -> {
-                            val blocked = review.items.firstOrNull { !it.plan.canStart }
-                            if (blocked == null) ArchiveCreationUiState.SeparateReview(review)
-                            else {
-                                separateCreationCoordinator.discard(review)
-                                ArchiveCreationUiState.Failed(
-                                    blocked.plan.warnings.firstOrNull()?.message
-                                        ?: "One of the separate creation plans cannot be started."
-                                )
-                            }
-                        }
-                        else -> ArchiveCreationUiState.Failed("Unable to prepare archive creation.")
-                    }
-                },
-                onFailure = { error -> ArchiveCreationUiState.Failed(error.message ?: "Unable to plan archive creation.") }
-            )
-        }
-    }
-
-    fun stageDebugCreationFixture() {
-        if (!BuildConfig.DEBUG) return
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { creationSourceStager.stageDebugFixture() }
-            }.onSuccess(::planCreation)
-                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage creation fixture.") }
-        }
-    }
-
-    fun stageDebugSplitCreationFixture() {
-        if (!BuildConfig.DEBUG) return
-        createVolumeSizeInput = "64k"
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { creationSourceStager.stageDebugSplitFixture() }
-            }.onSuccess(::planCreation)
-                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage split creation fixture.") }
-        }
-    }
-
-    fun stageDebugSeparateCreationFixture() {
-        if (!BuildConfig.DEBUG) return
-        createSeparateItems = true
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { creationSourceStager.stageDebugSeparateFixture() }
-            }.onSuccess { staged ->
-                // The debug fixture is intentionally repeatable. Remove only
-                // the fixed outputs owned by this fixture so a second E2E run
-                // cannot inherit an unverified archive from an earlier run.
-                listOf("one.zip", "two.zip").forEach { outputName ->
-                    File(creationCoordinator.appStorageDirectory(), outputName).delete()
-                }
-                planCreation(staged)
-            }
-                .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage separate creation fixture.") }
-        }
-    }
-
-    fun startCreation(review: ArchiveCreationReview) {
-        createPasswordInput = ""
-        creationState = ArchiveCreationUiState.Starting(review)
-        runCatching {
-            val token = ArchiveJobForegroundService.submit(
-                context,
-                ArchiveForegroundRequest.Create(review.request)
-            )
-            creationCoordinator.discard(review)
-            // Keep the password out of long-lived Compose state once the
-            // foreground service owns the request.
-            val stateReview = review.copy(request = review.request.copy(password = null))
-            creationState = ArchiveCreationUiState.Running(stateReview, token, "Creating archive")
-        }.onFailure { error ->
-            creationCoordinator.discard(review)
-            stagedCreationSources?.let(creationSourceStager::discard)
-            stagedCreationSources = null
-            creationState = ArchiveCreationUiState.Failed(error.message ?: "Unable to create archive.")
-        }
-    }
-
-    fun startSeparateCreation(review: ArchiveSeparateCreationReview) {
-        createPasswordInput = ""
-        creationState = ArchiveCreationUiState.StartingSeparate(review)
-        runCatching {
-            val token = ArchiveJobForegroundService.submit(
-                context,
-                ArchiveForegroundRequest.CreateSeparately(review.items.map { it.request })
-            )
-            separateCreationCoordinator.discard(review)
-            val stateReview = ArchiveSeparateCreationReview(
-                review.items.map { it.copy(request = it.request.copy(password = null)) }
-            )
-            creationState = ArchiveCreationUiState.RunningSeparate(stateReview, token, "Creating separate archives")
-        }.onFailure { error ->
-            separateCreationCoordinator.discard(review)
-            stagedCreationSources?.let(creationSourceStager::discard)
-            stagedCreationSources = null
-            creationState = ArchiveCreationUiState.Failed(error.message ?: "Unable to create separate archives.")
-        }
-    }
+    fun shareOutputFiles(paths: List<String>, title: String = "Share created archive") =
+        session.shareOutputFiles(paths, title)
 
     fun planExtraction(
         archive: ImportedArchive,
         entries: List<ArchiveEntrySummary>,
         destination: ExtractionDestination,
-        password: String?,
-        debugDelayMillis: Long = debugExtractionDelayMillis,
-        debugTimeoutMillis: Long? = debugExtractionTimeoutMillis
-    ) {
-        clearExtractionState()
-        val selectedPaths = extractionSelectedPaths(entries)
-        extractionState = ArchiveExtractionUiState.Planning(destination.label)
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    extractionCoordinator.plan(
-                        archive = archive,
-                        // An empty selection means every entry. Preserve that
-                        // contract so full extraction uses the engine's
-                        // whole-archive operation instead of selected-entry
-                        // calls.
-                        selectedPaths = selectedPaths,
-                        destination = destination,
-                        password = password,
-                        collisionPolicy = ExtractionCollisionPolicy.REFUSE,
-                        debugDelayMillis = debugDelayMillis,
-                        debugTimeoutMillis = debugTimeoutMillis
-                    )
-                }
-            }
-            extractionState = result.fold(
-                onSuccess = { review ->
-                    if (review.plan.canStart) ArchiveExtractionUiState.Review(review)
-                    else ArchiveExtractionUiState.Failed(
-                        review.plan.warnings.firstOrNull()?.message
-                            ?: "This extraction plan cannot be started."
-                    )
-                },
-                onFailure = { it.toExtractionUiState() }
-            )
-        }
-    }
+        password: String?
+    ) = extraction.planExtraction(archive, entries, destination, password)
 
-    fun retryRecovery(record: ArchiveRecoveryRecord) {
-        val archive = importedArchive
-        val summary = (listingState as? ArchiveListingState.Ready)?.summary
-        if (archive == null || summary == null || archive.localPath != record.archivePath) {
-            foregroundRecoveryMessage = "Import ${record.archiveDisplayName} again to retry the retained extraction."
-            return
-        }
-        val entries = if (record.selectedPaths.isEmpty()) {
-            summary.entries
-        } else {
-            summary.entries.filter { it.path in record.selectedPaths }
-        }
-        discardRecovery(record.id)
-        planExtraction(archive, entries, defaultExtractionDestination, null)
-    }
-
-    fun startExtraction(review: ExtractionReview) {
-        extractionState = ArchiveExtractionUiState.Starting(review)
-        debugExtractionDelayMillis = 0L
-        debugExtractionTimeoutMillis = null
-        val request = review.request
-        if (request == null) {
-            extractionState = ArchiveExtractionUiState.Failed("This extraction review cannot be resumed.")
-            extractionCoordinator.discard(review)
-            return
-        }
-        runCatching {
-            val token = ArchiveJobForegroundService.submit(
-                context,
-                ArchiveForegroundRequest.Extract(request)
-            )
-            extractionCoordinator.discard(review)
-            // Keep the password out of long-lived Compose state once the
-            // foreground service owns the request.
-            val stateReview = review.copy(request = request.copy(password = null))
-            extractionState = ArchiveExtractionUiState.Running(stateReview, token, "Extracting archive")
-        }.onFailure { error ->
-            extractionCoordinator.discard(review)
-            extractionState = error.toExtractionUiState()
-        }
-    }
-
-    fun startBatchImport(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        batchExtractionState = BatchExtractionUiState.Planning
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val root = File(context.filesDir, "BatchExtracted")
-                    uris.mapIndexed { index, uri ->
-                        val archive = importer.importUri(uri)
-                        val safeName = archive.displayName
-                            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
-                            .substringBeforeLast('.', archive.displayName)
-                            .ifBlank { "archive-$index" }
-                        BatchExtractionItem(
-                            archive = archive,
-                            selectedPaths = emptyList(),
-                            destination = ExtractionDestination.AppStorage(File(root, "$safeName-$index"))
-                        )
-                    }.let(batchExtractionCoordinator::plan)
-                }
-            }
-            result.onSuccess { review -> batchExtractionState = BatchExtractionUiState.Review(review) }
-                .onFailure { error ->
-                    batchExtractionState = BatchExtractionUiState.Failed(
-                        error.message ?: "Unable to prepare batch extraction."
-                    )
-                }
-        }
-    }
-
-    fun startDebugBatchImport() {
-        if (!BuildConfig.DEBUG) return
-        batchExtractionState = BatchExtractionUiState.Planning
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val root = File(context.filesDir, "BatchExtracted")
-                    val archives = listOf(
-                        importer.importAsset("maestro-nested.zip"),
-                        importer.importAsset("maestro-nested.zip")
-                    )
-                    batchExtractionCoordinator.plan(
-                        archives.mapIndexed { index, archive ->
-                            BatchExtractionItem(
-                                archive,
-                                emptyList(),
-                                ExtractionDestination.AppStorage(File(root, "fixture-$index"))
-                            )
-                        }
-                    )
-                }
-            }
-            result.onSuccess { batchExtractionState = BatchExtractionUiState.Review(it) }
-                .onFailure { batchExtractionState = BatchExtractionUiState.Failed("Unable to prepare batch fixture.") }
-        }
-    }
-
-    fun startBatchExtraction(review: BatchExtractionReview) {
-        runCatching {
-            val token = ArchiveJobForegroundService.submit(
-                context,
-                ArchiveForegroundRequest.BatchExtract(
-                    ArchiveBatchExtractionRequest(review.items)
-                )
-            )
-            batchExtractionCoordinator.discard(review)
-            batchExtractionState = BatchExtractionUiState.Running(token)
-        }.onFailure { error ->
-            batchExtractionCoordinator.discard(review)
-            batchExtractionState = BatchExtractionUiState.Failed(
-                error.message ?: "Unable to start batch extraction."
-            )
-        }
-    }
-
-    fun loadArchiveListing(archive: ImportedArchive, password: String?) {
-        listingRequestId += 1
-        val currentListingRequestId = listingRequestId
-        selectedEntryIds = emptySet()
-        clearPreviewState()
-        clearTestState()
-        clearExtractionState()
-        listingState = ArchiveListingState.Loading
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                listingRepository.load(archive, password)
-            }
-            if (
-                currentListingRequestId == listingRequestId &&
-                importedArchive?.id == archive.id
-            ) {
-                listingState = result
+    fun retryRecovery(record: ArchiveRecoveryRecord) = session.retryRecovery(
+        record,
+        onExtractionRecoveryDiscarded = { recoveryId ->
+            if ((extractionState as? ArchiveExtractionUiState.RecoveryAvailable)?.recoveryId == recoveryId) {
+                extractionState = ArchiveExtractionUiState.Idle
             }
         }
+    ) { planArchive, entries, destination, password ->
+        planExtraction(planArchive, entries, destination, password)
     }
 
-    fun startPreview(archive: ImportedArchive, entry: ArchiveEntrySummary, password: String?) {
-        previewRequestId += 1
-        val currentPreviewRequestId = previewRequestId
-        cleanupPreview(previewState)
-        previewState = ArchivePreviewState.Loading(entry)
-        previewPasswordInput = ""
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                listingRepository.materializePreview(archive, entry, password)
-            }
-            if (
-                currentPreviewRequestId == previewRequestId &&
-                importedArchive?.id == archive.id
-            ) {
-                previewState = result
-                if (result is ArchivePreviewState.Ready) {
-                    openPreview(context, result.summary)?.let { error ->
-                        previewState = ArchivePreviewState.Failed(result.summary.entry, error)
-                    }
-                }
-            }
-        }
-    }
+    fun startExtraction(review: ExtractionReview) = extraction.startExtraction(review, context)
+
+    fun startBatchImport(uris: List<Uri>) = batchExtraction.startBatchImport(uris)
+
+    fun startDebugBatchImport() = batchExtraction.startDebugBatchImport()
+
+    fun startBatchExtraction(review: BatchExtractionReview) = batchExtraction.startBatchExtraction(review, context)
+
+    fun startPreview(archive: ImportedArchive, entry: ArchiveEntrySummary, password: String?) =
+        listing.startPreview(archive, entry, password, context)
 
     fun startArchiveTest(
         archive: ImportedArchive,
         selectedEntries: List<ArchiveEntrySummary>,
         password: String?
-    ) {
-        testRequestId += 1
-        val currentTestRequestId = testRequestId
-        testState = ArchiveTestState.Loading(selectedEntries.size)
-        testPasswordInput = ""
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                listingRepository.testArchive(archive, selectedEntries, password)
-            }
-            if (
-                currentTestRequestId == testRequestId &&
-                importedArchive?.id == archive.id
-            ) {
-                testState = result
-            }
-        }
-    }
+    ) = listing.startArchiveTest(archive, selectedEntries, password)
 
-    LaunchedEffect(listingState, pendingAutomationAction, importedArchive?.id) {
-        val action = pendingAutomationAction
+    fun planCreation(staged: StagedCreationSources) = creation.planCreation(staged)
+
+    fun stageDebugCreationFixture() = creation.stageDebugCreationFixture()
+
+    fun stageDebugSplitCreationFixture() = creation.stageDebugSplitCreationFixture()
+
+    fun stageDebugSeparateCreationFixture() = creation.stageDebugSeparateCreationFixture()
+
+    fun startCreation(review: ArchiveCreationReview) = creation.startCreation(review, context)
+
+    fun startSeparateCreation(review: ArchiveSeparateCreationReview) = creation.startSeparateCreation(review, context)
+
+    fun startRepackaging(entries: List<ArchiveEntrySummary>, sourcePassword: String? = null) =
+        repackaging.startRepackaging(entries, sourcePassword)
+
+    fun runRepackaging(review: ArchiveRepackagingReview) = repackaging.runRepackaging(review)
+
+    LaunchedEffect(listingState, session.pendingAutomationAction, importedArchive?.id) {
+        val action = session.pendingAutomationAction
         val archive = importedArchive
         val ready = listingState as? ArchiveListingState.Ready
         if (action != null && archive != null && ready != null) {
-            pendingAutomationAction = null
+            session.pendingAutomationAction = null
             when (action) {
                 ArchiveAutomationAction.EXTRACT -> planExtraction(
                     archive,
@@ -937,101 +463,39 @@ private fun ZManagerApp(
     fun startImport(
         uris: List<Uri>,
         automationAction: ArchiveAutomationAction? = null
-    ) {
-        debugExtractionDelayMillis = 0L
-        debugExtractionTimeoutMillis = null
-        pendingAutomationAction = automationAction
-        importRequestId += 1
-        val currentImportRequestId = importRequestId
-        listingRequestId += 1
-        clearPreviewState()
-        clearTestState()
-        clearExtractionState()
-        archiveSessions.clear()
-        nestedNavigationVersion += 1
-        nestedOpenError = null
-        isImporting = true
-        importError = null
-        importedArchive = null
-        listingState = ArchiveListingState.Idle
-        passwordInput = ""
-        entrySearchQuery = ""
-        selectedEntryIds = emptySet()
-        clearLocalSendSelection()
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { importer.importUris(uris) }
-            }
-            if (currentImportRequestId != importRequestId) {
-                return@launch
-            }
-            result
-                .onSuccess { archive ->
-                    importedArchive = archive
-                    loadArchiveListing(archive, null)
-                }
-                .onFailure {
-                    importError = "Unable to import that archive."
-                }
-            isImporting = false
-        }
-    }
+    ) = session.startImport(
+        uris,
+        automationAction,
+        onImportStarted = {
+            listing.clearPreviewState()
+            listing.clearTestState()
+            extraction.clearExtractionState()
+            clearLocalSendSelection()
+        },
+        onImported = { archive -> loadArchiveListing(archive, null) }
+    )
 
     fun startMaestroFixtureImport(
         assetName: String = "maestro-files.zip",
         companionAssetNames: List<String> = emptyList(),
         automationAction: ArchiveAutomationAction? = null,
         displayAssetNames: List<String> = listOf(assetName) + companionAssetNames
-    ) {
-        if (automationAction != ArchiveAutomationAction.EXTRACT) {
-            debugExtractionDelayMillis = 0L
-            debugExtractionTimeoutMillis = null
-        }
-        pendingAutomationAction = automationAction
-        importRequestId += 1
-        val currentImportRequestId = importRequestId
-        listingRequestId += 1
-        clearPreviewState()
-        clearTestState()
-        clearExtractionState()
-        archiveSessions.clear()
-        nestedNavigationVersion += 1
-        nestedOpenError = null
-        isImporting = true
-        importError = null
-        importedArchive = null
-        listingState = ArchiveListingState.Idle
-        passwordInput = ""
-        entrySearchQuery = ""
-        selectedEntryIds = emptySet()
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    importer.importAssets(
-                        assetName,
-                        listOf(assetName) + companionAssetNames,
-                        displayAssetNames
-                    )
-                }
-            }
-            if (currentImportRequestId != importRequestId) {
-                return@launch
-            }
-            result
-                .onSuccess { archive ->
-                    importedArchive = archive
-                    loadArchiveListing(archive, null)
-                }
-                .onFailure {
-                    importError = "Unable to import the test fixture."
-                }
-            isImporting = false
-        }
-    }
+    ) = session.startMaestroFixtureImport(
+        assetName,
+        companionAssetNames,
+        automationAction,
+        displayAssetNames,
+        onImportStarted = {
+            listing.clearPreviewState()
+            listing.clearTestState()
+            extraction.clearExtractionState()
+        },
+        onImported = { archive -> loadArchiveListing(archive, null) }
+    )
 
     fun startDebugCancellableExtraction() {
         if (!BuildConfig.DEBUG) return
-        debugExtractionDelayMillis = 15_000L
+        session.debugJobPacer = DelayingJobPacer(delayMillis = 15_000L)
         startMaestroFixtureImport(
             assetName = "maestro-split.zip",
             companionAssetNames = listOf("maestro-split.z01"),
@@ -1041,8 +505,7 @@ private fun ZManagerApp(
 
     fun startDebugTimedOutExtraction() {
         if (!BuildConfig.DEBUG) return
-        debugExtractionDelayMillis = 15_000L
-        debugExtractionTimeoutMillis = 1_000L
+        session.debugJobPacer = DelayingJobPacer(delayMillis = 15_000L, timeoutBudgetMillis = 1_000L)
         startMaestroFixtureImport(
             assetName = "maestro-split.zip",
             companionAssetNames = listOf("maestro-split.z01"),
@@ -1050,60 +513,12 @@ private fun ZManagerApp(
         )
     }
 
-    fun openNestedArchive(entry: ArchiveEntrySummary) {
-        val parent = importedArchive ?: return
-        if (!NestedArchiveSupport.canOpen(entry)) return
-        nestedOpenError = null
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                listingRepository.materializePreview(parent, entry, null)
-            }
-            when (result) {
-                is ArchivePreviewState.Ready -> {
-                    val preview = result.summary
-                    val child = ImportedArchive(
-                        id = java.util.UUID.randomUUID().toString(),
-                        displayName = entry.displayName,
-                        localPath = preview.previewPath,
-                        byteSize = preview.writtenBytes.toLong(),
-                        sourceMimeType = null,
-                        importedAtEpochMillis = System.currentTimeMillis()
-                    )
-                    if (archiveSessions.current?.archive?.id != parent.id) {
-                        archiveSessions.push(parent)
-                    }
-                    archiveSessions.push(
-                        archive = child,
-                        parentEntryPath = entry.path,
-                        cleanupRoot = preview.cleanupRoot
-                    )
-                    importedArchive = child
-                    nestedNavigationVersion += 1
-                    loadArchiveListing(child, null)
-                }
-                is ArchivePreviewState.PasswordRequired -> {
-                    nestedOpenError = result.error.message
-                }
-                is ArchivePreviewState.Failed -> {
-                    nestedOpenError = result.error.message
-                }
-                else -> nestedOpenError = "Unable to open that nested archive."
-            }
-        }
+    fun openNestedArchive(entry: ArchiveEntrySummary) = session.openNestedArchive(entry) { child ->
+        loadArchiveListing(child, null)
     }
 
-    fun navigateBackFromNested() {
-        val removed = archiveSessions.pop() ?: return
-        val parent = archiveSessions.current?.archive
-        if (parent == null) {
-            importedArchive = null
-            listingState = ArchiveListingState.Idle
-        } else {
-            importedArchive = parent
-            loadArchiveListing(parent, null)
-        }
-        nestedOpenError = null
-        nestedNavigationVersion += 1
+    fun navigateBackFromNested() = session.navigateBackFromNested { parent ->
+        if (parent != null) loadArchiveListing(parent, null)
     }
 
     fun discoverLocalSendDevices() {
@@ -1214,8 +629,7 @@ private fun ZManagerApp(
             }
             val entries = readySummary.selectedEntries(selectedEntryIds).ifEmpty { readySummary.entries }
             val destination = ExtractionDestination.DocumentTree(uri)
-            destinationPreferences.setExtractionDestination(destination)
-            destinationPreferenceVersion += 1
+            session.recordDestinationPreference(destination)
             planExtraction(archive, entries, destination, null)
         }
     }
@@ -1225,7 +639,7 @@ private fun ZManagerApp(
         if (uris.isNotEmpty()) {
             scope.launch {
                 withContext(Dispatchers.IO) {
-                    runCatching { creationSourceStager.stageFiles(uris) }
+                    runCatching { creation.creationSourceStager.stageFiles(uris) }
                 }.onSuccess(::planCreation)
                     .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage selected files.") }
             }
@@ -1243,7 +657,7 @@ private fun ZManagerApp(
             }
             scope.launch {
                 withContext(Dispatchers.IO) {
-                    runCatching { creationSourceStager.stageTree(uri) }
+                    runCatching { creation.creationSourceStager.stageTree(uri) }
                 }.onSuccess(::planCreation)
                     .onFailure { creationState = ArchiveCreationUiState.Failed(it.message ?: "Unable to stage selected folder.") }
             }
@@ -1290,7 +704,7 @@ private fun ZManagerApp(
                     ArchiveAutomationAction.CREATE -> scope.launch {
                         runCatching {
                             withContext(Dispatchers.IO) {
-                                creationSourceStager.stageFiles(automation.sourceUris)
+                                creation.creationSourceStager.stageFiles(automation.sourceUris)
                             }
                         }.onSuccess(::planCreation)
                             .onFailure { creationState = ArchiveCreationUiState.Failed("Unable to prepare automation input.") }
@@ -1337,10 +751,7 @@ private fun ZManagerApp(
                         text = "Default extraction destination: ${defaultExtractionDestination.label}",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    TextButton(onClick = {
-                        destinationPreferences.resetExtractionDestination()
-                        destinationPreferenceVersion += 1
-                    }) {
+                    TextButton(onClick = { session.resetDefaultDestination() }) {
                         Text("Reset default destination")
                     }
                     TextButton(
@@ -1477,7 +888,7 @@ private fun ZManagerApp(
                         onCancel = { state ->
                             when (state) {
                                 is BatchExtractionUiState.Review -> {
-                                    batchExtractionCoordinator.discard(state.review)
+                                    batchExtraction.batchExtractionCoordinator.discard(state.review)
                                     batchExtractionState = BatchExtractionUiState.Idle
                                 }
                                 is BatchExtractionUiState.Running -> {
@@ -1514,8 +925,8 @@ private fun ZManagerApp(
                                 is ArchiveCreationUiState.RunningSeparate -> scope.launch(Dispatchers.IO) {
                                     ArchiveJobForegroundService.cancel(context, state.jobId)
                                 }
-                                is ArchiveCreationUiState.Review -> clearCreationState()
-                                is ArchiveCreationUiState.SeparateReview -> clearCreationState()
+                                is ArchiveCreationUiState.Review -> creation.clearCreationState()
+                                is ArchiveCreationUiState.SeparateReview -> creation.clearCreationState()
                                 else -> Unit
                             }
                         }
@@ -1582,20 +993,14 @@ private fun ZManagerApp(
                         onSortChanged = { entrySort = it },
                         viewMode = entryViewMode,
                         onViewModeChanged = { entryViewMode = it },
+                        windowSize = listingWindowSize,
+                        onLoadMore = { listing.loadMoreListingEntries() },
+                        onWindowReset = { listing.resetListingWindow() },
                         selectedEntryIds = selectedEntryIds,
-                        onToggleEntrySelected = { entry ->
-                            selectedEntryIds = if (selectedEntryIds.contains(entry.id)) {
-                                selectedEntryIds - entry.id
-                            } else {
-                                selectedEntryIds + entry.id
-                            }
-                        },
-                        onSelectEntries = { entries ->
-                            selectedEntryIds = selectedEntryIds + entries.map { it.id }.toSet()
-                        },
-                        onClearSelection = {
-                            selectedEntryIds = emptySet()
-                        },
+                        onToggleEntrySelected = session::toggleEntrySelected,
+                        onSelectEntries = session::selectEntries,
+                        onSelectEverything = session::selectEverything,
+                        onClearSelection = session::clearSelection,
                         previewState = previewState,
                         previewPasswordInput = previewPasswordInput,
                         onPreviewPasswordInputChanged = { previewPasswordInput = it },
@@ -1642,7 +1047,7 @@ private fun ZManagerApp(
                                 is ArchiveExtractionUiState.Running -> scope.launch(Dispatchers.IO) {
                                     ArchiveJobForegroundService.cancel(context, state.jobId)
                                 }
-                                is ArchiveExtractionUiState.Review -> clearExtractionState()
+                                is ArchiveExtractionUiState.Review -> extraction.clearExtractionState()
                                 else -> Unit
                             }
                         },
@@ -1671,7 +1076,7 @@ private fun ZManagerApp(
                         onCancelRepackaging = { state ->
                             when (state) {
                                 is ArchiveRepackagingUiState.Review -> {
-                                    repackagingCoordinator.discard(state.review)
+                                    repackaging.repackagingCoordinator.discard(state.review)
                                     repackagingState = ArchiveRepackagingUiState.Idle
                                 }
                                 is ArchiveRepackagingUiState.PasswordRequired -> {
@@ -1679,7 +1084,7 @@ private fun ZManagerApp(
                                     repackagingState = ArchiveRepackagingUiState.Idle
                                 }
                                 is ArchiveRepackagingUiState.Running -> {
-                                    scope.launch(Dispatchers.IO) { repackagingCoordinator.cancel(state.review) }
+                                    scope.launch(Dispatchers.IO) { repackaging.repackagingCoordinator.cancel(state.review) }
                                 }
                                 else -> Unit
                             }
@@ -2225,9 +1630,13 @@ private fun ArchiveListingPanel(
     onSortChanged: (ArchiveEntrySort) -> Unit,
     viewMode: ArchiveEntryViewMode,
     onViewModeChanged: (ArchiveEntryViewMode) -> Unit,
+    windowSize: Int,
+    onLoadMore: () -> Unit,
+    onWindowReset: () -> Unit,
     selectedEntryIds: Set<String>,
     onToggleEntrySelected: (ArchiveEntrySummary) -> Unit,
     onSelectEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onSelectEverything: (ArchiveListingSummary) -> Unit,
     onClearSelection: () -> Unit,
     previewState: ArchivePreviewState,
     previewPasswordInput: String,
@@ -2273,9 +1682,13 @@ private fun ArchiveListingPanel(
             onSortChanged = onSortChanged,
             viewMode = viewMode,
             onViewModeChanged = onViewModeChanged,
+            windowSize = windowSize,
+            onLoadMore = onLoadMore,
+            onWindowReset = onWindowReset,
             selectedEntryIds = selectedEntryIds,
             onToggleEntrySelected = onToggleEntrySelected,
             onSelectEntries = onSelectEntries,
+            onSelectEverything = onSelectEverything,
             onClearSelection = onClearSelection,
             previewState = previewState,
             previewPasswordInput = previewPasswordInput,
@@ -2358,9 +1771,13 @@ private fun ArchiveListingReadyPanel(
     onSortChanged: (ArchiveEntrySort) -> Unit,
     viewMode: ArchiveEntryViewMode,
     onViewModeChanged: (ArchiveEntryViewMode) -> Unit,
+    windowSize: Int,
+    onLoadMore: () -> Unit,
+    onWindowReset: () -> Unit,
     selectedEntryIds: Set<String>,
     onToggleEntrySelected: (ArchiveEntrySummary) -> Unit,
     onSelectEntries: (List<ArchiveEntrySummary>) -> Unit,
+    onSelectEverything: (ArchiveListingSummary) -> Unit,
     onClearSelection: () -> Unit,
     previewState: ArchivePreviewState,
     previewPasswordInput: String,
@@ -2390,9 +1807,27 @@ private fun ArchiveListingReadyPanel(
     onRetryRepackagingWithPassword: (List<ArchiveEntrySummary>) -> Unit,
     onCancelRepackaging: (ArchiveRepackagingUiState) -> Unit
 ) {
-    val groups = summary.visibleGroups(searchQuery, sort, viewMode)
-    val selectedEntries = summary.selectedEntries(selectedEntryIds)
-    val previewEntry = summary.previewableSelectedEntry(selectedEntryIds)
+    var debouncedSearchQuery by remember { mutableStateOf(searchQuery) }
+    LaunchedEffect(searchQuery) {
+        delay(150)
+        debouncedSearchQuery = searchQuery
+        onWindowReset()
+    }
+    val filteredEntries = remember(summary, debouncedSearchQuery, sort) {
+        summary.filteredSortedEntries(debouncedSearchQuery, sort)
+    }
+    val windowedEntries = remember(filteredEntries, windowSize) {
+        filteredEntries.take(windowSize)
+    }
+    val groups = remember(windowedEntries, viewMode) {
+        windowedEntries.grouped(viewMode)
+    }
+    val selectedEntries = remember(summary, selectedEntryIds) {
+        summary.selectedEntries(selectedEntryIds)
+    }
+    val previewEntry = remember(summary, selectedEntryIds) {
+        summary.previewableSelectedEntry(selectedEntryIds)
+    }
 
     Spacer(modifier = Modifier.height(8.dp))
     Text(
@@ -2428,6 +1863,22 @@ private fun ArchiveListingReadyPanel(
         EntryViewModeButton("List", ArchiveEntryViewMode.LIST, viewMode, onViewModeChanged)
         EntryViewModeButton("Folders", ArchiveEntryViewMode.FOLDERS, viewMode, onViewModeChanged)
     }
+    if (windowedEntries.size < filteredEntries.size) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Showing ${windowedEntries.size} of ${filteredEntries.size} entries",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onLoadMore) {
+                Text("Load more")
+            }
+        }
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2443,6 +1894,18 @@ private fun ArchiveListingReadyPanel(
             onClick = { onSelectEntries(groups.flatMap { it.entries }) }
         ) {
             Text("Select visible")
+        }
+        TextButton(
+            enabled = filteredEntries.isNotEmpty(),
+            onClick = {
+                if (debouncedSearchQuery.isBlank()) {
+                    onSelectEverything(summary)
+                } else {
+                    onSelectEntries(filteredEntries)
+                }
+            }
+        ) {
+            Text("Select all ${filteredEntries.size}")
         }
         TextButton(
             enabled = selectedEntries.isNotEmpty(),
@@ -2668,27 +2131,6 @@ private fun EntryViewModeButton(
     }
 }
 
-private sealed interface ArchiveExtractionUiState {
-    data object Idle : ArchiveExtractionUiState
-    data class Planning(val destination: String) : ArchiveExtractionUiState
-    data class Review(val review: ExtractionReview) : ArchiveExtractionUiState
-    data class Starting(val review: ExtractionReview) : ArchiveExtractionUiState
-    data class Running(val review: ExtractionReview, val jobId: String, val message: String) : ArchiveExtractionUiState
-    data class Completed(val outcome: ExtractionOutcome.Completed) : ArchiveExtractionUiState
-    data object Cancelled : ArchiveExtractionUiState
-    data class PasswordRequired(val message: String) : ArchiveExtractionUiState
-    data class Failed(val message: String) : ArchiveExtractionUiState
-    data class RecoveryAvailable(val recoveryId: String, val message: String) : ArchiveExtractionUiState
-}
-
-private fun Throwable.toExtractionUiState(): ArchiveExtractionUiState = when (this) {
-    is ZmanagerGuiException.Bridge -> if (code == "password_required" || code == "invalid_password") {
-        ArchiveExtractionUiState.PasswordRequired(userMessage)
-    } else {
-        ArchiveExtractionUiState.Failed(userMessage)
-    }
-    else -> ArchiveExtractionUiState.Failed(message ?: "Unable to extract that archive.")
-}
 
 @Composable
 private fun ArchiveExtractionPanel(
@@ -2904,64 +2346,3 @@ private fun ArchiveTestPanel(
     }
 }
 
-private fun openPreview(
-    context: Context,
-    preview: ArchivePreviewSummary
-): ArchiveListingError? {
-    return try {
-        val file = File(preview.previewPath)
-        if (!file.isFile) {
-            return ArchiveListingError(
-                code = "preview_unavailable",
-                message = "The preview file is not available.",
-                recoveryHint = null,
-                retryable = false
-            )
-        }
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, preview.entry.path.previewMimeType())
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        context.startActivity(Intent.createChooser(intent, "Preview ${preview.entry.displayName}"))
-        null
-    } catch (error: ActivityNotFoundException) {
-        ArchiveListingError(
-            code = "preview_unavailable",
-            message = "No installed app can preview that file.",
-            recoveryHint = null,
-            retryable = false
-        )
-    } catch (error: IllegalArgumentException) {
-        ArchiveListingError(
-            code = "preview_unavailable",
-            message = "Unable to share the preview file with another app.",
-            recoveryHint = null,
-            retryable = false
-        )
-    } catch (error: RuntimeException) {
-        ArchiveListingError(
-            code = "preview_unavailable",
-            message = "Unable to open that preview.",
-            recoveryHint = null,
-            retryable = false
-        )
-    }
-}
-
-private fun String.previewMimeType(): String {
-    val extension = substringAfterLast('.', missingDelimiterValue = "")
-        .lowercase(Locale.ROOT)
-    return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-        ?: "application/octet-stream"
-}
-
-private fun cleanupPreview(state: ArchivePreviewState) {
-    val cleanupRoot = (state as? ArchivePreviewState.Ready)?.summary?.cleanupRoot ?: return
-    runCatching {
-        File(cleanupRoot).deleteRecursively()
-    }
-}

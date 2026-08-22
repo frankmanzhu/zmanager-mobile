@@ -383,7 +383,7 @@ class ArchiveListingRepository(
             formatLabel = formatLabel,
             entryCount = entryCount,
             totalSize = totalSize,
-            entries = entries.take(50).mapIndexed { index, entry -> entry.toSummary(index) },
+            entries = entries.mapIndexed { index, entry -> entry.toSummary(index) },
             warnings = warnings.map { it.message }
         )
     }
@@ -445,25 +445,25 @@ class ArchiveListingRepository(
     }
 }
 
-fun ArchiveListingSummary.visibleGroups(
+fun ArchiveListingSummary.filteredSortedEntries(
     searchQuery: String,
-    sort: ArchiveEntrySort,
-    viewMode: ArchiveEntryViewMode
-): List<ArchiveEntryGroup> {
-    val filtered = entries
+    sort: ArchiveEntrySort
+): List<ArchiveEntrySummary> {
+    return entries
         .filter { entry -> entry.matchesSearch(searchQuery) }
         .sortedWith(sort.comparator())
+}
 
+fun List<ArchiveEntrySummary>.grouped(viewMode: ArchiveEntryViewMode): List<ArchiveEntryGroup> {
     return when (viewMode) {
         ArchiveEntryViewMode.LIST -> {
-            if (filtered.isEmpty()) {
+            if (isEmpty()) {
                 emptyList()
             } else {
-                listOf(ArchiveEntryGroup(id = "all", label = "All entries", entries = filtered))
+                listOf(ArchiveEntryGroup(id = "all", label = "All entries", entries = this))
             }
         }
-        ArchiveEntryViewMode.FOLDERS -> filtered
-            .groupBy { entry -> entry.parentPath.ifBlank { "/" } }
+        ArchiveEntryViewMode.FOLDERS -> groupBy { entry -> entry.parentPath.ifBlank { "/" } }
             .toSortedMap(compareBy<String> { it != "/" }.thenBy { it.lowercase(Locale.ROOT) })
             .map { (parentPath, groupedEntries) ->
                 ArchiveEntryGroup(
@@ -473,6 +473,21 @@ fun ArchiveListingSummary.visibleGroups(
                 )
             }
     }
+}
+
+/**
+ * A caller that windows the listing should call [filteredSortedEntries],
+ * `.take(windowSize)`, then [grouped] directly instead of this. This combined
+ * form (filter+sort+group over every entry, unwindowed) exists for callers,
+ * such as tests, that do not need to window. See Track 3 in
+ * docs/mobile-code-health-remediation-plan.md.
+ */
+fun ArchiveListingSummary.visibleGroups(
+    searchQuery: String,
+    sort: ArchiveEntrySort,
+    viewMode: ArchiveEntryViewMode
+): List<ArchiveEntryGroup> {
+    return filteredSortedEntries(searchQuery, sort).grouped(viewMode)
 }
 
 fun ArchiveListingSummary.selectedEntries(selectedIds: Set<String>): List<ArchiveEntrySummary> {
