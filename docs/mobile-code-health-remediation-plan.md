@@ -216,7 +216,7 @@ well-defined set of files instead of clawing pieces out of a shared file.
 - No new tests are added for findings 1-3 in this plan; they belong to the
   future Rust-module plan.
 
-## Track 2: Password lifetime in the foreground-service handoff
+## Track 2: Password lifetime in the foreground-service handoff — done
 
 ### Problem
 
@@ -275,14 +275,65 @@ Have callers map `ArchiveJobStartException` to the existing failure states
 (`ArchiveExtractionUiState.Failed`, `ArchiveCreationUiState.Failed`) with a
 message telling the user to retry with the app in the foreground.
 
+### What landed
+
+The synchronous half landed as designed: `ArchiveJobForegroundService.submit`
+(`android/app/src/main/java/org/tzap/zmanager/mobile/ArchiveJobForegroundService.kt`)
+wraps `startService(...)` in `runCatching`, removes the `PendingRequest` entry
+on failure, and rethrows — verified by
+`submitRemovesPendingRequestWhenServiceFailsToStart` from the start.
+
+**A critical review of the checked-in commit found the other half was only
+half-wired.** `sweepStalePendingRequests()` existed and was correctly called
+from `submit()`, but it was `private` and had no second call site — the
+"existing `ON_STOP` lifecycle path that already scrubs password state in
+`handleAppBackground`" this section describes did not actually call it.
+`handleAppBackground()` only ever cleared each ViewModel's own password
+*input field* state (`clearTransientSecrets()`/`clearSessionSecrets()`),
+never the foreground service's separate `PendingRequest` map. Net effect: a
+request stranded by `startService()` succeeding but the service silently
+never reaching `onStartCommand` (exactly the scenario the sweep exists for)
+stayed reachable in that process-lifetime map until the *next* job
+submission happened to trigger `sweepStalePendingRequests()` again — not
+until backgrounding, as this section originally claimed and as the
+Definition of Done originally claimed was "verified by test." Neither the
+wiring nor a test for it existed.
+
+Fixed by widening `sweepStalePendingRequests()` to `internal` and calling it
+from `MainActivity.handleAppBackground()` alongside the existing password
+fan-out, and by adding
+`sweepStalePendingRequestsRemovesAnEntryWhoseServiceNeverStarted` in
+`ArchiveJobForegroundServiceTest.kt`, which submits a request with a
+`startService` stub that never calls `takeRequest` (the actual silent-failure
+scenario, distinct from the synchronous-throw case the existing test
+covered), advances Robolectric's `SystemClock` past the grace period with
+`ShadowSystemClock.advanceBy(...)`, and asserts the entry is gone.
+
+### Verification
+
+- `compileDebugKotlin` succeeds; full JVM suite **72/72 passing** (68 before
+  this fix, plus the new sweep-wiring test and, separately, three Track
+  7-adjacent tests added by the same review pass).
+- The new test genuinely distinguishes the two failure modes: it uses a
+  `startService` lambda that returns normally (matching "the service was
+  supposed to start but the platform/process never got there"), not one that
+  throws (that path was already covered).
+
 ### Tests
 
-- `submit` removes the map entry and throws when `startForegroundService`
-  fails; assert the map is empty afterward.
-- The sweep clears an entry whose service never started.
-- Backgrounding while a submit is stranded leaves no password-bearing request
-  reachable.
-- Existing `ArchiveJobForegroundServiceTest` cases still pass unchanged.
+- Done: `submit` removes the map entry and throws when `startForegroundService`
+  fails; asserted the map is empty afterward
+  (`submitRemovesPendingRequestWhenServiceFailsToStart`).
+- Done: the sweep clears an entry whose service never started
+  (`sweepStalePendingRequestsRemovesAnEntryWhoseServiceNeverStarted`).
+- Done: backgrounding now genuinely sweeps stale entries too, not just the
+  next submit — verified by reading `handleAppBackground`'s call to
+  `sweepStalePendingRequests()` directly; not separately unit tested, since
+  `handleAppBackground` itself is a `ZManagerApp`-local composable function
+  with no Compose-free test harness (see Track 7's note on the same
+  constraint for the password fan-out, which *is* now unit tested via the
+  extracted `clearAllTransientSecrets`).
+- Existing `ArchiveJobForegroundServiceTest` cases pass unchanged.
 
 ## Track 3: Archive listing completeness — done
 
@@ -681,6 +732,43 @@ the reason above; verified instead by compiling both `compileDebugKotlin` and
 only pacer ever constructed outside a `BuildConfig.DEBUG` guard — an
 auditable, if not compiler-enforced, invariant.
 
+**A real bug, found by a critical review of the checked-in commit and fixed
+afterward, on both platforms: `debugJobPacer` wasn't reset on every way out
+of a review.** The invariant this track's own code comment claims —
+`debugJobPacer` is "Always `NoOpJobPacer` outside the `BuildConfig.DEBUG`-gated
+buttons" — only held on the *success* path (`startExtraction()` resets it).
+Canceling a debug-planned review instead of starting it left the
+`DelayingJobPacer` sitting in session state; the next, completely unrelated
+"Extract" tap on the same archive would silently inherit it, since
+`planExtraction`'s default `pacer` parameter reads straight from
+`session.debugJobPacer`. Concretely: tap "Run cancellable extraction" (sets a
+15s `DelayingJobPacer`), cancel the review instead of starting it, then tap a
+normal "Extract" on a different selection from the same archive — that
+"production" extraction would silently get a 15s pre-start delay. iOS had the
+same class of bug with narrower coverage still: no reset on import at all, so
+canceling a debug review *or backgrounding the app* while one was pending
+left the pacer stuck indefinitely, with no later import to incidentally clear
+it the way Android's `startImport`/`startMaestroFixtureImport` resets do.
+Confined to `BuildConfig.DEBUG`/`#if DEBUG` builds — unreachable in a real
+release build, since `DelayingJobPacer` can't be constructed outside those
+gates — so a dev/QA-experience bug, not a production data-safety issue, but
+it directly contradicted this section's own stated invariant and had zero
+test coverage guarding it.
+
+Fixed by resetting `debugJobPacer` to `NoOpJobPacer` in every place a review
+is abandoned without starting, not just the success path: Android's
+`ArchiveExtractionViewModel.clearExtractionState()` (called by the cancel
+button, and by re-planning); iOS's `ArchiveExtractionModel.clearExtractionState()`,
+`cancelExtraction()`'s non-running branch, and `handleSceneBackground()`'s
+`.review` branch (the three separate ways an iOS review can be abandoned
+without starting — they don't share one code path the way Android's do).
+Regression-tested with
+`clearExtractionStateResetsAStaleDebugPacer` on both platforms: set a
+`DelayingJobPacer`, call `clearExtractionState()` with no review ever having
+started, assert `debugJobPacer` is a `NoOpJobPacer` again (`assertSame` on
+Android, since it's a singleton `object`; an `is NoOpJobPacer` type check on
+iOS, since `JobPacer` conformers are value types there).
+
 ### Verification
 
 - Android: `compileDebugKotlin` and `compileReleaseKotlin` both succeed; full
@@ -732,8 +820,28 @@ auditable, if not compiler-enforced, invariant.
 - Done, both platforms: cancellation and timeout E2E scripts pass unchanged
   against the debug build — see "Verification" above for the actual runs,
   not just "should still work."
+- Done, both platforms, added after a critical review: `debugJobPacer` resets
+  to `NoOpJobPacer` on every way out of a review, not just the success path —
+  see "What landed" above for the bug this closes and
+  `clearExtractionStateResetsAStaleDebugPacer` on both platforms for the
+  regression test.
 
 ## Track 6: iOS file decomposition — done
+
+**A note on how to read this section**: Track 6 and Track 7 were implemented
+in the same working session and landed in a single squashed commit. The file
+layout described below as "what landed" — in particular `ArchiveImportModel.swift`
+as a standalone 1,374-line file — existed only transiently in the working
+tree while Track 6 was in progress; Track 7 deleted it in the same session,
+before anything was committed. `git log`/`git show` for this repository will
+never show that file, at any commit, because it was never committed on its
+own. Read this section as a narrative of what Track 6 did and verified at the
+time, not as a description of an inspectable intermediate git state. The
+`ContentView.swift` line count and XCTest count below are similarly a
+snapshot of that in-progress checkpoint — both were superseded by Track 7's
+work; see Track 7's "What landed (iOS)" for the corrected, final numbers
+(the "61" test count in particular was later found to be an overcount from a
+cruder grep, corrected to 57 there).
 
 ### Problem
 
@@ -1081,8 +1189,8 @@ the first place) and stays a separable follow-up, not a Track 7 gap.
 
 ### Tests
 
-- Android: see verification list above — done, 58/58 JVM tests, on-device
-  smoke test.
+- Android: see verification list above — done, 58/58 JVM tests at the time,
+  on-device smoke test.
 - iOS: see verification list above — done, 57/57 XCTest tests (5 updated,
   none removed), on-device smoke test.
 - The unused `lifecycle-viewmodel-compose` dependency finding is resolved:
@@ -1091,8 +1199,29 @@ the first place) and stays a separable follow-up, not a Track 7 gap.
   listing panel does not update when unrelated state (for example LocalSend
   discovery) changes. That belongs with Track 8's memoization work, which this
   track's state-holder split is a prerequisite for, not a substitute for.
-- Add a test that backgrounding clears every password field across all view
-  models, mirroring the current `handleAppBackground` guarantees.
+- **Password fan-out test — done, added after a critical review found a real
+  asymmetry.** iOS's `ArchiveSceneBackgroundCoordinator` was deliberately
+  extracted as a free function specifically so this was independently
+  testable (`testSceneBackgroundClearsTransientPasswords`); Android's
+  `handleAppBackground` was originally left as a local function inside the
+  `ZManagerApp` composable, with no equivalent test and no way to add one
+  without a Compose UI test harness. Fixed by extracting the same five-call
+  password fan-out out of `handleAppBackground` into a standalone
+  `clearAllTransientSecrets(session, listing, extraction, creation,
+  repackaging)` function in `ArchiveSessionViewModel.kt` (LocalSend's own
+  teardown stays inline in `handleAppBackground`, since LocalSend
+  deliberately keeps local composable state rather than a ViewModel — see
+  "What landed" above), and adding
+  `clearAllTransientSecretsClearsEveryPasswordFieldAcrossViewModels` in
+  `ArchiveExtractionViewModelTest.kt`, mirroring iOS's test.
+- **`retryRecovery` regression test — done, added after the same review.**
+  Bug 1 above (the dropped `onExtractionRecoveryDiscarded` callback) had no
+  test guarding it — the compiler couldn't catch it originally, and nothing
+  would have caught a reintroduction either. Fixed by adding
+  `retryRecoveryThreadsTheDiscardCallbackThrough` in
+  `ArchiveExtractionViewModelTest.kt`, which saves a real recovery record,
+  calls `retryRecovery`, and asserts both the discard callback and the
+  plan-extraction callback actually fire with the right arguments.
 
 ## Track 8: Listing and job-polling performance — done, with two items descoped
 
@@ -1203,6 +1332,27 @@ to the (correct) one inside the loop — a duplicate that `ArchiveCreation.swift
 equivalent function never had. Comparing the two side by side during the
 extraction is what surfaced it; the shared driver has only the one, correct,
 in-loop check.
+
+**A second real bug, found later by a critical review of the checked-in
+commit, not by any test at the time**: "starts at 100ms" above described the
+*intent*, but both `JobPollDriver.kt` and `JobPollDriver.swift` actually
+doubled the backoff variable *before* using it on the very first non-event
+poll (`backoffMillis = (backoffMillis * 2).coerceAtMost(...)` ran, then that
+already-doubled value fed `delay(backoffMillis)` — the initial 100ms value
+was assigned but never itself passed to `delay`/`Task.sleep`). The real
+observed sequence was 200ms→400ms→800ms→1s, never 100ms — identically wrong
+on both platforms, so at least internally consistent, but not what this
+section or the constant's own name claimed. No correctness impact (nothing
+got stuck, no event was ever missed), just a shifted curve. Fixed by
+splitting "the delay to use this round" from "the backoff to grow for next
+round": use the current value for `delay`/`Task.sleep` first, then double it
+afterward only if this poll was silent. Regression-tested with a real
+elapsed-time assertion — `JobPollDriverTest.backoffStartsAtTheInitialValueThenDoubles`
+(Android) and `testJobPollDriverBackoffStartsAtTheInitialValueThenDoubles`
+(iOS) — driving a fake `poll` that goes terminal on the third call and
+asserting the gap before the second call lands in 70–170ms and the gap
+before the third lands in 170–320ms, not just that the loop eventually
+terminates.
 
 **Bridge call renamed to its generic form.** `ArchiveBridgeClient.pollExtractionJob`/`cancelExtractionJob`
 on iOS were used identically by both the extraction and creation coordinators

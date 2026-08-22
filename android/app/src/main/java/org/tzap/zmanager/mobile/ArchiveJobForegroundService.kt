@@ -116,7 +116,13 @@ object ArchiveJobForegroundService {
         return token
     }
 
-    private fun sweepStalePendingRequests() {
+    /**
+     * Called both from [submit] and from the app's background lifecycle path
+     * ([MainActivity.handleAppBackground]), so a password-bearing request
+     * stranded by a silently-failed service start doesn't outlive the app
+     * being backgrounded, not just the next job submission.
+     */
+    internal fun sweepStalePendingRequests() {
         val cutoff = SystemClock.elapsedRealtime() - PENDING_REQUEST_GRACE_MILLIS
         requests.entries.removeIf { it.value.submittedAtMillis < cutoff }
     }

@@ -113,6 +113,7 @@ final class ArchiveExtractionModel: ObservableObject {
         guard case .running(_, let jobId, _) = extractionState else {
             if case .review(let review) = extractionState { extractionCoordinator.discard(review: review) }
             extractionState = .idle
+            session.debugJobPacer = NoOpJobPacer()
             return
         }
         cancellationRequestedExtractionJobIDs.insert(jobId)
@@ -124,6 +125,15 @@ final class ArchiveExtractionModel: ObservableObject {
         if case .review(let review) = extractionState { extractionCoordinator.discard(review: review) }
         extractionState = .idle
         extractionPasswordInput = ""
+        // A debug-only pacer set ahead of a planned review (see
+        // ContentView.startDebugCancellableExtraction) must not survive
+        // abandoning that review without starting it — otherwise it silently
+        // leaks into the next, unrelated extraction on this archive.
+        // startExtraction() already resets this on the success path; this,
+        // cancelExtraction(), and handleSceneBackground() cover every other
+        // way out of a review. See Track 5 in
+        // docs/mobile-code-health-remediation-plan.md.
+        session.debugJobPacer = NoOpJobPacer()
     }
 
     /// Called from the scene-background coordinator in `ContentView`.
@@ -134,6 +144,7 @@ final class ArchiveExtractionModel: ObservableObject {
         case .review(let review):
             extractionCoordinator.discard(review: review)
             extractionState = .idle
+            session.debugJobPacer = NoOpJobPacer()
         default:
             break
         }

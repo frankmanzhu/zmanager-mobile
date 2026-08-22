@@ -52,6 +52,14 @@ class ArchiveExtractionViewModel(
         (extractionState as? ArchiveExtractionUiState.Review)?.review?.let(extractionCoordinator::discard)
         extractionState = ArchiveExtractionUiState.Idle
         extractionPasswordInput = ""
+        // A debug-only pacer set ahead of a planned review (see
+        // startDebugCancellableExtraction/startDebugTimedOutExtraction in
+        // MainActivity.kt) must not survive abandoning that review without
+        // starting it — otherwise it silently leaks into the next, unrelated
+        // extraction on this archive. startExtraction() already resets this
+        // on the success path; this covers every other way out of a review.
+        // See Track 5 in docs/mobile-code-health-remediation-plan.md.
+        session.debugJobPacer = NoOpJobPacer
     }
 
     fun planExtraction(

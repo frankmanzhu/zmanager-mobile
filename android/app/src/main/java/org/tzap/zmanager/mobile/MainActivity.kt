@@ -215,14 +215,14 @@ private fun ZManagerApp(
     }
 
     fun handleAppBackground() {
-        // Fans out to each ViewModel's own clearTransientSecrets() rather
-        // than each one observing lifecycle independently, so the password
-        // scrubbing stays auditable in this one place.
-        session.clearSessionSecrets()
-        listing.clearTransientSecrets()
-        extraction.clearTransientSecrets()
-        creation.clearTransientSecrets()
-        repackaging.clearTransientSecrets()
+        clearAllTransientSecrets(session, listing, extraction, creation, repackaging)
+        // A password-bearing request stranded by a startForegroundService
+        // failure that submit() never observed (e.g. the process was killed
+        // between the call and onStartCommand) would otherwise only be
+        // cleared by the *next* job submission. Sweep it here too so
+        // backgrounding is itself enough. See Track 2 in
+        // docs/mobile-code-health-remediation-plan.md.
+        ArchiveJobForegroundService.sweepStalePendingRequests()
         localSendPinInput = ""
         pendingLocalSendDevice = null
 

@@ -24,17 +24,23 @@ enum JobPollDriver {
         while true {
             let update = try poll(cursor)
             cursor = update.nextCursor
-            if let event = update.events.last {
+            let event = update.events.last
+            if let event {
                 onEvent(event)
                 backoffNanoseconds = backoffInitialNanoseconds
-            } else {
-                backoffNanoseconds = min(backoffNanoseconds * 2, backoffMaxNanoseconds)
             }
             await pacer.beforePoll(isTerminal: update.isTerminal)
             if update.isTerminal {
                 return onTerminal(update)
             }
+            // Use the current backoff for this wait, then grow it for the
+            // next one only if this poll was silent — growing before the
+            // first use would mean the "initial" backoff is never actually
+            // observed.
             try await Task.sleep(nanoseconds: backoffNanoseconds)
+            if event == nil {
+                backoffNanoseconds = min(backoffNanoseconds * 2, backoffMaxNanoseconds)
+            }
         }
     }
 }

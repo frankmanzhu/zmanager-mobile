@@ -168,6 +168,63 @@ final class ZManagerMobileTests: XCTestCase {
         XCTAssertLessThan(terminalElapsed, 40, "expected a terminal poll not to delay, elapsed=\(terminalElapsed)ms")
     }
 
+    // Regression test for a real bug found during a critical review of
+    // Track 8 (docs/mobile-code-health-remediation-plan.md): the backoff
+    // variable was doubled before its first use, so the first non-terminal
+    // poll always waited ~200ms instead of the documented/named 100ms
+    // initial value. Mirrors Android's JobPollDriverTest.
+    func testJobPollDriverBackoffStartsAtTheInitialValueThenDoubles() async throws {
+        var pollCount = 0
+        var pollTimestampsMillis: [Double] = []
+        let start = DispatchTime.now()
+
+        _ = try await JobPollDriver.pollUntilTerminal(
+            poll: { cursor in
+                pollTimestampsMillis.append(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000)
+                pollCount += 1
+                return PollJobEventsResult(
+                    jobId: "job",
+                    kind: .zipExtract,
+                    status: pollCount >= 3 ? .completed : .running,
+                    events: [],
+                    nextCursor: cursor + 1,
+                    minRetainedSequence: 0,
+                    isTerminal: pollCount >= 3,
+                    terminalSummary: nil
+                )
+            },
+            onEvent: { _ in },
+            onTerminal: { $0 }
+        )
+
+        XCTAssertEqual(pollCount, 3)
+        let firstGapMillis = pollTimestampsMillis[1] - pollTimestampsMillis[0]
+        let secondGapMillis = pollTimestampsMillis[2] - pollTimestampsMillis[1]
+        XCTAssertTrue(
+            (70...170).contains(firstGapMillis),
+            "expected the gap before the 2nd poll to be close to the 100ms initial backoff, was \(firstGapMillis)ms"
+        )
+        XCTAssertTrue(
+            (170...320).contains(secondGapMillis),
+            "expected the gap before the 3rd poll to be close to the 200ms second backoff, was \(secondGapMillis)ms"
+        )
+    }
+
+    // Regression test for a real bug found during a critical review of
+    // Track 5 (docs/mobile-code-health-remediation-plan.md): a debug-only
+    // pacer set ahead of a planned review survived abandoning that review
+    // without starting it, leaking into the next, unrelated extraction.
+    @MainActor
+    func testClearExtractionStateResetsAStaleDebugPacer() {
+        let session = ArchiveSessionModel()
+        let extraction = ArchiveExtractionModel(session: session)
+        session.debugJobPacer = DelayingJobPacer(delayNanoseconds: 15_000_000_000)
+
+        extraction.clearExtractionState()
+
+        XCTAssertTrue(session.debugJobPacer is NoOpJobPacer)
+    }
+
     func testLocalSendTrustStorePersistsExplicitFingerprintOnly() {
         let suiteName = "ZManagerMobileTests.localsend-trust"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -979,7 +1036,7 @@ final class ZManagerMobileTests: XCTestCase {
     @MainActor
     func testSceneBackgroundDiscardsStagedLocalSendFiles() throws {
         let source = FileManager.default.temporaryDirectory
-            .appendingPathComponent("localsend-background-(UUID().uuidString).txt")
+            .appendingPathComponent("localsend-background-\(UUID().uuidString).txt")
         try Data("temporary transfer".utf8).write(to: source)
         defer { try? FileManager.default.removeItem(at: source) }
 

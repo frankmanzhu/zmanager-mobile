@@ -400,3 +400,29 @@ class ArchiveSessionViewModel(application: Application) : AndroidViewModel(appli
         destinationPreferenceVersion += 1
     }
 }
+
+/**
+ * Fans out to each ViewModel's own clearTransientSecrets()/clearSessionSecrets()
+ * rather than each one observing lifecycle independently, so the password
+ * scrubbing stays auditable in one place. Extracted as a free function
+ * (called from `MainActivity.handleAppBackground`, alongside that
+ * composable's own LocalSend-specific teardown, which stays inline since
+ * LocalSend deliberately keeps its state as local composable state rather
+ * than a ViewModel — see Track 7) so the password-clearing invariant itself
+ * is independently unit-testable without a Compose host, mirroring iOS's
+ * `ArchiveSceneBackgroundCoordinator`. See Track 7 in
+ * docs/mobile-code-health-remediation-plan.md.
+ */
+fun clearAllTransientSecrets(
+    session: ArchiveSessionViewModel,
+    listing: ArchiveListingViewModel,
+    extraction: ArchiveExtractionViewModel,
+    creation: ArchiveCreationViewModel,
+    repackaging: ArchiveRepackagingViewModel
+) {
+    session.clearSessionSecrets()
+    listing.clearTransientSecrets()
+    extraction.clearTransientSecrets()
+    creation.clearTransientSecrets()
+    repackaging.clearTransientSecrets()
+}

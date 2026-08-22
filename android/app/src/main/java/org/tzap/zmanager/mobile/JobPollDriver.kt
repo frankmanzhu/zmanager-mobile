@@ -35,13 +35,17 @@ suspend fun <T> pollJobUntilTerminal(
         if (event != null) {
             onEvent(event)
             backoffMillis = JOB_POLL_BACKOFF_INITIAL_MILLIS
-        } else {
-            backoffMillis = (backoffMillis * 2).coerceAtMost(JOB_POLL_BACKOFF_MAX_MILLIS)
         }
         pacer.beforePoll(update.isTerminal)
         if (update.isTerminal) {
             return onTerminal(update)
         }
+        // Use the current backoff for this wait, then grow it for the next
+        // one only if this poll was silent — growing before the first use
+        // would mean the "initial" backoff is never actually observed.
         delay(backoffMillis)
+        if (event == null) {
+            backoffMillis = (backoffMillis * 2).coerceAtMost(JOB_POLL_BACKOFF_MAX_MILLIS)
+        }
     }
 }

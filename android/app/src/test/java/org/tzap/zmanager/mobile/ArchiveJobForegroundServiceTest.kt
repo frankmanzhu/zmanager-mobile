@@ -48,6 +48,25 @@ class ArchiveJobForegroundServiceTest {
     }
 
     @Test
+    fun sweepStalePendingRequestsRemovesAnEntryWhoseServiceNeverStarted() {
+        val context = RuntimeEnvironment.getApplication()
+        // startService returns normally without ever calling takeRequest,
+        // simulating onStartCommand silently never running (the process was
+        // killed between the call and the callback, or the platform dropped
+        // it) rather than the synchronous-throw case submitRemovesPendingRequestWhenServiceFailsToStart
+        // already covers.
+        val token = ArchiveJobForegroundService.submit(context, sampleExtractRequest()) { _, _ -> }
+
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofSeconds(31))
+        ArchiveJobForegroundService.sweepStalePendingRequests()
+
+        assertNull(
+            "a request whose service never started must not remain retrievable once stale",
+            ArchiveJobForegroundService.takeRequest(token)
+        )
+    }
+
+    @Test
     fun submitReturnsRetrievableTokenWhenServiceStarts() {
         val context = RuntimeEnvironment.getApplication()
         val request = sampleExtractRequest()
